@@ -7,6 +7,7 @@ from gettext import find
 from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple
 from math import atan2, cos, sin, pi
 
+from multipledispatch import dispatch
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
@@ -14,15 +15,13 @@ from mutagen.id3 import ID3, ID3NoHeaderError
 
 from PyQt6 import QtMultimedia
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from multipledispatch import dispatch
-
 from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
                          QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon)
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
-from src.core.log_system import print_d
+from src.core.log_system import print_d, print_e
 from src.emus import PlayerState
 
 if TYPE_CHECKING:
@@ -30,11 +29,17 @@ if TYPE_CHECKING:
 
 
 class MetaListItem(QWidget):
-    def __init__(self, key: str, value: List[str], *args, **kwargs):
+    def __init__(self, key: str, values: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
+        tag_str_value: str = ""
+        for tag_value in values:
+            if isinstance(tag_value, list):
+                tag_str_value += ', '.join(tag_value)
+            else:
+                tag_str_value += str(tag_value)
         self.label = QLabel(self)
         self.label.setText(f'<span style=" font-size:8pt; font-weight: bold; color:#36C942;">{key}:</span> '
-                           f'{"; ".join(value)}')
+                           f'{tag_str_value}')
         self.label.adjustSize()
         self.label.move(5, 0)
 
@@ -178,8 +183,12 @@ class AudioPlayer(QWidget):
         print_d(f"Open file: {path}")
 
         # region Meta info
-        self.mf.settings.system_settings.open_filename = path
-        audio = FLAC(path)
+        filename, file_extension = os.path.splitext(os.path.basename(path))
+        audio = mutagen.File(path)
+        if audio is None:
+            print_e(f'Open file error. {filename}')
+            return
+        print_d('Tags:', audio)
         # endregion
 
         for key, value in audio.items():
@@ -192,7 +201,6 @@ class AudioPlayer(QWidget):
         url = QUrl.fromLocalFile(path)
         self.player.setSource(url)
 
-        filename = os.path.splitext(os.path.basename(path))[0]
         track_name = audio.get('title', None)
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
@@ -203,6 +211,8 @@ class AudioPlayer(QWidget):
         self.label_duration_right.adjustSize()
 
         self.player_state = PlayerState.WAIT
+        self.mf.settings.system_settings.open_filename = path
+        self.mf.save_config_app()
 
     @pyqtSlot()
     def play_music(self) -> None:

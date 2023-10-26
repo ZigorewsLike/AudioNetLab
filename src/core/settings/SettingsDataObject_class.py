@@ -19,20 +19,25 @@ class SystemSettings:
     form_position: Point
     last_file: str
     last_folder: str
-    open_dir: str
     open_filename: str
     console_height: int
     version: str
 
 
+@dataclass()
+class PlayerSettings:
+    volume: int
+
+
 class SettingsDataObject:
     def __init__(self):
         self.system_settings = SystemSettings(form_width=1600, form_height=900, form_position=Point(-1.0, -1.0),
-                                              last_file="", last_folder="", open_dir="", open_filename="",
+                                              last_file="", last_folder="", open_filename="",
                                               console_height=206, version=f"{VERSION}")
+        self.player_settings = PlayerSettings(volume=50)
 
     def __repr__(self) -> str:
-        return f"SettingsDataObject({self.system_settings})"
+        return f"SettingsDataObject({self.system_settings}, {self.player_settings})"
 
     @staticmethod
     def data_to_str(data: Any) -> str:
@@ -61,7 +66,7 @@ class SettingsDataObject:
 
     def save_to_ini(self, save_path: str) -> None:
         conf = configparser.ConfigParser()
-        for class_field in [self.system_settings]:
+        for class_field in [self.system_settings, self.player_settings]:
             conf.add_section(class_field.__class__.__name__)
             for data_field in fields(class_field):
                 conf.set(class_field.__class__.__name__, data_field.name,
@@ -74,7 +79,7 @@ class SettingsDataObject:
             config = configparser.ConfigParser()
             config.read(file, encoding='UTF-8')
             field_dict: Dict[str, Tuple[object, type]] = {}
-            for class_field in [self.system_settings]:
+            for class_field in [self.system_settings, self.player_settings]:
                 for data_field in fields(class_field):
                     field_dict[data_field.name] = (class_field, data_field.type)
             for each_section in config.sections():

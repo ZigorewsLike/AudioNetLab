@@ -42,6 +42,11 @@ class MainForm(QMainWindow):
 
         self.audio_player = AudioPlayer(self)
 
+        # region apply settings
+        self.audio_player.volume_slider.setValue(self.settings.player_settings.volume)
+        self.audio_player.audio_output.setVolume(self.settings.player_settings.volume / 100)
+        # endregion
+
     def init_ui(self):
         if self.settings.system_settings.form_position == Point(-1, -1):
             self.settings.system_settings.form_position.x = self.screen_width / 2 - self.settings.system_settings.form_width / 2
@@ -59,8 +64,12 @@ class MainForm(QMainWindow):
                          int(self.settings.system_settings.form_width), int(self.settings.system_settings.form_height))
         self.setWindowTitle(f'{APP_TITLE} v{VERSION}')
         self.setMouseTracking(True)
-        self.setMinimumSize(850, 720)
+        self.setMinimumSize(850, 300)
         self.setWindowIcon(QIcon('Icon.ico'))
+
+    def showEvent(self, event: QShowEvent) -> None:
+        if self.settings.system_settings.open_filename:
+            self.audio_player.open_file(self.settings.system_settings.open_filename)
 
     def moveEvent(self, event: QMoveEvent) -> None:
         self.settings.system_settings.form_position.x = event.pos().x()
@@ -86,6 +95,7 @@ class MainForm(QMainWindow):
         pass
 
     def save_config_app(self) -> None:
+        self.settings.player_settings.volume = self.audio_player.volume_slider.value()
         self.settings.save_to_ini(CONFIG_FILENAME)
 
     def closeEvent(self, event):
