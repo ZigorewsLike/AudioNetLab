@@ -15,12 +15,17 @@ from mutagen.id3 import ID3, ID3NoHeaderError
 
 from PyQt6 import QtMultimedia
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize
+from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
                          QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon)
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
+# AI
+import torch
+import torchaudio
+
+from src.core.render.graphics_system import GraphPanelAudio
 from src.core.log_system import print_d, print_e
 from src.emus import PlayerState
 
@@ -108,6 +113,8 @@ class AudioPlayer(QWidget):
 
         self.label_duration_right = QLabel("0:00:00", self)
         self.label_duration_right.adjustSize()
+
+        self.audio_graph = GraphPanelAudio(self)
         # endregion
 
         self.player = QMediaPlayer()
@@ -115,6 +122,7 @@ class AudioPlayer(QWidget):
         self.player.setAudioOutput(self.audio_output)
         self.audio_output.setVolume(50)
         self.player.positionChanged.connect(self.track_position_changed)
+        self.player.playbackStateChanged.connect(self.player_state_changed)
 
         self.change_play_icon()
 
@@ -132,6 +140,9 @@ class AudioPlayer(QWidget):
         self.label_duration_right.move(self.width() - 10 - self.label_duration_right.width(),
                                        self.meta_list.y() + self.meta_list.height() + 5)
         self.label_duration_left.move(10, self.meta_list.y() + self.meta_list.height() + 5)
+
+        self.audio_graph.resize(self.width() - 20, 300)
+        self.audio_graph.move(10, self.position_slider.y() + self.position_slider.height())
 
         self.update()
 
@@ -170,11 +181,31 @@ class AudioPlayer(QWidget):
         elif self.player_state is PlayerState.PLAY:
             self.pause_music()
 
+    @pyqtSlot('qint64')
     def track_position_changed(self, position: int) -> None:
         self.position_slider.setValue(position)
         position_time = timedelta(milliseconds=position)
         self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_left.adjustSize()
+
+        self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
+        # self.audio_graph.change_scale_graph()
+
+    def player_state_changed(self, state: QMediaPlayer.PlaybackState):
+        print_d(state)
+        if state is QMediaPlayer.PlaybackState.StoppedState:
+            self.player.stop()
+            self.position_slider.setValue(0)
+            self.player_state = PlayerState.WAIT
+            self.change_play_icon()
+
+    def open_file_from_ai(self, path) -> None:
+        waveform, sample_rate = torchaudio.load(path)
+        waveform: torch.Tensor
+        waveform_np = waveform.numpy()
+        print_d(waveform_np.shape, waveform_np[0], sample_rate)
+        self.audio_graph.set_data((waveform_np[0] + 1.0) / 2.0, calc_line=False)
+        self.audio_graph.set_shift(0, 1)
 
     # region Player methods
     def open_file(self, path: str) -> None:
@@ -210,9 +241,13 @@ class AudioPlayer(QWidget):
         self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_right.adjustSize()
 
+        self.open_file_from_ai(path)
+
         self.player_state = PlayerState.WAIT
         self.mf.settings.system_settings.open_filename = path
         self.mf.save_config_app()
+        if self.mf.settings.player_settings.auto_play:
+            self.play_music()
 
     @pyqtSlot()
     def play_music(self) -> None:
@@ -244,6 +279,3 @@ class AudioPlayer(QWidget):
         self.audio_output.setVolume(value / 100)
 
     # endregion
-
-
-

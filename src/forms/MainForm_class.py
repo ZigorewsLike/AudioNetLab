@@ -89,7 +89,7 @@ class MainForm(QMainWindow):
         self.settings.system_settings.form_width = self.width()
         self.settings.system_settings.form_height = self.height()
 
-        self.audio_player.resize(self.width(), 300)
+        self.audio_player.resize(self.width(), 700)
 
     def load_ann_models(self) -> None:
         pass
