@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDia
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME)
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
+from src.core.audio import AudioPlayer
 
 
 class MainForm(QMainWindow):
@@ -37,8 +38,9 @@ class MainForm(QMainWindow):
 
         self.installEventFilter(self)
         self.init_ui()
-
         self.resized.connect(self.recalculate_size)
+
+        self.audio_player = AudioPlayer(self)
 
     def init_ui(self):
         if self.settings.system_settings.form_position == Point(-1, -1):
@@ -77,6 +79,8 @@ class MainForm(QMainWindow):
         """
         self.settings.system_settings.form_width = self.width()
         self.settings.system_settings.form_height = self.height()
+
+        self.audio_player.resize(self.width(), 300)
 
     def load_ann_models(self) -> None:
         pass

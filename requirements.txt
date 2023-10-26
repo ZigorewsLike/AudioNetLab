@@ -1,0 +1,3 @@
+PyQt6~=6.5.3
+multipledispatch~=1.0.0
+mutagen~=1.47.0
