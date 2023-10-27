@@ -59,6 +59,7 @@ class AudioPlayer(QWidget):
         self.resize(400, 400)
         self.image_size: int = 120
         self.player_state: PlayerState = PlayerState.NONE
+        self.graph_visible: bool = True
 
         # region UI
         self.title_tack = QLabel("Tittle", self)
@@ -116,6 +117,9 @@ class AudioPlayer(QWidget):
         self.label_duration_right.adjustSize()
 
         self.audio_graph = GraphPanelAudio(self)
+
+        self.graph_visible_button = QPushButton("Скрыть", self)
+        self.graph_visible_button.clicked.connect(self.switch_visible_graph)
         # endregion
 
         self.player = QMediaPlayer()
@@ -142,8 +146,10 @@ class AudioPlayer(QWidget):
                                        self.meta_list.y() + self.meta_list.height() + 5)
         self.label_duration_left.move(10, self.meta_list.y() + self.meta_list.height() + 5)
 
-        self.audio_graph.resize(self.width() - 20, 300)
+        self.audio_graph.resize(self.width() - 20, 150)
         self.audio_graph.move(10, self.position_slider.y() + self.position_slider.height() + 10)
+
+        self.graph_visible_button.move(10, self.position_slider.y() + self.position_slider.height() + 10)
 
         self.update()
 
@@ -181,6 +187,18 @@ class AudioPlayer(QWidget):
             self.play_music()
         elif self.player_state is PlayerState.PLAY:
             self.pause_music()
+
+    @pyqtSlot()
+    def switch_visible_graph(self) -> None:
+        self.graph_visible = not self.graph_visible
+        if not self.graph_visible:
+            self.resize(self.width(), self.height() - self.audio_graph.height() + 10)
+            self.audio_graph.setVisible(False)
+        else:
+            self.resize(self.width(), self.height() + self.audio_graph.height() - 10)
+            self.audio_graph.setVisible(True)
+        self.mf.settings.player_settings.graph_visible = self.graph_visible
+        self.mf.resized.emit()
 
     @pyqtSlot('qint64')
     def track_position_changed(self, position: int) -> None:

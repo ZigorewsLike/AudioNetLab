@@ -16,6 +16,7 @@ from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME)
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
+from src.core.qt_widgets import BaseTabWidget
 
 
 class MainForm(QMainWindow):
@@ -40,6 +41,7 @@ class MainForm(QMainWindow):
         self.init_ui()
         self.resized.connect(self.recalculate_size)
 
+        self.tab_widget = BaseTabWidget(self)
         self.audio_player = AudioPlayer(self)
 
         # region apply settings
@@ -90,7 +92,9 @@ class MainForm(QMainWindow):
         self.settings.system_settings.form_width = self.width()
         self.settings.system_settings.form_height = self.height()
 
-        self.audio_player.resize(self.width(), 700)
+        self.audio_player.resize(self.width(), self.audio_player.height())
+        self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
+        self.tab_widget.move(0, self.audio_player.height())
 
     def load_ann_models(self) -> None:
         pass

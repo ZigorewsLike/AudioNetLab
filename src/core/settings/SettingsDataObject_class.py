@@ -28,6 +28,7 @@ class SystemSettings:
 class PlayerSettings:
     volume: int
     auto_play: bool
+    graph_visible: bool
 
 
 class SettingsDataObject:
@@ -35,7 +36,7 @@ class SettingsDataObject:
         self.system_settings = SystemSettings(form_width=1600, form_height=900, form_position=Point(-1.0, -1.0),
                                               last_file="", last_folder="", open_filename="",
                                               console_height=206, version=f"{VERSION}")
-        self.player_settings = PlayerSettings(volume=50, auto_play=False)
+        self.player_settings = PlayerSettings(volume=50, auto_play=False, graph_visible=True)
 
     def __repr__(self) -> str:
         return f"SettingsDataObject({self.system_settings}, {self.player_settings})"
