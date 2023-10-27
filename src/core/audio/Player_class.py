@@ -26,6 +26,7 @@ import torch
 import torchaudio
 
 from src.core.render.graphics_system import GraphPanelAudio
+from src.core.qt_widgets import SimpleSlider
 from src.core.log_system import print_d, print_e
 from src.emus import PlayerState
 
@@ -97,13 +98,13 @@ class AudioPlayer(QWidget):
         self.meta_list.move(self.image_size + 20, 40)
         self.meta_list.setContentsMargins(5, 5, 5, 5)
 
-        self.position_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.position_slider.setRange(0, 0)
+        self.position_slider = SimpleSlider(self)
+        self.position_slider.set_range(0, 0)
         self.position_slider.sliderMoved.connect(self.set_track_position)
 
-        self.volume_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
+        self.volume_slider = SimpleSlider(self)
+        self.volume_slider.set_range(0, 100)
+        self.volume_slider.set_value(50)
         self.volume_slider.sliderMoved.connect(self.set_track_volume)
         self.volume_slider.move(10, self.image_size + 20)
         self.volume_slider.setFixedWidth(self.image_size)
@@ -142,7 +143,7 @@ class AudioPlayer(QWidget):
         self.label_duration_left.move(10, self.meta_list.y() + self.meta_list.height() + 5)
 
         self.audio_graph.resize(self.width() - 20, 300)
-        self.audio_graph.move(10, self.position_slider.y() + self.position_slider.height())
+        self.audio_graph.move(10, self.position_slider.y() + self.position_slider.height() + 10)
 
         self.update()
 
@@ -183,7 +184,7 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot('qint64')
     def track_position_changed(self, position: int) -> None:
-        self.position_slider.setValue(position)
+        self.position_slider.set_value(position)
         position_time = timedelta(milliseconds=position)
         self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_left.adjustSize()
@@ -195,7 +196,7 @@ class AudioPlayer(QWidget):
         print_d(state)
         if state is QMediaPlayer.PlaybackState.StoppedState:
             self.player.stop()
-            self.position_slider.setValue(0)
+            self.position_slider.set_value(0)
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
@@ -236,7 +237,7 @@ class AudioPlayer(QWidget):
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
 
-        self.position_slider.setRange(0, self.player.duration())
+        self.position_slider.set_range(0, self.player.duration())
         position_time = timedelta(milliseconds=self.player.duration())
         self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_right.adjustSize()

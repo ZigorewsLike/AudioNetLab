@@ -43,8 +43,10 @@ class MainForm(QMainWindow):
         self.audio_player = AudioPlayer(self)
 
         # region apply settings
-        self.audio_player.volume_slider.setValue(self.settings.player_settings.volume)
+        self.audio_player.volume_slider.set_value(self.settings.player_settings.volume)
         self.audio_player.audio_output.setVolume(self.settings.player_settings.volume / 100)
+        if self.settings.system_settings.open_filename:
+            self.audio_player.open_file(self.settings.system_settings.open_filename)
         # endregion
 
     def init_ui(self):
@@ -68,8 +70,7 @@ class MainForm(QMainWindow):
         self.setWindowIcon(QIcon('Icon.ico'))
 
     def showEvent(self, event: QShowEvent) -> None:
-        if self.settings.system_settings.open_filename:
-            self.audio_player.open_file(self.settings.system_settings.open_filename)
+        pass
 
     def moveEvent(self, event: QMoveEvent) -> None:
         self.settings.system_settings.form_position.x = event.pos().x()
@@ -95,7 +96,7 @@ class MainForm(QMainWindow):
         pass
 
     def save_config_app(self) -> None:
-        self.settings.player_settings.volume = self.audio_player.volume_slider.value()
+        self.settings.player_settings.volume = self.audio_player.volume_slider.value
         self.settings.save_to_ini(CONFIG_FILENAME)
 
     def closeEvent(self, event):

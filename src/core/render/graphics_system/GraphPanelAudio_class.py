@@ -17,7 +17,7 @@ class GraphPanelAudio(GraphPanelBase):
         super().__init__(main_form, *args, **kwargs)
         self.setParent(main_form)
         self.cursor_position: float = 0.0
-        self.scale_factor: float = 1
+        # self.scale_factor: float = 1
         self.changeCursorPosition.connect(self.cursor_position_changed)
         self.setMouseTracking(True)
 

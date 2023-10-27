@@ -4,6 +4,7 @@ import numpy as np
 
 from PyQt6.QtCore import QLine, QPointF, Qt
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QMouseEvent, QShowEvent, QResizeEvent
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import QWidget
 
 from src.core.log_system import print_d
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from src.forms.MainForm_class import MainForm
 
 
-class GraphPanelBase(QWidget):
+class GraphPanelBase(QOpenGLWidget):
     def __init__(self, main_form, *args, **kwargs):
         super(GraphPanelBase, self).__init__(*args, **kwargs)
         self.mf: MainForm = main_form
@@ -23,6 +24,7 @@ class GraphPanelBase(QWidget):
         self.data_type: Optional[np.dtype] = None
         self.shift_left: float = 0
         self.shift_right: float = 1
+        self.scale_factor: float = 1.
         self.new_width: float = self.width()
         self.render_lines: List[QPointF] = []
 
@@ -49,7 +51,7 @@ class GraphPanelBase(QWidget):
         self.render_lines = [QPointF(0, self.height() / 2)]
         self.render_lines += [QPointF(((i / (self.lines[1].size - 1) - self.shift_left) * self.new_width),
                                       self.height() - self.lines[1][i] * self.height())
-                              for i in color_slice[::max(1, int(color_slice.size / self.width()/2))]]
+                              for i in color_slice[::max(1, int(color_slice.size / self.width()))]]
         self.render_lines += [QPointF(self.width(), self.height()/2)]
 
     def set_shift(self, shift_left: float, shift_right: float):
