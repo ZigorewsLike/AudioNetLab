@@ -97,7 +97,7 @@ class SimpleSlider(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self.is_clicked = False
         self.onMouseRelease.emit()
-        self.sliderMoved.emit(self.value)
+        # self.sliderMoved.emit(self.value)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         self.front_color = self.hover_color

@@ -35,6 +35,9 @@ class GraphPanelAudio(GraphPanelBase):
         pass
         # self.set_shift(event.pos().x() / self.width(), 1.0)
 
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        self.change_scale_graph()
+
     def wheelEvent(self, event: QWheelEvent) -> None:
         self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 50)
         self.change_scale_graph()

@@ -52,7 +52,7 @@ class GraphPanelBase(QOpenGLWidget):
         self.render_lines = [QPointF(0, self.height() / 2)]
         self.render_lines += [QPointF(((i / (self.lines[1].size - 1) - self.shift_left) * self.new_width),
                                       self.height() - self.lines[1][i] * self.height())
-                              for i in color_slice[::max(1, int(color_slice.size / self.width() / 3 / self.scale_factor))]]
+                              for i in color_slice[::max(1, int(color_slice.size / self.width() / 2 / self.scale_factor))]]
         self.render_lines += [QPointF(self.width(), self.height()/2)]
 
     def set_shift(self, shift_left: float, shift_right: float):

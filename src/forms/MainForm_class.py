@@ -12,11 +12,13 @@ from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEv
 from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDialog, QMessageBox, QVBoxLayout, QMenu,
                              QFrame, QSpinBox, QProgressBar, QWidget, QApplication)
 
-from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME)
+from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED)
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
 from src.core.qt_widgets import BaseTabWidget
+
+from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 
 
 class MainForm(QMainWindow):
@@ -43,6 +45,14 @@ class MainForm(QMainWindow):
 
         self.tab_widget = BaseTabWidget(self)
         self.audio_player = AudioPlayer(self)
+
+        # region AI MODULES
+        self.genre_widget = GenreClassifierModule(model_path=GENRE_MODEL_PATH, main_form=self)
+        if AI_ENABLED:
+            self.genre_widget.load_model()
+
+        self.tab_widget.add_tab(self.genre_widget, "Genre classification")
+        # endregion
 
         # region apply settings
         self.audio_player.volume_slider.set_value(self.settings.player_settings.volume)
