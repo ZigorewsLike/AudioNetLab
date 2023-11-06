@@ -16,7 +16,7 @@ from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME,
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
-from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget
+from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidget
 
 from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 
@@ -43,7 +43,8 @@ class MainForm(QMainWindow):
         self.init_ui()
         self.resized.connect(self.recalculate_size)
 
-        self.tab_widget = BaseTabWidget(self)
+        self.tab_widget = VerticalTabWidget(self)
+        self.tab_widget.tab_switched.connect(self.tab_switched)
         self.audio_player = AudioPlayer(self)
 
         self.preloader = PreLoaderWidget(self)
@@ -54,7 +55,8 @@ class MainForm(QMainWindow):
         if AI_ENABLED:
             self.genre_widget.load_model()
 
-        self.tab_widget.add_tab(self.genre_widget, "Genre classification")
+        self.tab_widget.add_tab(self.genre_widget, "Жанр")
+        self.tab_widget.add_tab(QPushButton("Debug"), "Empty")
         # endregion
 
         # region apply settings
@@ -111,6 +113,12 @@ class MainForm(QMainWindow):
         self.tab_widget.resize_tab_content()
 
         self.preloader.resize(self.width(), self.height())
+
+    @pyqtSlot(int)
+    def tab_switched(self, index: int) -> None:
+        self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
+        self.tab_widget.move(0, self.audio_player.height())
+        self.tab_widget.resize_tab_content()
 
     def load_ann_models(self) -> None:
         pass

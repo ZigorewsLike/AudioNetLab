@@ -7,7 +7,8 @@ import torch
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont
+from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont, \
+    QResizeEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton
 from sklearn.preprocessing import StandardScaler
 
@@ -30,6 +31,8 @@ class GenreClassifierModule(QWidget):
         self.model_path = model_path
 
         self.mf: Union[QWidget, MainForm] = main_form
+        self.graph_y: int = 60
+        self.graph_height: int = 60
 
         self.work_thread = QThread(self)
         self.worker = GenrePredictWorker()
@@ -38,16 +41,16 @@ class GenreClassifierModule(QWidget):
         self.worker.preloader_signal.connect(self.mf.preloader.set_help_text)
 
         self.predict_button = QPushButton("Predict", self)
-        self.predict_button.move(10, 0)
+        self.predict_button.move(10, 5)
         self.predict_button.clicked.connect(lambda: self.predict_current())
 
         self.status_label = QLabel("", self)
-        self.status_label.move(self.predict_button.width() + 20, 0)
+        self.status_label.move(self.predict_button.width() + 20, 5)
 
         self.best_of_label = QLabel("", self)
-        self.best_of_label.move(10, 100)
+        self.best_of_label.move(10, self.graph_y + self.graph_height + 10)
 
-        self.genre_gradient = QLinearGradient(0, 30, self.width(), 60)
+        self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
         self.genre_gradient.setColorAt(0.0, QColor("#2A2A2A"))
         self.genre_gradient.setColorAt(1.0, QColor("#2A2A2A"))
         self.global_results = []
@@ -89,9 +92,19 @@ class GenreClassifierModule(QWidget):
         self.work_thread.start()
         self.mf.preloader.setVisible(True)
 
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        if self.global_results:
+            self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
+
+            for step in range(len(self.global_results)):
+                self.genre_gradient.setColorAt(step / len(self.global_results),
+                                               QColor(self.genre_color[self.global_results[step]]))
+            self.update()
+
     @pyqtSlot(list)
     def predict_finished(self, out: List[int]) -> None:
-        self.genre_gradient = QLinearGradient(0, 30, self.width(), 60)
+        self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
         sample_len: int = int(self.mf.audio_player.waveform.shape[0] / self.mf.audio_player.sample_rate / 3)
         for step in range(sample_len):
             self.genre_gradient.setColorAt(step / sample_len, QColor(self.genre_color[out[step]]))
@@ -101,12 +114,14 @@ class GenreClassifierModule(QWidget):
 
         best_of_text: str = ""
         for inx, count in enumerate(counts):
-            best_of_text += f"{self.genre_dict[inx]} : {round(count / counts.sum() * 100, 2)}%\n"
+            best_of_text += (f"<span style=' font-size:8pt; font-weight: bold; color:#4477C9;'>{self.genre_dict[inx]}"
+                             f"</span> : {round(count / counts.sum() * 100, 2)}%<br>")
         self.best_of_label.setText(best_of_text)
         self.best_of_label.adjustSize()
 
         print_d(f"Final genre: {np.argmax(counts)}, name: {self.genre_dict[int(np.argmax(counts))]}")
-        self.status_label.setText(f"result: {self.genre_dict[int(np.argmax(counts))]}")
+        self.status_label.setText(f"<span style=' font-size:8pt; font-weight: bold; color:#4477C9;'>ИТОГ:</span> "
+                                  f"{self.genre_dict[int(np.argmax(counts))]}")
         self.status_label.adjustSize()
         self.update()
 
@@ -121,22 +136,27 @@ class GenreClassifierModule(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
         painter = QPainter(self)
-        painter.fillRect(10, 30, self.width() - 21, 60, QBrush(self.genre_gradient))
+        painter.fillRect(10, self.graph_y, self.width() - 21, self.graph_height, QBrush(self.genre_gradient))
+
         if self.drawing_text_pos is not None and len(self.global_results) > 0:
             painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
             painter.setFont(QFont("Arial", 14))
-            painter.drawLine(self.drawing_text_pos.x(), 30, self.drawing_text_pos.x(), 90)
+            painter.drawLine(self.drawing_text_pos.x(), self.graph_y, self.drawing_text_pos.x(),
+                             self.graph_y + self.graph_height)
 
-            painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
+            # painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
             index_factor: float = (self.drawing_text_pos.x() - 10) / (self.width() - 21)
             index: int = median(0, round(len(self.global_results) * index_factor), len(self.global_results) - 1)
-            painter.drawText(self.drawing_text_pos, self.genre_dict[self.global_results[index]])
-            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+            genre_text: str = self.genre_dict[self.global_results[index]]
+            genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
+            painter.drawText(int(self.drawing_text_pos.x() - genre_text_width/2), self.graph_y - 10, genre_text)
+            # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         super().mouseMoveEvent(event)
-        self.drawing_text_pos = event.pos()
-        self.update()
+        if self.graph_y <= event.pos().y() <= self.graph_y + self.graph_height:
+            self.drawing_text_pos = event.pos()
+            self.update()
 
     def leaveEvent(self, a0) -> None:
         self.drawing_text_pos = None
