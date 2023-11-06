@@ -16,7 +16,7 @@ from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME,
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
-from src.core.qt_widgets import BaseTabWidget
+from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget
 
 from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 
@@ -45,6 +45,9 @@ class MainForm(QMainWindow):
 
         self.tab_widget = BaseTabWidget(self)
         self.audio_player = AudioPlayer(self)
+
+        self.preloader = PreLoaderWidget(self)
+        self.preloader.setVisible(False)
 
         # region AI MODULES
         self.genre_widget = GenreClassifierModule(model_path=GENRE_MODEL_PATH, main_form=self)
@@ -106,6 +109,8 @@ class MainForm(QMainWindow):
         self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
         self.tab_widget.move(0, self.audio_player.height())
         self.tab_widget.resize_tab_content()
+
+        self.preloader.resize(self.width(), self.height())
 
     def load_ann_models(self) -> None:
         pass

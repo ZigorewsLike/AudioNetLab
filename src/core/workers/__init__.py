@@ -1,0 +1,1 @@
+from .GenrePredictWorker_class import GenrePredictWorker
