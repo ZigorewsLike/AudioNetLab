@@ -14,5 +14,5 @@ APP_ROAMING_DIR = os.path.join(os.getenv('APPDATA'), APP_NAME)
 CONFIG_FILENAME = "config_app.ini"
 
 # region AI MODULES
-GENRE_MODEL_PATH = "models/best_cls_genre_0.001.h5"
+GENRE_MODEL_PATH = "models/best_cls_genre_3s_0.001.h5"
 # endregion

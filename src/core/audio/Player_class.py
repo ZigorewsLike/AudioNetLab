@@ -7,11 +7,10 @@ from gettext import find
 from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple
 from math import atan2, cos, sin, pi
 
+import numpy as np
 from multipledispatch import dispatch
 import mutagen
-from mutagen.easyid3 import EasyID3
-from mutagen.flac import FLAC
-from mutagen.id3 import ID3, ID3NoHeaderError
+import librosa
 
 from PyQt6 import QtMultimedia
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -60,6 +59,9 @@ class AudioPlayer(QWidget):
         self.image_size: int = 120
         self.player_state: PlayerState = PlayerState.NONE
         self.graph_visible: bool = True
+
+        self.waveform: Optional[np.ndarray] = None
+        self.sample_rate: Optional[int] = None
 
         # region UI
         self.title_tack = QLabel("Tittle", self)
@@ -218,13 +220,19 @@ class AudioPlayer(QWidget):
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
-    def open_file_from_ai(self, path) -> None:
-        waveform, sample_rate = torchaudio.load(path)
-        waveform: torch.Tensor
-        waveform_np = waveform.numpy()
+    def open_file_ai(self, path) -> None:
+        # waveform, sample_rate = torchaudio.load(path)
+        # waveform: torch.Tensor
+        # waveform_np = waveform.numpy()
+
+        waveform_np, sample_rate = librosa.load(path)
+        # print_d(y.shape, waveform_np.shape)
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
-        self.audio_graph.set_data((waveform_np[0] + 1.0) / 2.0, calc_line=False)
+        self.audio_graph.set_data((waveform_np + 1.0) / 2.0, calc_line=False)
         self.audio_graph.set_shift(0, 1)
+
+        self.waveform = waveform_np
+        self.sample_rate = sample_rate
 
     # region Player methods
     def open_file(self, path: str) -> None:
@@ -260,7 +268,7 @@ class AudioPlayer(QWidget):
         self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_right.adjustSize()
 
-        self.open_file_from_ai(path)
+        self.open_file_ai(path)
 
         self.player_state = PlayerState.WAIT
         self.mf.settings.system_settings.open_filename = path

@@ -105,6 +105,7 @@ class MainForm(QMainWindow):
         self.audio_player.resize(self.width(), self.audio_player.height())
         self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
         self.tab_widget.move(0, self.audio_player.height())
+        self.tab_widget.resize_tab_content()
 
     def load_ann_models(self) -> None:
         pass
