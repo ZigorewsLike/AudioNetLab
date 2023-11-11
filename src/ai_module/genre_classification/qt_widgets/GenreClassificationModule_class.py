@@ -1,16 +1,20 @@
 import math
+import os
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import librosa
 import numpy as np
 import torch
 
+from openpyxl.styles import Font, NamedStyle
+from openpyxl.workbook import Workbook
+from openpyxl.worksheet.worksheet import Worksheet
+
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont, \
     QResizeEvent
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton
-from sklearn.preprocessing import StandardScaler
+from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog
 
 from src.core.log_system import print_d
 from src.function_lib.math_lib import median
@@ -46,6 +50,10 @@ class GenreClassifierModule(QWidget):
 
         self.status_label = QLabel("", self)
         self.status_label.move(self.predict_button.width() + 20, 5)
+
+        self.analysis_button = QPushButton("Анализ", self)
+        self.analysis_button.move(self.status_label.x() + self.status_label.width() + 10, 5)
+        self.analysis_button.clicked.connect(self.do_analysis)
 
         self.best_of_label = QLabel("", self)
         self.best_of_label.move(10, self.graph_y + self.graph_height + 10)
@@ -126,7 +134,9 @@ class GenreClassifierModule(QWidget):
         self.update()
 
         self.mf.preloader.setVisible(False)
+        self.worker_reset()
 
+    def worker_reset(self) -> None:
         self.work_thread.exit(0)
         self.worker = GenrePredictWorker()
         self.worker.mf = self.mf
@@ -160,6 +170,64 @@ class GenreClassifierModule(QWidget):
 
     def leaveEvent(self, a0) -> None:
         self.drawing_text_pos = None
+
+    def do_analysis(self) -> None:
+        file_path = QFileDialog.getExistingDirectory(self, 'Путь к директории, где музыка по жанрам')
+        if not file_path:
+            return
+
+        wb = Workbook()
+        sheet: Worksheet = wb.active
+        sheet.title = 'Analysis'
+        # analysis_sheet = wb.create_sheet("Analysis")
+        sheet["A1"] = "Анализ"
+        header1_style = NamedStyle("Header1", Font(bold=True, size=12))
+        header2_style = NamedStyle("Header2", Font(bold=True, size=11))
+
+        for index, genre in enumerate(self.genre_dict.values()):
+            sheet[f"{chr(65 + index + 1)}2"] = genre
+            sheet[f"{chr(65 + index + 1)}2"].style = header1_style
+        sheet[f"{chr(65 + 11)}2"] = "Итог"
+        sheet[f"{chr(65 + 11)}2"].style = header1_style
+        sheet.column_dimensions[chr(65)].width = 50
+
+        data_begin_index: int = 3
+        row_count: int = 0
+        for root, _, files in os.walk(file_path):
+            folder_name: str = ""
+            if files:
+                folder_name = os.path.basename(root)
+                sheet[f"A{data_begin_index + row_count}"] = folder_name
+                sheet[f"A{data_begin_index + row_count}"].style = header2_style
+            for file_index, _file in enumerate(files):
+                print_d(folder_name, _file)
+                sheet[f"A{data_begin_index + row_count + file_index + 1}"] = _file
+                file_path = os.path.join(root, _file)
+
+                waveform, sample_rate = librosa.load(file_path)
+
+                self.work_thread.exit(0)
+                self.worker = GenrePredictWorker()
+                self.worker.mf = self.mf
+                self.worker.waveform = waveform
+                self.worker.sample_rate = sample_rate
+
+                results = self.worker.run()
+
+                for col in range(len(self.genre_dict.values())):
+                    sheet[f"{chr(65 + 1 + col)}{data_begin_index + row_count + file_index + 1}"] = 0.0
+
+                counts = np.bincount(np.array(results))
+                print(results, counts)
+                for count_index, count in enumerate(counts):
+                    percents = round(count / counts.sum() * 100, 2)
+                    sheet[f"{chr(65 + 1 + count_index)}{data_begin_index + row_count + file_index + 1}"] = percents
+                sheet[f"{chr(65 + 11)}{data_begin_index + row_count + file_index + 1}"] = self.genre_dict[int(np.argmax(counts))]
+            row_count += len(files)
+
+        wb.save('data/local/analysis.xlsx')
+
+
 
 
 

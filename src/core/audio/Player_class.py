@@ -37,11 +37,15 @@ class MetaListItem(QWidget):
     def __init__(self, key: str, values: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         tag_str_value: str = ""
-        for tag_value in values:
-            if isinstance(tag_value, list):
-                tag_str_value += ', '.join(tag_value)
-            else:
-                tag_str_value += str(tag_value)
+        try:
+            for tag_value in values:
+                if isinstance(tag_value, list):
+                    tag_str_value += ', '.join(tag_value)
+                else:
+                    tag_str_value += str(tag_value)
+        except Exception as e:
+            print_e(e)
+            tag_str_value = 'UNKNOWN'
         self.label = QLabel(self)
         self.label.setText(f'<span style=" font-size:8pt; font-weight: bold; color:#36C942;">{key}:</span> '
                            f'{tag_str_value}')

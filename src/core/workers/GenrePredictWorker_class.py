@@ -17,14 +17,21 @@ class GenrePredictWorker(QObject):
     mf = None  # MainForm
     pattern_length: int = 3  # sec
     preloader_signal = QtCore.pyqtSignal(str)
+    waveform: Optional[np.ndarray] = None
+    sample_rate: Optional[int] = None
 
     def __init__(self):
         super().__init__()
 
-    def run(self) -> None:
-        if self.mf.audio_player.waveform is not None:
+    def run(self) -> List[int]:
+        if self.waveform is not None:
+            waveform = self.waveform
+            sample_rate = self.sample_rate
+        else:
             waveform = self.mf.audio_player.waveform
             sample_rate = self.mf.audio_player.sample_rate
+
+        if waveform is not None:
             predict_index_list: List[int] = []
 
             sample_len: int = int(waveform.shape[0] / sample_rate / self.pattern_length)
@@ -81,6 +88,7 @@ class GenrePredictWorker(QObject):
                 # endregion
             self.preloader_signal.emit(f"Классификация жанра 100%")
             self.finished.emit(predict_index_list)
-            return
+            return predict_index_list
         self.finished.emit([])
+        return []
 

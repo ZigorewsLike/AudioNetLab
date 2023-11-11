@@ -62,7 +62,7 @@ class MainForm(QMainWindow):
         # region apply settings
         self.audio_player.volume_slider.set_value(self.settings.player_settings.volume)
         self.audio_player.audio_output.setVolume(self.settings.player_settings.volume / 100)
-        if self.settings.system_settings.open_filename:
+        if self.settings.system_settings.open_filename and os.path.exists(self.settings.system_settings.open_filename):
             self.audio_player.open_file(self.settings.system_settings.open_filename)
         # endregion
 
