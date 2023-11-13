@@ -6,6 +6,7 @@ import torch
 from PyQt6 import QtCore
 from PyQt6.QtCore import QObject
 
+from src.core.log_system import print_d
 from src.function_lib.audio import get_genre_input_data
 
 if TYPE_CHECKING:
@@ -24,6 +25,9 @@ class GenrePredictWorker(QObject):
         super().__init__()
 
     def run(self) -> List[int]:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print_d("device:", device)
+        self.mf.genre_widget.model.to(device)
         if self.waveform is not None:
             waveform = self.waveform
             sample_rate = self.sample_rate
@@ -79,7 +83,8 @@ class GenrePredictWorker(QObject):
 
                 # region Predict
                 with torch.set_grad_enabled(False):
-                    outputs = self.mf.genre_widget.model(torch.Tensor(input_data))
+                    input_tensor = torch.Tensor(input_data)
+                    outputs = self.mf.genre_widget.model(input_tensor.to(device))
                     # print_d(outputs)
                     preds = outputs.data.cpu().numpy().squeeze()
                     pred = np.argmax(preds)

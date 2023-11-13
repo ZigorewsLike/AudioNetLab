@@ -91,7 +91,7 @@ class GenreClassifierModule(QWidget):
         }
 
     def load_model(self) -> None:
-        self.model.classifier.load_state_dict(torch.load(self.model_path, map_location='cpu'))
+        self.model.classifier.load_state_dict(torch.load(self.model_path))
         self.model.eval()
 
     def predict_current(self) -> None:
@@ -199,9 +199,10 @@ class GenreClassifierModule(QWidget):
                 folder_name = os.path.basename(root)
                 sheet[f"A{data_begin_index + row_count}"] = folder_name
                 sheet[f"A{data_begin_index + row_count}"].style = header2_style
+                row_count += 1
             for file_index, _file in enumerate(files):
                 print_d(folder_name, _file)
-                sheet[f"A{data_begin_index + row_count + file_index + 1}"] = _file
+                sheet[f"A{data_begin_index + row_count + file_index}"] = _file
                 file_path = os.path.join(root, _file)
 
                 waveform, sample_rate = librosa.load(file_path)
@@ -215,14 +216,14 @@ class GenreClassifierModule(QWidget):
                 results = self.worker.run()
 
                 for col in range(len(self.genre_dict.values())):
-                    sheet[f"{chr(65 + 1 + col)}{data_begin_index + row_count + file_index + 1}"] = 0.0
+                    sheet[f"{chr(65 + 1 + col)}{data_begin_index + row_count + file_index}"] = 0.0
 
                 counts = np.bincount(np.array(results))
                 print(results, counts)
                 for count_index, count in enumerate(counts):
                     percents = round(count / counts.sum() * 100, 2)
-                    sheet[f"{chr(65 + 1 + count_index)}{data_begin_index + row_count + file_index + 1}"] = percents
-                sheet[f"{chr(65 + 11)}{data_begin_index + row_count + file_index + 1}"] = self.genre_dict[int(np.argmax(counts))]
+                    sheet[f"{chr(65 + 1 + count_index)}{data_begin_index + row_count + file_index}"] = percents
+                sheet[f"{chr(65 + 11)}{data_begin_index + row_count + file_index}"] = self.genre_dict[int(np.argmax(counts))]
             row_count += len(files)
 
         wb.save('data/local/analysis.xlsx')
