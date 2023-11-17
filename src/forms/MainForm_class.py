@@ -54,6 +54,7 @@ class MainForm(QMainWindow):
         self.genre_widget = GenreClassifierModule(model_path=GENRE_MODEL_PATH, main_form=self)
         if AI_ENABLED:
             self.genre_widget.load_model()
+        self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
 
         self.tab_widget.add_tab(self.genre_widget, "Жанр")
         self.tab_widget.add_tab(QPushButton("Debug"), "Empty")

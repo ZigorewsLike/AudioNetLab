@@ -16,7 +16,7 @@ from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFon
     QResizeEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog
 
-from src.core.log_system import print_d
+from src.core.log_system import print_d, print_e
 from src.function_lib.math_lib import median
 from src.ai_module.genre_classification.model import GenreClassifier
 from src.core.workers import GenrePredictWorker
@@ -37,6 +37,7 @@ class GenreClassifierModule(QWidget):
         self.mf: Union[QWidget, MainForm] = main_form
         self.graph_y: int = 60
         self.graph_height: int = 60
+        self.cursor_position: float = 0.0
 
         self.work_thread = QThread(self)
         self.worker = GenrePredictWorker()
@@ -91,7 +92,11 @@ class GenreClassifierModule(QWidget):
         }
 
     def load_model(self) -> None:
-        self.model.classifier.load_state_dict(torch.load(self.model_path))
+        try:
+            self.model.classifier.load_state_dict(torch.load(self.model_path))
+        except Exception as e:
+            print_e("CUDA load model error: ", e, '\n Switch to CPU')
+            self.model.classifier.load_state_dict(torch.load(self.model_path, map_location='cpu'))
         self.model.eval()
 
     def predict_current(self) -> None:
@@ -112,8 +117,11 @@ class GenreClassifierModule(QWidget):
 
     @pyqtSlot(list)
     def predict_finished(self, out: List[int]) -> None:
+        if not out:
+            # TODO: Сообщить о том, что выход пустой
+            return
         self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
-        sample_len: int = int(self.mf.audio_player.waveform.shape[0] / self.mf.audio_player.sample_rate / 3)
+        sample_len: int = math.ceil(self.mf.audio_player.waveform.shape[0] / self.mf.audio_player.sample_rate / 3)
         for step in range(sample_len):
             self.genre_gradient.setColorAt(step / sample_len, QColor(self.genre_color[out[step]]))
 
@@ -148,6 +156,10 @@ class GenreClassifierModule(QWidget):
         painter = QPainter(self)
         painter.fillRect(10, self.graph_y, self.width() - 21, self.graph_height, QBrush(self.genre_gradient))
 
+        painter.setPen(QPen(QColor("#FA6900"), 1.0, Qt.PenStyle.DashLine))
+        cursor_x: int = round(self.cursor_position * (self.width() - 21) + 10)
+        painter.drawLine(cursor_x, self.graph_y, cursor_x, self.graph_y + self.graph_height)
+
         if self.drawing_text_pos is not None and len(self.global_results) > 0:
             painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
             painter.setFont(QFont("Arial", 14))
@@ -156,20 +168,30 @@ class GenreClassifierModule(QWidget):
 
             # painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
             index_factor: float = (self.drawing_text_pos.x() - 10) / (self.width() - 21)
-            index: int = median(0, round(len(self.global_results) * index_factor), len(self.global_results) - 1)
+            index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
             genre_text: str = self.genre_dict[self.global_results[index]]
             genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
             painter.drawText(int(self.drawing_text_pos.x() - genre_text_width/2), self.graph_y - 10, genre_text)
             # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+        elif self.global_results:
+            painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
+            painter.setFont(QFont("Arial", 14))
+            index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
+            genre_text: str = self.genre_dict[self.global_results[index]]
+            genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
+            painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, genre_text)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         super().mouseMoveEvent(event)
         if self.graph_y <= event.pos().y() <= self.graph_y + self.graph_height:
             self.drawing_text_pos = event.pos()
-            self.update()
+        else:
+            self.drawing_text_pos = None
+        self.update()
 
     def leaveEvent(self, a0) -> None:
         self.drawing_text_pos = None
+        self.update()
 
     def do_analysis(self) -> None:
         file_path = QFileDialog.getExistingDirectory(self, 'Путь к директории, где музыка по жанрам')
@@ -228,7 +250,10 @@ class GenreClassifierModule(QWidget):
 
         wb.save('data/local/analysis.xlsx')
 
-
+    @pyqtSlot(float)
+    def set_cursor_position(self, position: float) -> None:
+        self.cursor_position = position
+        self.update()
 
 
 

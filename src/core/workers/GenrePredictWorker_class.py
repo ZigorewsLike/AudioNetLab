@@ -1,3 +1,4 @@
+import math
 import time
 from typing import TYPE_CHECKING, Optional, List
 
@@ -38,7 +39,7 @@ class GenrePredictWorker(QObject):
         if waveform is not None:
             predict_index_list: List[int] = []
 
-            sample_len: int = int(waveform.shape[0] / sample_rate / self.pattern_length)
+            sample_len: int = math.ceil(waveform.shape[0] / sample_rate / self.pattern_length)
             for step in range(sample_len):
                 self.preloader_signal.emit(f"Классификация жанра {round(step / sample_len * 100)}%")
                 waveform_part = waveform[step * sample_rate * self.pattern_length:

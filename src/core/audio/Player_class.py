@@ -12,7 +12,7 @@ from multipledispatch import dispatch
 import mutagen
 import librosa
 
-from PyQt6 import QtMultimedia
+from PyQt6 import QtMultimedia, QtCore
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
@@ -54,6 +54,8 @@ class MetaListItem(QWidget):
 
 
 class AudioPlayer(QWidget):
+    positionChanged = QtCore.pyqtSignal(float)
+
     def __init__(self, *args, **kwargs):
         super(AudioPlayer, self).__init__(*args, **kwargs)
         self.mf: Union[MainForm, QWidget] = self.parent()
@@ -214,6 +216,7 @@ class AudioPlayer(QWidget):
         self.label_duration_left.adjustSize()
 
         self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
+        self.positionChanged.emit(position / self.player.duration())
         # self.audio_graph.change_scale_graph()
 
     def player_state_changed(self, state: QMediaPlayer.PlaybackState):
@@ -304,6 +307,7 @@ class AudioPlayer(QWidget):
         position_time = timedelta(milliseconds=value)
         self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_left.adjustSize()
+        self.positionChanged.emit(value / self.player.duration())
 
     @pyqtSlot(int)
     def set_track_volume(self, value: int) -> None:
