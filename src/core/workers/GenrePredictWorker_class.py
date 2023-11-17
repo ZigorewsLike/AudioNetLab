@@ -3,12 +3,18 @@ import time
 from typing import TYPE_CHECKING, Optional, List
 
 import numpy as np
-import torch
 from PyQt6 import QtCore
 from PyQt6.QtCore import QObject
 
+from src.global_constants import ONNX_INFERENCE
 from src.core.log_system import print_d
 from src.function_lib.audio import get_genre_input_data
+
+if not ONNX_INFERENCE:
+    try:
+        import torch
+    except ImportError as ie:
+        ONNX_INFERENCE = True
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -26,9 +32,10 @@ class GenrePredictWorker(QObject):
         super().__init__()
 
     def run(self) -> List[int]:
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        print_d("device:", device)
-        self.mf.genre_widget.model.to(device)
+        if not ONNX_INFERENCE:
+            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            print_d("device:", device)
+            self.mf.genre_widget.model.to(device)
         if self.waveform is not None:
             waveform = self.waveform
             sample_rate = self.sample_rate
@@ -83,12 +90,19 @@ class GenrePredictWorker(QObject):
                 input_data = input_data.reshape(1, -1)
 
                 # region Predict
-                with torch.set_grad_enabled(False):
-                    input_tensor = torch.Tensor(input_data)
-                    outputs = self.mf.genre_widget.model(input_tensor.to(device))
-                    # print_d(outputs)
-                    preds = outputs.data.cpu().numpy().squeeze()
-                    pred = np.argmax(preds)
+                if not ONNX_INFERENCE:
+                    with torch.set_grad_enabled(False):
+                        input_tensor = torch.Tensor(input_data)
+                        outputs = self.mf.genre_widget.model(input_tensor.to(device))
+                        preds = outputs.data.cpu().numpy().squeeze()
+                else:
+                    input_name = self.mf.genre_widget.model.get_inputs()[0].name
+                    output_name = self.mf.genre_widget.model.get_outputs()[0].name
+
+                    preds = np.array(self.mf.genre_widget.model.run([output_name],
+                                                                    {input_name: input_data.astype(np.float32)}))
+                    preds = preds.squeeze()
+                pred = np.argmax(preds)
 
                 predict_index_list.append(int(pred))
                 # endregion
