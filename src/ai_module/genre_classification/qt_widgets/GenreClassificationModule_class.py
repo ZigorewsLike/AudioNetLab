@@ -39,7 +39,7 @@ class GenreClassifierModule(QWidget):
         self.setMouseTracking(True)
 
         if not ONNX_INFERENCE:
-            self.model = GenreClassifier()
+            self.model = GenreClassifier(input_shape=57)
         else:
             self.model = None
         self.model_path = model_path
@@ -76,29 +76,27 @@ class GenreClassifierModule(QWidget):
         self.drawing_text_pos: Optional[QPoint] = None
 
         self.genre_dict: Dict[int, str] = {
-            0: "blues",
-            1: "classical",
-            2: "country",
-            3: "disco",
-            4: "hiphop",
-            5: "jazz",
-            6: "metal",
-            7: "pop",
-            8: "reggae",
-            9: "rock"
+            0: "Electronic",
+            1: "Experimental",
+            2: "Folk",
+            3: "Hip-Hop",
+            4: "Instrumental",
+            5: "International",
+            6: "Pop",
+            7: "Rock",
         }
 
         self.genre_color: Dict[int, str] = {
             3: "#742CFA",
-            6: "#FA474A",
+            7: "#FA474A",
             8: "#D1FA58",
-            0: "#6A9EFA",
+            2: "#6A9EFA",
             9: "#FA7543",
-            1: "#6AFAD2",
+            4: "#6AFAD2",
             5: "#56FA86",
-            4: "#DB81FA",
-            2: "#FAF550",
-            7: "#ADBDFA",
+            1: "#DB81FA",
+            0: "#FAF550",
+            6: "#ADBDFA",
         }
 
     def load_model(self) -> None:
@@ -146,8 +144,8 @@ class GenreClassifierModule(QWidget):
 
         best_of_text: str = ""
         for inx, count in enumerate(counts):
-            best_of_text += (f"<span style=' font-size:8pt; font-weight: bold; color:#4477C9;'>{self.genre_dict[inx]}"
-                             f"</span> : {round(count / counts.sum() * 100, 2)}%<br>")
+            best_of_text += (f"<span style=' font-size:8pt; font-weight: bold; color:{self.genre_color[inx]};'>"
+                             f"{self.genre_dict[inx]}</span> : {round(count / counts.sum() * 100, 2)}%<br>")
         self.best_of_label.setText(best_of_text)
         self.best_of_label.adjustSize()
 

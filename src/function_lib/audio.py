@@ -84,7 +84,6 @@ def get_harmonics_and_perceptrual(waveform: Optional[np.ndarray] = None) -> Opti
 
 def get_genre_input_data(waveform: Optional[np.ndarray] = None, sample_rate: Optional[int] = None) -> List[float]:
     input_data: list = []
-    input_data += [waveform.shape[0]]
     input_data += get_chroma_stft(waveform, sample_rate)
     input_data += get_rms(waveform)
     input_data += get_spectral_centroid(waveform, sample_rate)
