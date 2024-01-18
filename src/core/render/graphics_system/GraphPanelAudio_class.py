@@ -17,7 +17,6 @@ class GraphPanelAudio(GraphPanelBase):
         super().__init__(main_form, *args, **kwargs)
         self.setParent(main_form)
         self.cursor_position: float = 0.0
-        # self.scale_factor: float = 1
         self.changeCursorPosition.connect(self.cursor_position_changed)
         self.setMouseTracking(True)
 
@@ -28,12 +27,16 @@ class GraphPanelAudio(GraphPanelBase):
         cursor_x = int((self.cursor_position - self.shift_left) * self.scale_factor * self.width())
         painter.drawLine(cursor_x, 0, cursor_x, self.height())
         if DEBUG:
-            painter.drawText(5, 10, f'scale:{self.scale_factor}')
-            painter.drawText(5, 25, f'shift:{self.shift_left} : {self.shift_right}')
+            painter.setPen(QPen(QColor("#FA887F"), 2.0, Qt.PenStyle.SolidLine))
+            painter.drawText(5, 40, f'scale:{self.scale_factor}')
+            painter.drawText(5, 55, f'shift:{self.shift_left} : {self.shift_right}')
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pass
         # self.set_shift(event.pos().x() / self.width(), 1.0)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        self.change_scale_graph()
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 50)

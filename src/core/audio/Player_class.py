@@ -1,23 +1,23 @@
+import gc
 import math
 import os
 import time
 from copy import deepcopy
-from datetime import timedelta
+from datetime import timedelta, datetime
 from gettext import find
 from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple
 from math import atan2, cos, sin, pi
 
+import numpy as np
 from multipledispatch import dispatch
 import mutagen
-from mutagen.easyid3 import EasyID3
-from mutagen.flac import FLAC
-from mutagen.id3 import ID3, ID3NoHeaderError
+import librosa
 
-from PyQt6 import QtMultimedia
+from PyQt6 import QtMultimedia, QtCore
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
-                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon)
+                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent)
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
@@ -25,10 +25,11 @@ from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushBut
 import torch
 import torchaudio
 
+from src.core.file_system import LastFileProp
 from src.core.render.graphics_system import GraphPanelAudio
 from src.core.qt_widgets import SimpleSlider
 from src.core.log_system import print_d, print_e
-from src.emus import PlayerState
+from src.enums import PlayerState, StateMode
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -38,11 +39,15 @@ class MetaListItem(QWidget):
     def __init__(self, key: str, values: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         tag_str_value: str = ""
-        for tag_value in values:
-            if isinstance(tag_value, list):
-                tag_str_value += ', '.join(tag_value)
-            else:
-                tag_str_value += str(tag_value)
+        try:
+            for tag_value in values:
+                if isinstance(tag_value, list):
+                    tag_str_value += ', '.join(tag_value)
+                else:
+                    tag_str_value += str(tag_value)
+        except Exception as e:
+            print_e(e)
+            tag_str_value = 'UNKNOWN'
         self.label = QLabel(self)
         self.label.setText(f'<span style=" font-size:8pt; font-weight: bold; color:#36C942;">{key}:</span> '
                            f'{tag_str_value}')
@@ -51,17 +56,23 @@ class MetaListItem(QWidget):
 
 
 class AudioPlayer(QWidget):
-    def __init__(self, *args, **kwargs):
+    positionChanged = QtCore.pyqtSignal(float)
+
+    def __init__(self, mf, *args, **kwargs):
         super(AudioPlayer, self).__init__(*args, **kwargs)
-        self.mf: Union[MainForm, QWidget] = self.parent()
+        self.mf: Union[MainForm, QWidget] = mf
         self.setAcceptDrops(True)
 
         self.resize(400, 400)
         self.image_size: int = 120
         self.player_state: PlayerState = PlayerState.NONE
+        self.graph_visible: bool = True
+
+        self.waveform: Optional[np.ndarray] = None
+        self.sample_rate: Optional[int] = None
 
         # region UI
-        self.title_tack = QLabel("Tittle", self)
+        self.title_tack = QLabel("Player is empty", self)
         self.title_tack.setStyleSheet("""
         QLabel{
             font-size: 14pt;
@@ -99,7 +110,7 @@ class AudioPlayer(QWidget):
         self.meta_list.setContentsMargins(5, 5, 5, 5)
 
         self.position_slider = SimpleSlider(self)
-        self.position_slider.set_range(0, 0)
+        self.position_slider.set_range(0, 1)
         self.position_slider.sliderMoved.connect(self.set_track_position)
 
         self.volume_slider = SimpleSlider(self)
@@ -116,6 +127,9 @@ class AudioPlayer(QWidget):
         self.label_duration_right.adjustSize()
 
         self.audio_graph = GraphPanelAudio(self)
+
+        self.graph_visible_button = QPushButton("Скрыть", self)
+        self.graph_visible_button.clicked.connect(self.switch_visible_graph)
         # endregion
 
         self.player = QMediaPlayer()
@@ -133,8 +147,16 @@ class AudioPlayer(QWidget):
         # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
         painter.drawPixmap(10, 10, self.track_image)
 
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self.recalc_sizes()
+
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
+        if self.isVisible():
+            self.recalc_sizes()
+
+    def recalc_sizes(self) -> None:
         self.meta_list.resize(self.width() - self.image_size - 30, self.image_size - self.meta_list.y() + 50)
         self.position_slider.move(10, self.meta_list.y() + self.meta_list.height() + 25)
         self.position_slider.setFixedWidth(self.width() - 20)
@@ -142,8 +164,10 @@ class AudioPlayer(QWidget):
                                        self.meta_list.y() + self.meta_list.height() + 5)
         self.label_duration_left.move(10, self.meta_list.y() + self.meta_list.height() + 5)
 
-        self.audio_graph.resize(self.width() - 20, 300)
+        self.audio_graph.resize(self.width() - 20, 150)
         self.audio_graph.move(10, self.position_slider.y() + self.position_slider.height() + 10)
+
+        self.graph_visible_button.move(10, self.position_slider.y() + self.position_slider.height() + 10)
 
         self.update()
 
@@ -182,6 +206,18 @@ class AudioPlayer(QWidget):
         elif self.player_state is PlayerState.PLAY:
             self.pause_music()
 
+    @pyqtSlot()
+    def switch_visible_graph(self) -> None:
+        self.graph_visible = not self.graph_visible
+        if not self.graph_visible:
+            self.resize(self.width(), self.height() - self.audio_graph.height() + 10)
+            self.audio_graph.setVisible(False)
+        else:
+            self.resize(self.width(), self.height() + self.audio_graph.height() - 10)
+            self.audio_graph.setVisible(True)
+        self.mf.settings.player_settings.graph_visible = self.graph_visible
+        self.mf.resized.emit()
+
     @pyqtSlot('qint64')
     def track_position_changed(self, position: int) -> None:
         self.position_slider.set_value(position)
@@ -190,6 +226,7 @@ class AudioPlayer(QWidget):
         self.label_duration_left.adjustSize()
 
         self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
+        self.positionChanged.emit(position / self.player.duration())
         # self.audio_graph.change_scale_graph()
 
     def player_state_changed(self, state: QMediaPlayer.PlaybackState):
@@ -200,13 +237,19 @@ class AudioPlayer(QWidget):
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
-    def open_file_from_ai(self, path) -> None:
-        waveform, sample_rate = torchaudio.load(path)
-        waveform: torch.Tensor
-        waveform_np = waveform.numpy()
+    def open_file_ai(self, path) -> None:
+        # waveform, sample_rate = torchaudio.load(path)
+        # waveform: torch.Tensor
+        # waveform_np = waveform.numpy()
+
+        waveform_np, sample_rate = librosa.load(path)
+        # print_d(y.shape, waveform_np.shape)
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
-        self.audio_graph.set_data((waveform_np[0] + 1.0) / 2.0, calc_line=False)
+        self.audio_graph.set_data((waveform_np + 1.0) / 2.0, calc_line=False)
         self.audio_graph.set_shift(0, 1)
+
+        self.waveform = waveform_np
+        self.sample_rate = sample_rate
 
     # region Player methods
     def open_file(self, path: str) -> None:
@@ -242,38 +285,45 @@ class AudioPlayer(QWidget):
         self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_right.adjustSize()
 
-        self.open_file_from_ai(path)
+        self.open_file_ai(path)
+        self.mf.last_files.add(LastFileProp(path, datetime.now()))
 
         self.player_state = PlayerState.WAIT
         self.mf.settings.system_settings.open_filename = path
         self.mf.save_config_app()
         if self.mf.settings.player_settings.auto_play:
             self.play_music()
+        gc.collect()
 
     @pyqtSlot()
     def play_music(self) -> None:
-        self.player.play()
-        self.player_state = PlayerState.PLAY
-        self.change_play_icon()
+        if self.mf.state is StateMode.PLAYER:
+            self.player.play()
+            self.player_state = PlayerState.PLAY
+            self.change_play_icon()
 
     @pyqtSlot()
     def pause_music(self) -> None:
-        self.player.pause()
-        self.player_state = PlayerState.PAUSE
-        self.change_play_icon()
+        if self.mf.state is StateMode.PLAYER:
+            self.player.pause()
+            self.player_state = PlayerState.PAUSE
+            self.change_play_icon()
 
     @pyqtSlot()
     def stop_music(self) -> None:
-        self.player.stop()
-        self.player_state = PlayerState.WAIT
-        self.change_play_icon()
+        if self.mf.state is StateMode.PLAYER:
+            self.player.stop()
+            self.player_state = PlayerState.WAIT
+            self.change_play_icon()
 
     @pyqtSlot(int)
     def set_track_position(self, value: int) -> None:
-        self.player.setPosition(value)
-        position_time = timedelta(milliseconds=value)
-        self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
-        self.label_duration_left.adjustSize()
+        if self.mf.state is StateMode.PLAYER:
+            self.player.setPosition(value)
+            position_time = timedelta(milliseconds=value)
+            self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
+            self.label_duration_left.adjustSize()
+            self.positionChanged.emit(value / self.player.duration())
 
     @pyqtSlot(int)
     def set_track_volume(self, value: int) -> None:

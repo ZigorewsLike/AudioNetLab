@@ -17,7 +17,7 @@ class GraphPanelBase(QOpenGLWidget):
     def __init__(self, main_form, *args, **kwargs):
         super(GraphPanelBase, self).__init__(*args, **kwargs)
         self.mf: MainForm = main_form
-        self.colors = [QColor("#3F60D3"), QColor("#D0D3C7"), QColor("#D0D3C7")]
+        self.colors = [QColor("#5CD392"), QColor("#D0D3C7"), QColor("#D0D3C7")]
         self.lines: Tuple[np.ndarray, np.ndarray] = (np.array([]), np.array([]))
         self.max_u_count: float = 0.0
         self.setMouseTracking(True)
@@ -27,6 +27,7 @@ class GraphPanelBase(QOpenGLWidget):
         self.scale_factor: float = 1.
         self.new_width: float = self.width()
         self.render_lines: List[QPointF] = []
+        self.graph_visible: bool = True
 
     def showEvent(self, event: QShowEvent) -> None:
         self.new_width = self.width()
@@ -51,7 +52,7 @@ class GraphPanelBase(QOpenGLWidget):
         self.render_lines = [QPointF(0, self.height() / 2)]
         self.render_lines += [QPointF(((i / (self.lines[1].size - 1) - self.shift_left) * self.new_width),
                                       self.height() - self.lines[1][i] * self.height())
-                              for i in color_slice[::max(1, int(color_slice.size / self.width()))]]
+                              for i in color_slice[::max(1, int(color_slice.size / self.width() / 2 / self.scale_factor))]]
         self.render_lines += [QPointF(self.width(), self.height()/2)]
 
     def set_shift(self, shift_left: float, shift_right: float):
@@ -65,7 +66,7 @@ class GraphPanelBase(QOpenGLWidget):
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
-        if self.isVisible():
+        if self.graph_visible and self.isVisible():
             painter = QPainter(self)
             painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#4B4B4B")))
 

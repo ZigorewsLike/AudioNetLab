@@ -3,6 +3,8 @@
 *.pdproject
 error_log.txt
 config_app.ini
+local_history.bin
+*.psd
 
 # Project dirs
 logs
