@@ -79,12 +79,13 @@ class SimpleSlider(QWidget):
         painter = QPainter(self)
         painter.fillRect(self.left_right_margin, self.top_bottom_margin, self.width() - self.left_right_margin * 2,
                          self.height() - self.top_bottom_margin * 2, QBrush(self.background_color))
-        calc_width: float = (self.width() - self.left_right_margin * 2) * (self.value / (self.maximum - self.minimum))
-        painter.fillRect(self.left_right_margin, self.top_bottom_margin,
-                         int(calc_width), int(self.height() - self.top_bottom_margin * 2), QBrush(self.front_color))
-        if self.rect_always_show or self.is_hover:
-            painter.fillRect(int(calc_width - 2 + self.left_right_margin), int(self.top_bottom_margin // 2),
-                             5, int(self.height() - self.top_bottom_margin), QBrush(self.flag_color))
+        if self.maximum - self.minimum != 0:
+            calc_width: float = (self.width() - self.left_right_margin * 2) * (self.value / (self.maximum - self.minimum))
+            painter.fillRect(self.left_right_margin, self.top_bottom_margin,
+                             int(calc_width), int(self.height() - self.top_bottom_margin * 2), QBrush(self.front_color))
+            if self.rect_always_show or self.is_hover:
+                painter.fillRect(int(calc_width - 2 + self.left_right_margin), int(self.top_bottom_margin // 2),
+                                 5, int(self.height() - self.top_bottom_margin), QBrush(self.flag_color))
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self.is_clicked = True
@@ -103,8 +104,8 @@ class SimpleSlider(QWidget):
         self.front_color = self.hover_color
         self.is_hover = True
         if self.is_clicked:
-            mouse_val: int = median(0, event.pos().x() - self.top_bottom_margin, self.width() - self.top_bottom_margin * 2)
-            mouse_val /= self.width() - self.top_bottom_margin * 2  # Normalisation
+            mouse_val: int = median(0, event.pos().x() - self.left_right_margin, self.width() - self.left_right_margin * 2)
+            mouse_val /= self.width() - self.left_right_margin * 2  # Normalisation
             self.valueChanged.emit(int((self.maximum - self.minimum) * mouse_val + self.minimum))
             self.sliderMoved.emit(self.value)
         self.update()

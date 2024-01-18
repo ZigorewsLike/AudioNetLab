@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QWidget, QToolTip, QLabel
 
 from src.core.log_system import print_d
 from src.function_lib.math_lib import median
-from .BaseTabWidget import BaseTabWidget, TabItem
+from .BaseTabWidget_class import BaseTabWidget, TabItem
 
 
 class VerticalTabButton(QWidget):

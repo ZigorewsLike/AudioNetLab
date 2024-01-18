@@ -167,33 +167,34 @@ class GenreClassifierModule(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
-        painter = QPainter(self)
-        painter.fillRect(10, self.graph_y, self.width() - 21, self.graph_height, QBrush(self.genre_gradient))
+        if self.isVisible():
+            painter = QPainter(self)
+            painter.fillRect(10, self.graph_y, self.width() - 21, self.graph_height, QBrush(self.genre_gradient))
 
-        painter.setPen(QPen(QColor("#FA6900"), 1.0, Qt.PenStyle.DashLine))
-        cursor_x: int = round(self.cursor_position * (self.width() - 21) + 10)
-        painter.drawLine(cursor_x, self.graph_y, cursor_x, self.graph_y + self.graph_height)
+            painter.setPen(QPen(QColor("#FA6900"), 1.0, Qt.PenStyle.DashLine))
+            cursor_x: int = round(self.cursor_position * (self.width() - 21) + 10)
+            painter.drawLine(cursor_x, self.graph_y, cursor_x, self.graph_y + self.graph_height)
 
-        if self.drawing_text_pos is not None and len(self.global_results) > 0:
-            painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
-            painter.setFont(QFont("Arial", 14))
-            painter.drawLine(self.drawing_text_pos.x(), self.graph_y, self.drawing_text_pos.x(),
-                             self.graph_y + self.graph_height)
+            if self.drawing_text_pos is not None and len(self.global_results) > 0:
+                painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
+                painter.setFont(QFont("Arial", 14))
+                painter.drawLine(self.drawing_text_pos.x(), self.graph_y, self.drawing_text_pos.x(),
+                                 self.graph_y + self.graph_height)
 
-            # painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
-            index_factor: float = (self.drawing_text_pos.x() - 10) / (self.width() - 21)
-            index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
-            genre_text: str = self.genre_dict[self.global_results[index]]
-            genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
-            painter.drawText(int(self.drawing_text_pos.x() - genre_text_width/2), self.graph_y - 10, genre_text)
-            # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-        elif self.global_results:
-            painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
-            painter.setFont(QFont("Arial", 14))
-            index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
-            genre_text: str = self.genre_dict[self.global_results[index]]
-            genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
-            painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, genre_text)
+                # painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
+                index_factor: float = (self.drawing_text_pos.x() - 10) / (self.width() - 21)
+                index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
+                genre_text: str = self.genre_dict[self.global_results[index]]
+                genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
+                painter.drawText(int(self.drawing_text_pos.x() - genre_text_width/2), self.graph_y - 10, genre_text)
+                # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+            elif self.global_results:
+                painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
+                painter.setFont(QFont("Arial", 14))
+                index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
+                genre_text: str = self.genre_dict[self.global_results[index]]
+                genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
+                painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, genre_text)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         super().mouseMoveEvent(event)
