@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List
 from PyQt6 import QtCore
 from PyQt6.QtCore import QLine, QPointF, Qt, QPoint, QRectF, pyqtSlot
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QPolygon, QMouseEvent, QTextOption, QWheelEvent
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QSlider
 
 from src.global_constants import DEBUG
 from .GraphPanelBase_class import GraphPanelBase
@@ -19,6 +19,12 @@ class GraphPanelAudio(GraphPanelBase):
         self.cursor_position: float = 0.0
         self.changeCursorPosition.connect(self.cursor_position_changed)
         self.setMouseTracking(True)
+
+        self.step_slider = QSlider(self)
+        self.step_slider.move(0, 30)
+        self.step_slider.setRange(1, 20)
+        self.step_slider.setValue(self.step_multiplier)
+        self.step_slider.valueChanged.connect(self.step_multiplier_changed)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
@@ -42,6 +48,12 @@ class GraphPanelAudio(GraphPanelBase):
         self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 50)
         self.change_scale_graph()
 
+    @pyqtSlot(int)
+    def step_multiplier_changed(self, val: int) -> None:
+        self.step_multiplier = val
+        self.calculate_render_lines()
+        self.update()
+
     def change_scale_graph(self) -> None:
         region_size: float = 1 / self.scale_factor
         n_l = self.cursor_position - region_size / 2
@@ -51,7 +63,6 @@ class GraphPanelAudio(GraphPanelBase):
         if (new_shift_l, new_shift_r) != (self.shift_left, self.shift_right):
             self.set_shift(new_shift_l, new_shift_r)
 
-        # self.set_shift(max(0., self.cursor_position - region_size / 2), min(1., self.cursor_position + region_size / 2))
         self.update()
 
     @pyqtSlot(float)

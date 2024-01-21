@@ -227,7 +227,7 @@ class AudioPlayer(QWidget):
 
         self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
         self.positionChanged.emit(position / self.player.duration())
-        # self.audio_graph.change_scale_graph()
+        self.audio_graph.change_scale_graph()
 
     def player_state_changed(self, state: QMediaPlayer.PlaybackState):
         print_d(state)
