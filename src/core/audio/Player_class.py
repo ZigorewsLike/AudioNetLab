@@ -21,10 +21,6 @@ from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMo
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
-# AI
-import torch
-import torchaudio
-
 from src.core.file_system import LastFileProp
 from src.core.render.graphics_system import GraphPanelAudio
 from src.core.qt_widgets import SimpleSlider
@@ -238,10 +234,6 @@ class AudioPlayer(QWidget):
             self.change_play_icon()
 
     def open_file_ai(self, path) -> None:
-        # waveform, sample_rate = torchaudio.load(path)
-        # waveform: torch.Tensor
-        # waveform_np = waveform.numpy()
-
         waveform_np, sample_rate = librosa.load(path)
         # print_d(y.shape, waveform_np.shape)
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
@@ -280,10 +272,7 @@ class AudioPlayer(QWidget):
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
 
-        self.position_slider.set_range(0, self.player.duration())
-        position_time = timedelta(milliseconds=self.player.duration())
-        self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
-        self.label_duration_right.adjustSize()
+        self.player.durationChanged.connect(self.duration_is_changed)
 
         self.open_file_ai(path)
         self.mf.last_files.add(LastFileProp(path, datetime.now()))
@@ -294,6 +283,13 @@ class AudioPlayer(QWidget):
         if self.mf.settings.player_settings.auto_play:
             self.play_music()
         gc.collect()
+
+    @pyqtSlot('qint64')
+    def duration_is_changed(self, duration: int) -> None:
+        self.position_slider.set_range(0, duration)
+        position_time = timedelta(milliseconds=duration)
+        self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
+        self.label_duration_right.adjustSize()
 
     @pyqtSlot()
     def play_music(self) -> None:
