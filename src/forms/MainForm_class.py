@@ -24,6 +24,7 @@ from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidge
 from src.enums import StateMode
 
 from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
+from src.core.render.graphics_system import LibrosaGraphsModule
 
 
 class MainForm(QMainWindow):
@@ -90,8 +91,12 @@ class MainForm(QMainWindow):
             self.genre_widget.load_model()
         self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
 
+        # librosa graphs
+        self.librosa_module = LibrosaGraphsModule(self)
+        self.audio_player.positionChanged.connect(self.librosa_module.set_cursor_position)
+
         self.tab_widget.add_tab(self.genre_widget, "Жанр")
-        self.tab_widget.add_tab(QPushButton("Debug"), "Empty")
+        self.tab_widget.add_tab(self.librosa_module, "Librosa")
         # endregion
 
         # region apply settings

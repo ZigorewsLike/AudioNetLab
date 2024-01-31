@@ -20,11 +20,11 @@ from src.core.log_system import print_d, print_e, print_i
 from src.core.workers import GenrePredictWorker
 from src.function_lib.math_lib import median
 from src.function_lib.ai import load_sess_model
-from src.ai_module.genre_classification.model import GenreClassifier
 
 if not ONNX_INFERENCE:
     try:
         import torch
+        from src.ai_module.genre_classification.model import GenreClassifier
     except ImportError as ie:
         ONNX_INFERENCE = True
 

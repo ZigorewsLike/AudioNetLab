@@ -45,7 +45,7 @@ class GraphPanelAudio(GraphPanelBase):
         self.change_scale_graph()
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 50)
+        self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 5)
         self.change_scale_graph()
 
     @pyqtSlot(int)

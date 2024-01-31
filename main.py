@@ -24,6 +24,8 @@ warnings.filterwarnings('ignore')
 if TRACE:
     tracemalloc.start(1)
 
+os.system('cls')
+
 
 # Функция перехвата критических ошибок
 def except_hook(exc_type, exc_value, exc_tb):
