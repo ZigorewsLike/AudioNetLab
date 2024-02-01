@@ -89,7 +89,7 @@ class GenrePredictWorker(QObject):
                 input_data = (input_data - mean) / std
                 input_data = input_data.reshape(1, -1)
 
-                # region Predict
+                # region Predicta
                 if not ONNX_INFERENCE:
                     with torch.set_grad_enabled(False):
                         input_tensor = torch.Tensor(input_data)

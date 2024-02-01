@@ -6,3 +6,4 @@ class StateMode(Enum):
     HOME_PAGE = 1,
     PLAYER = 2,
     LOADING = 3,
+    OPENING = 4,

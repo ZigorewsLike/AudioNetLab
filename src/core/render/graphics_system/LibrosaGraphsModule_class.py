@@ -42,7 +42,7 @@ class LibrosaGraphsModule(QWidget):
         self.fourier_graph = NamedGraphPanel(self.mf, self.graphs_frame)
         self.fourier_graph.set_header("Short-time Fourier transform (STFT)")
         self.fourier_graph.resize(self.width() - 10, 300)
-        self.fourier_graph.move(10, 80)
+        self.fourier_graph.move(10, 40)
         self.fourier_graph.graph.step_multiplier = 10
         self.fourier_graph.graph.brush_graph = True
         self.fourier_graph.graph.draw_peak_text = True

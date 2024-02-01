@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 from datetime import timedelta, datetime
 from gettext import find
-from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple
+from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple, Any
 from math import atan2, cos, sin, pi
 
 import numpy as np
@@ -57,7 +57,6 @@ class AudioPlayer(QWidget):
     def __init__(self, mf, *args, **kwargs):
         super(AudioPlayer, self).__init__(*args, **kwargs)
         self.mf: Union[MainForm, QWidget] = mf
-        self.setAcceptDrops(True)
 
         self.resize(400, 400)
         self.image_size: int = 120
@@ -66,6 +65,8 @@ class AudioPlayer(QWidget):
 
         self.waveform: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
+
+        self.track_meta: Optional[Dict[str, Any]] = None
 
         # region UI
         self.title_tack = QLabel("Player is empty", self)
@@ -134,6 +135,7 @@ class AudioPlayer(QWidget):
         self.audio_output.setVolume(50)
         self.player.positionChanged.connect(self.track_position_changed)
         self.player.playbackStateChanged.connect(self.player_state_changed)
+        self.player.durationChanged.connect(self.duration_is_changed)
 
         self.change_play_icon()
 
@@ -167,28 +169,6 @@ class AudioPlayer(QWidget):
 
         self.update()
 
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.accept()
-        else:
-            event.ignore()
-
-    def dropEvent(self, event: QDropEvent) -> None:
-        if event.mimeData().hasUrls:
-            event.setDropAction(Qt.DropAction.CopyAction)
-            event.accept()
-            for path in event.mimeData().urls():
-                if path.isLocalFile():
-                    self.open_file(path.path()[1:])
-                else:
-                    self.open_file(str(path))
-                break
-        else:
-            event.ignore()
-
-    def dragMoveEvent(self, event):
-        pass
-
     def change_play_icon(self) -> None:
         if self.player_state is PlayerState.PLAY:
             self.play_button.setIcon(QIcon('res/PauseButton.png'))
@@ -221,9 +201,10 @@ class AudioPlayer(QWidget):
         self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
         self.label_duration_left.adjustSize()
 
-        self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
-        self.positionChanged.emit(position / self.player.duration())
-        self.audio_graph.change_scale_graph()
+        if self.player.duration() != 0:
+            self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
+            self.positionChanged.emit(position / self.player.duration())
+            self.audio_graph.change_scale_graph()
 
     def player_state_changed(self, state: QMediaPlayer.PlaybackState):
         print_d(state)
@@ -233,18 +214,8 @@ class AudioPlayer(QWidget):
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
-    def open_file_ai(self, path) -> None:
-        waveform_np, sample_rate = librosa.load(path)
-        # print_d(y.shape, waveform_np.shape)
-        print_d(waveform_np.shape, waveform_np[0], sample_rate)
-        self.audio_graph.set_data((waveform_np + 1.0) / 2.0, calc_line=False)
-        self.audio_graph.set_shift(0, 1)
-
-        self.waveform = waveform_np
-        self.sample_rate = sample_rate
-
     # region Player methods
-    def open_file(self, path: str) -> None:
+    def prepare_to_open_file(self, path: str) -> bool:
         self.stop_music()
         self.meta_list.clear()
         print_d(f"Open file: {path}")
@@ -254,7 +225,7 @@ class AudioPlayer(QWidget):
         audio = mutagen.File(path)
         if audio is None:
             print_e(f'Open file error. {filename}')
-            return
+            return False
         print_d('Tags:', audio)
         # endregion
 
@@ -265,24 +236,26 @@ class AudioPlayer(QWidget):
             self.meta_list.addItem(item)
             self.meta_list.setItemWidget(item, MetaListItem(key, value))
 
-        url = QUrl.fromLocalFile(path)
-        self.player.setSource(url)
-
         track_name = audio.get('title', None)
+
+        pict_tag = audio.get("APIC:", None)
+        if pict_tag is not None:
+            print_d(pict_tag.data)
+        # im = Image.open(BytesIO(pict))
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
 
-        self.player.durationChanged.connect(self.duration_is_changed)
+        return True
 
-        self.open_file_ai(path)
-        self.mf.last_files.add(LastFileProp(path, datetime.now()))
+    def open_file_ai(self, path) -> None:
+        waveform_np, sample_rate = librosa.load(path)
+        # print_d(y.shape, waveform_np.shape)
+        print_d(waveform_np.shape, waveform_np[0], sample_rate)
+        self.audio_graph.set_data((waveform_np + 1.0) / 2.0, calc_line=False)
+        self.audio_graph.set_shift(0, 1)
 
-        self.player_state = PlayerState.WAIT
-        self.mf.settings.system_settings.open_filename = path
-        self.mf.save_config_app()
-        if self.mf.settings.player_settings.auto_play:
-            self.play_music()
-        gc.collect()
+        self.waveform = waveform_np
+        self.sample_rate = sample_rate
 
     @pyqtSlot('qint64')
     def duration_is_changed(self, duration: int) -> None:

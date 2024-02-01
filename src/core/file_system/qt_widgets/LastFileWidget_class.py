@@ -8,7 +8,7 @@ from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion, \
     QPen, QPixmap, QIcon, QShowEvent
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu
+from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu, QStyle
 
 from src.core.log_system import print_d
 from src.core.file_system import LastFileProp
@@ -84,7 +84,9 @@ class LastFileList(QWidget):
 
         if self.mf.last_files.props:
             for _file in reversed(self.mf.last_files.props):
-                last_file = LastFileItem(_file, self.mf, self)
+                _file: LastFileProp
+                file_exist = os.path.exists(_file.path)
+                last_file = LastFileItem(_file, self.mf, self, file_exist=file_exist)
                 last_file.setFixedHeight(120)
                 self.v_layout.addWidget(last_file)
             self.v_layout.addStretch()
@@ -99,7 +101,7 @@ class LastFileList(QWidget):
 class LastFileItem(QWidget):
     resource_icon_dir = "res"
 
-    def __init__(self, file_prop: LastFileProp, main_form, container, *args, **kwargs):
+    def __init__(self, file_prop: LastFileProp, main_form, container, file_exist: bool = True, *args, **kwargs):
         super(LastFileItem, self).__init__(*args, **kwargs)
         self.resize(self.width(), 120)
 
@@ -109,6 +111,13 @@ class LastFileItem(QWidget):
         self.file_path = file_prop.path
         self.mf = main_form
         self.container: LastFileList = container
+        self.file_exist: bool = file_exist
+
+        not_exist_style: str = """
+        QLabel{
+            color: #FA514C
+        }
+        """
 
         self.label_filename = QLabel(os.path.basename(self.file_path), self)
         self.label_filename.setGeometry(QRect(0, 0, 300, 40))
@@ -128,6 +137,11 @@ class LastFileItem(QWidget):
         self.label_path.setFont(font)
         self.label_path.setGeometry(QRect(0, 50, 360, 60))
         # self.label_path.setWordWrap(True)
+
+        if not file_exist:
+            self.label_filename.setText(self.label_filename.text() + " (!NOT FOUND!)")
+            for label in [self.label_filename, self.label_path, self.label_date]:
+                label.setStyleSheet(not_exist_style)
 
         self.button_open = QPushButton(self)
         self.button_open.setGeometry(QRect(310, 2, 60, 50))

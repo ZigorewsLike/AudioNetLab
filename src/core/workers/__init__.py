@@ -1,1 +1,2 @@
 from .GenrePredictWorker_class import GenrePredictWorker
+from .OpenWorker_class import OpenFileWorker

@@ -1,27 +1,33 @@
 import configparser
+import gc
 import math
 import os
 import shutil
 import pickle
 import tracemalloc
 from datetime import datetime
+from typing import Optional
 
+import mutagen
 from PyQt6 import QtCore, QtSvg, QtWidgets
 from PyQt6.QtCore import Qt, QRectF, QPoint, QTimer, QThread, pyqtSlot, QSize, QRect
 from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEvent, QKeySequence, QMoveEvent,
-                         QMouseEvent, QKeyEvent, QColor, QShowEvent, QCursor, QAction)
+                         QMouseEvent, QKeyEvent, QColor, QShowEvent, QCursor, QAction, QDragEnterEvent, QDragLeaveEvent,
+                         QDropEvent)
 from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDialog, QMessageBox, QVBoxLayout, QMenu,
-                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication)
+                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem)
 
+from src.core.audio.Player_class import MetaListItem
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT)
+                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR)
 from src.core.log_system import print_e, print_d
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
 from src.core.file_system import LastFileContainer, LastFileProp
-from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget
-from src.enums import StateMode
+from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget
+from src.enums import StateMode, PlayerState
+from src.core.workers import OpenFileWorker
 
 from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 from src.core.render.graphics_system import LibrosaGraphsModule
@@ -38,6 +44,8 @@ class MainForm(QMainWindow):
         super().__init__()
         self.params: dict = params
         self.params['main_form_ref'] = self
+
+        self.setAcceptDrops(True)
 
         self.create_menu_bars()
 
@@ -80,8 +88,15 @@ class MainForm(QMainWindow):
 
         self.home_page = HomePageWidget(self, self.central_widget)
 
+        # region Overlap widgets
+
+        self.drag_widget = DragFileWidget(self)
+        self.drag_widget.setVisible(False)
+
         self.preloader = PreLoaderWidget(self)
         self.preloader.setVisible(False)
+
+        # endregion
 
         self.set_state_mode(self.state)
 
@@ -102,9 +117,13 @@ class MainForm(QMainWindow):
         # region apply settings
         self.audio_player.volume_slider.set_value(self.settings.player_settings.volume)
         self.audio_player.audio_output.setVolume(self.settings.player_settings.volume / 100)
-        # if self.settings.system_settings.open_filename and os.path.exists(self.settings.system_settings.open_filename):
-        #     self.audio_player.open_file(self.settings.system_settings.open_filename)
         # endregion
+
+        self.work_thread = QThread(self)
+        self.worker = OpenFileWorker()
+        self.worker.mf = self
+        self.worker.finished.connect(self.open_finished)
+        self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
     def init_ui(self):
         if self.settings.system_settings.form_position == Point(-1, -1):
@@ -123,7 +142,7 @@ class MainForm(QMainWindow):
                          int(self.settings.system_settings.form_width), int(self.settings.system_settings.form_height))
         self.setWindowTitle(f'{APP_TITLE} v{VERSION}')
         self.setMouseTracking(True)
-        self.setMinimumSize(850, 300)
+        self.setMinimumSize(800, 720)
         self.setWindowIcon(QIcon('Icon.ico'))
 
     def create_menu_bars(self) -> None:
@@ -131,12 +150,20 @@ class MainForm(QMainWindow):
         file_menu = QMenu("&File", self)
         edit_menu = QMenu("&Edit", self)
 
+        open_file_action = QAction("Open file", self)
+        open_file_action.triggered.connect(lambda: self.open_file_dialog())
+        icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
+        open_file_action.setIcon(QIcon(icon))
+
         home_page_action = QAction("Home page", self)
         home_page_action.triggered.connect(lambda: self.set_state_mode(StateMode.HOME_PAGE))
+        icon = QPixmap(RESOURCE_ICON_DIR + "home_FILL0_wght400_GRAD0_opsz24.png")
+        home_page_action.setIcon(QIcon(icon))
 
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(lambda: self.close())
 
+        file_menu.addAction(open_file_action)
         file_menu.addAction(home_page_action)
         file_menu.addSeparator()
         file_menu.addAction(exit_action)
@@ -155,6 +182,40 @@ class MainForm(QMainWindow):
         self.resized.emit()
         return super(MainForm, self).resizeEvent(event)
 
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if self.state is not StateMode.OPENING and event.mimeData().hasUrls:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            for path in event.mimeData().urls():
+                if path.isLocalFile():
+                    file_path = path.path()[1:]
+                else:
+                    file_path = str(path)
+                _, file_extension = os.path.splitext(file_path)
+                if file_extension.lower() in ['.mp3', '.wave', '.wav', '.flac']:
+                    event.accept()
+                    self.drag_widget.setVisible(True)
+                break
+        else:
+            event.ignore()
+            self.drag_widget.setVisible(False)
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        if event.mimeData().hasUrls:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+            for path in event.mimeData().urls():
+                self.drag_widget.setVisible(False)
+                if path.isLocalFile():
+                    self.open_file(path.path()[1:])
+                else:
+                    self.open_file(str(path))
+                break
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:
+        self.drag_widget.setVisible(False)
+
     @pyqtSlot()
     def recalculate_size(self) -> None:
         """
@@ -171,6 +232,7 @@ class MainForm(QMainWindow):
         self.tab_widget.resize_tab_content()
 
         self.preloader.resize(self.width(), self.height())
+        self.drag_widget.resize(self.width(), self.height())
 
         self.home_page.resize(self.size())
 
@@ -190,10 +252,74 @@ class MainForm(QMainWindow):
     def load_ann_models(self) -> None:
         pass
 
+    def reset_open_workers(self) -> None:
+        self.worker = OpenFileWorker()
+        self.worker.mf = self
+        self.worker.finished.connect(self.open_finished)
+        self.worker.preloader_signal.connect(self.preloader.set_help_text)
+
+        self.work_thread.exit(0)
+
+    def open_file_dialog(self) -> None:
+        dialog_filter = f"Все музыкальные форматы (*.mp3 *.flac *.wave);;" \
+                        f"MP3 (*.mp3);;FLAC (*.flac);;WAVE (*.wave *.wav);;" \
+                        f"Все файлы (*.*)"
+        filename = QFileDialog.getOpenFileName(self, "Открыть файл",
+                                               self.settings.system_settings.last_folder,
+                                               dialog_filter)[0]
+        if filename:
+            self.settings.system_settings.last_folder = os.path.dirname(filename)
+            self.open_file(filename)
+
     def open_file(self, file_path) -> None:
         if not os.path.exists(file_path):
+            error_msg = QMessageBox()
+            error_msg.setText("Файл не найден. Возможно он удалён")
+            error_msg.setIcon(QMessageBox.Icon.Critical)
+            error_msg.setWindowTitle("Ошибка открытия файла")
+            error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
+            error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            error_msg.exec()
             return
-        self.audio_player.open_file(file_path)
+        self.preloader.setVisible(True)
+        self.preloader.set_help_text("Открытие файла")
+        if not self.audio_player.prepare_to_open_file(file_path):
+            error_msg = QMessageBox()
+            error_msg.setText("Не возможно открыть файл!")
+            error_msg.setIcon(QMessageBox.Icon.Critical)
+            error_msg.setWindowTitle("Ошибка открытия файла")
+            error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
+            error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            error_msg.exec()
+            self.preloader.setVisible(False)
+            return
+        self.state = StateMode.OPENING
+
+        self.worker.file_path = file_path
+        self.worker.moveToThread(self.work_thread)
+        self.work_thread.started.connect(self.worker.run)
+        self.work_thread.start()
+
+    def open_finished(self, path: Optional[str]) -> None:
+        self.reset_open_workers()
+        self.drag_widget.setVisible(False)
+        if not path:
+            error_msg = QMessageBox()
+            error_msg.setText("Не возможно открыть файл!")
+            error_msg.setIcon(QMessageBox.Icon.Critical)
+            error_msg.setWindowTitle("Ошибка открытия файла")
+            error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
+            error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            error_msg.exec()
+            self.preloader.setVisible(False)
+            return
+        self.last_files.add(LastFileProp(path, datetime.now()))
+
+        self.audio_player.player_state = PlayerState.WAIT
+        self.settings.system_settings.open_filename = path
+        self.save_config_app()
+        gc.collect()
+        self.preloader.setVisible(False)
         self.set_state_mode(StateMode.PLAYER)
 
     def save_config_app(self) -> None:

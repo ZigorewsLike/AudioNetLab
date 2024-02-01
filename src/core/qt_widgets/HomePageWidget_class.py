@@ -21,8 +21,13 @@ class HomePageWidget(QWidget):
         self.setAutoFillBackground(True)
 
         self.mf: Union[MainForm, QWidget] = mf
-        self.button_start = QPushButton("Go to player", self)
-        self.button_start.clicked.connect(self.open_player)
+
+        self.button_player = QPushButton("Go to player", self)
+        self.button_player.clicked.connect(self.open_player)
+
+        self.button_open = QPushButton("Open file", self)
+        self.button_open.clicked.connect(self.call_open_dialog)
+        self.button_open.move(100, 0)
 
         self.top_panel_height: int = 60
 
@@ -32,6 +37,10 @@ class HomePageWidget(QWidget):
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self.last_file.resize(self.width(), self.height() - self.top_panel_height)
+
+    @pyqtSlot()
+    def call_open_dialog(self) -> None:
+        self.mf.open_file_dialog()
 
     @pyqtSlot()
     def open_player(self) -> None:
