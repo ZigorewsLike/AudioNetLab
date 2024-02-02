@@ -14,6 +14,7 @@ VERSION = "0.0.0.2"
 APP_ROAMING_DIR = os.path.join(os.getenv('APPDATA'), APP_NAME)
 CONFIG_FILENAME = "config_app.ini"
 RESOURCE_ICON_DIR = "res/icons/"
+PATH_TO_LAST_PREVIEW = "data/preview/"
 
 # region AI MODULES
 GENRE_MODEL_PATH = "models/best_cls_genre_fma_3s_0.0001.onnx"

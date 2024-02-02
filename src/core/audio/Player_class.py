@@ -11,13 +11,15 @@ from math import atan2, cos, sin, pi
 import numpy as np
 from multipledispatch import dispatch
 import mutagen
+from mutagen.flac import FLAC
+from mutagen.mp3 import MP3
 import librosa
 
 from PyQt6 import QtMultimedia, QtCore
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
-                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent)
+                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent, QImage)
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
@@ -106,6 +108,9 @@ class AudioPlayer(QWidget):
         self.meta_list.move(self.image_size + 20, 40)
         self.meta_list.setContentsMargins(5, 5, 5, 5)
 
+        self.track_meta_image_bytes: Optional[bytes] = None
+        self.track_meta_image = QImage()
+
         self.position_slider = SimpleSlider(self)
         self.position_slider.set_range(0, 1)
         self.position_slider.sliderMoved.connect(self.set_track_position)
@@ -144,6 +149,9 @@ class AudioPlayer(QWidget):
         painter = QPainter(self)
         # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
         painter.drawPixmap(10, 10, self.track_image)
+        image_rect = QRect(11, 11, self.image_size - 2, self.image_size - 2)
+        painter.drawImage(image_rect, self.track_meta_image)
+        painter.fillRect(image_rect, QColor(0, 0, 0, 50))
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -206,6 +214,7 @@ class AudioPlayer(QWidget):
             self.positionChanged.emit(position / self.player.duration())
             self.audio_graph.change_scale_graph()
 
+    @pyqtSlot(QMediaPlayer.PlaybackState)
     def player_state_changed(self, state: QMediaPlayer.PlaybackState):
         print_d(state)
         if state is QMediaPlayer.PlaybackState.StoppedState:
@@ -216,13 +225,27 @@ class AudioPlayer(QWidget):
 
     # region Player methods
     def prepare_to_open_file(self, path: str) -> bool:
-        self.stop_music()
+        self.player.stop()
         self.meta_list.clear()
         print_d(f"Open file: {path}")
 
+        self.track_meta_image_bytes = None
+        self.track_meta_image = QImage()
+
         # region Meta info
         filename, file_extension = os.path.splitext(os.path.basename(path))
-        audio = mutagen.File(path)
+        try:
+            if file_extension.lower() == '.flac':
+                audio = FLAC(path)
+                self.track_meta_image_bytes = audio.pictures[0].data
+                self.track_meta_image.loadFromData(self.track_meta_image_bytes)
+            elif file_extension.lower() == '.mp3':
+                audio = MP3(path)
+            else:
+                raise ValueError
+        except Exception as e:
+            print_e("Meta read error", e)
+            audio = mutagen.File(path)
         if audio is None:
             print_e(f'Open file error. {filename}')
             return False
@@ -238,10 +261,6 @@ class AudioPlayer(QWidget):
 
         track_name = audio.get('title', None)
 
-        pict_tag = audio.get("APIC:", None)
-        if pict_tag is not None:
-            print_d(pict_tag.data)
-        # im = Image.open(BytesIO(pict))
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
 

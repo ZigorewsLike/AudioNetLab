@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pickle
 
 from src.core.log_system import print_e, print_d, OutputBuffer
-from src.global_constants import APP_NAME, DEBUG, VERSION, APP_ROAMING_DIR, TRACE, LOG_IN_FILE
+from src.global_constants import APP_NAME, DEBUG, VERSION, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_PREVIEW
 
 from PyQt6.QtCore import QRect, QPoint
 from PyQt6.QtGui import QIcon
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     sys.stdout = OutputBuffer()
 
     # region Создание необходимых для программы директорий и файлов
-    for dir_name in ["data/local/"]:
+    for dir_name in ["data/local/", PATH_TO_LAST_PREVIEW]:
         os.makedirs(dir_name, exist_ok=True)
     os.makedirs(APP_ROAMING_DIR, exist_ok=True)
     if LOG_IN_FILE:
@@ -87,6 +87,7 @@ if __name__ == '__main__':
     params_dist: dict = {"size_width": size.width(), "size_height": size.height()}
     # Создание окна авторизации
     mainWin = MainForm(params_dist)
+    app.processEvents()
     mainWin.load_ann_models()
     # splash_screen.close()
 

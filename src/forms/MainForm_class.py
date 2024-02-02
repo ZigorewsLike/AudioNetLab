@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 import mutagen
+import numpy as np
 from PyQt6 import QtCore, QtSvg, QtWidgets
 from PyQt6.QtCore import Qt, QRectF, QPoint, QTimer, QThread, pyqtSlot, QSize, QRect
 from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEvent, QKeySequence, QMoveEvent,
@@ -19,7 +20,8 @@ from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDia
 
 from src.core.audio.Player_class import MetaListItem
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR)
+                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR,
+                                  PATH_TO_LAST_PREVIEW)
 from src.core.log_system import print_e, print_d
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
@@ -28,6 +30,7 @@ from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget
 from src.enums import StateMode, PlayerState
 from src.core.workers import OpenFileWorker
+from src.function_lib.math_lib import fixed_hash
 
 from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 from src.core.render.graphics_system import LibrosaGraphsModule
@@ -155,6 +158,11 @@ class MainForm(QMainWindow):
         icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
         open_file_action.setIcon(QIcon(icon))
 
+        player_action = QAction("Open player", self)
+        player_action.triggered.connect(lambda: self.set_state_mode(StateMode.PLAYER))
+        # icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
+        # player_action.setIcon(QIcon(icon))
+
         home_page_action = QAction("Home page", self)
         home_page_action.triggered.connect(lambda: self.set_state_mode(StateMode.HOME_PAGE))
         icon = QPixmap(RESOURCE_ICON_DIR + "home_FILL0_wght400_GRAD0_opsz24.png")
@@ -164,6 +172,7 @@ class MainForm(QMainWindow):
         exit_action.triggered.connect(lambda: self.close())
 
         file_menu.addAction(open_file_action)
+        file_menu.addAction(player_action)
         file_menu.addAction(home_page_action)
         file_menu.addSeparator()
         file_menu.addAction(exit_action)
@@ -226,15 +235,16 @@ class MainForm(QMainWindow):
         self.settings.system_settings.form_width = self.width()
         self.settings.system_settings.form_height = self.height()
 
-        self.audio_player.resize(self.width(), self.audio_player.height())
-        self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
+        self.audio_player.resize(self.central_widget.width(), self.audio_player.height())
+        self.tab_widget.resize(self.central_widget.width(),
+                               self.central_widget.height() - self.audio_player.height())
         self.tab_widget.move(0, self.audio_player.height())
         self.tab_widget.resize_tab_content()
 
-        self.preloader.resize(self.width(), self.height())
-        self.drag_widget.resize(self.width(), self.height())
+        self.preloader.resize(self.size())
+        self.drag_widget.resize(self.size())
 
-        self.home_page.resize(self.size())
+        self.home_page.resize(self.central_widget.size())
 
     def set_state_mode(self, state: StateMode) -> None:
         player_enabled = state is StateMode.PLAYER
@@ -259,6 +269,7 @@ class MainForm(QMainWindow):
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
         self.work_thread.exit(0)
+        self.work_thread.wait()
 
     def open_file_dialog(self) -> None:
         dialog_filter = f"Все музыкальные форматы (*.mp3 *.flac *.wave);;" \
@@ -298,6 +309,8 @@ class MainForm(QMainWindow):
         self.worker.file_path = file_path
         self.worker.moveToThread(self.work_thread)
         self.work_thread.started.connect(self.worker.run)
+        print_d("RUN Thread")
+        self.work_thread.wait()
         self.work_thread.start()
 
     def open_finished(self, path: Optional[str]) -> None:
@@ -314,6 +327,13 @@ class MainForm(QMainWindow):
             self.preloader.setVisible(False)
             return
         self.last_files.add(LastFileProp(path, datetime.now()))
+
+        # region preview
+        if self.audio_player.track_meta_image_bytes is not None:
+            path_hash = fixed_hash(path)
+            with open(f"{PATH_TO_LAST_PREVIEW}/{path_hash}.byte", "wb") as binary_file:
+                binary_file.write(self.audio_player.track_meta_image_bytes)
+        # endregion
 
         self.audio_player.player_state = PlayerState.WAIT
         self.settings.system_settings.open_filename = path
