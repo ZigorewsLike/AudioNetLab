@@ -10,6 +10,7 @@ from src.core.log_system import print_d
 from src.core.file_system.qt_widgets import LastFileList
 from src.enums import StateMode
 from src.global_constants import RESOURCE_ICON_DIR
+from src.global_styles import AppColorSchemes
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -23,13 +24,13 @@ class HomePageButtonWidget(QWidget):
         self.resize(300, 300)
         self.setStyleSheet("""
         QFrame#MainFrame{
-            background-color: #D9D9D9;
+            background-color: """ + AppColorSchemes.FILE_LIST_ITEM_BODY + """;
         }
         QFrame#InfoFrame{
             background-color: transparent;
         }
         QFrame#MainFrame:hover{
-            background-color: #CACACA;
+            background-color: """ + AppColorSchemes.BUTTON_HOVER + """;
         }
         QLabel{
             background-color: transparent;
@@ -115,4 +116,4 @@ class HomePageWidget(QWidget):
         super(HomePageWidget, self).paintEvent(event)
         if self.isVisible():
             painter = QPainter(self)
-            painter.fillRect(0, 0, self.width(), self.height(), QColor("#B3B3B3"))
+            painter.fillRect(0, 0, self.width(), self.height(), QColor(AppColorSchemes.FILE_LIST_BACKGROUND))

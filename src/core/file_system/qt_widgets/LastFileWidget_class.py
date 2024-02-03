@@ -2,20 +2,21 @@ import os
 import subprocess
 import sys
 from datetime import datetime
+from math import pi, sin, cos
 from typing import List, Optional, Union, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize
+from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize, QTimer
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion, \
-    QPen, QPixmap, QIcon, QShowEvent, QImage
+    QPen, QPixmap, QIcon, QShowEvent, QImage, QHideEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu, QStyle
 
 from src.core.log_system import print_d
 from src.core.file_system import LastFileProp
 from src.function_lib.math_lib import fixed_hash
-from src.enums import StateMode
+from src.enums import StateMode, PlayerState
 from src.global_constants import RESOURCE_ICON_DIR, PATH_TO_LAST_PREVIEW
-from src.global_styles import DEFAULT_SCROLLBAR_STYLE
+from src.global_styles import DEFAULT_SCROLLBAR_STYLE, AppColorSchemes
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -38,7 +39,7 @@ class LastFileList(QWidget):
             background-color: transparent;
         }
         QFrame{
-            background-color: #B3B3B3;
+            background-color: """ + AppColorSchemes.FILE_LIST_BACKGROUND + """;
             border: 0px solid black;
         }
         QPushButton#openFolder{
@@ -51,7 +52,6 @@ class LastFileList(QWidget):
         }
 
         """ + DEFAULT_SCROLLBAR_STYLE)
-        "#B3B3B3"
         self.file_frame = QFrame()
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidget(self.file_frame)
@@ -95,6 +95,9 @@ class LastFileList(QWidget):
                 file_exist = os.path.exists(_file.path)
                 last_file = LastFileItem(_file, self.mf, self, file_exist=file_exist)
                 last_file.setFixedHeight(self.item_height)
+                if file_exist and self.mf.audio_player.player_state is PlayerState.PLAY and \
+                        self.mf.settings.system_settings.open_filename == _file.path:
+                    last_file.is_playing = True
                 self.v_layout.addWidget(last_file)
             self.v_layout.addStretch()
             self.file_frame.resize(self.widget_width - self.right_padding, self.item_height * (self.v_layout.count() - 1))
@@ -115,14 +118,15 @@ class LastFileItem(QWidget):
         self.mf = main_form
         self.container: LastFileList = container
         self.file_exist: bool = file_exist
+        self.is_playing: bool = False
+
+        self.angular_velocity: float = .05
+        self.angle: float = .0
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.rotate_wave)
 
         self.resize(self.width(), self.container.item_height)
 
-        not_exist_style: str = """
-        QLabel{
-            color: #FA514C
-        }
-        """
         header_style: str = """
         QLabel{
             color: black;
@@ -159,8 +163,10 @@ class LastFileItem(QWidget):
         self.label_path.setStyleSheet(header_style)
         # self.label_path.setWordWrap(True)
 
+        self.button_open_size: QSize = QSize(70, 70)
+
         self.button_open = QPushButton(self)
-        self.button_open.setGeometry(QRect(10, 10, 70, 70))
+        self.button_open.setGeometry(QRect(10, 10, self.button_open_size.width(), self.button_open_size.height()))
         self.button_open.setObjectName("openFolder")
         if not file_exist:
             icon = QPixmap(os.path.join(RESOURCE_ICON_DIR, 'file_error_icon_white.png'))
@@ -188,14 +194,26 @@ class LastFileItem(QWidget):
             with open(path_to_hash, 'rb') as bytes_file:
                 self.track_meta_image = QImage()
                 self.track_meta_image.loadFromData(bytes_file.read())
-                self.track_meta_image = self.track_meta_image.scaled(70, 70, Qt.AspectRatioMode.KeepAspectRatio,
-                                                                     Qt.TransformationMode.FastTransformation)
+                self.track_meta_image = self.track_meta_image.scaled(self.button_open_size.width(),
+                                                                     self.button_open_size.height(),
+                                                                     Qt.AspectRatioMode.KeepAspectRatio,
+                                                                     Qt.TransformationMode.SmoothTransformation)
 
         self.file_type: str = "folder"
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
         self.recalc_sizes()
+        if self.is_playing:
+            # self.button_open.setIcon(QIcon())
+            if self.timer.isActive():
+                self.timer.stop()
+            self.timer.start(10)
+
+    def hideEvent(self, event: QHideEvent) -> None:
+        super().hideEvent(event)
+        if self.timer.isActive():
+            self.timer.stop()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -208,7 +226,10 @@ class LastFileItem(QWidget):
         self.right_plane.move(self.width() - self.right_plane.width(), 5)
 
     def click_open_folder(self):
-        self.mf.open_file(self.file_path)
+        if self.is_playing:
+            self.mf.set_state_mode(StateMode.PLAYER)
+        else:
+            self.mf.open_file(self.file_path)
 
     def contextMenuEvent(self, event):
         # self.color = '#2C2A35'
@@ -232,14 +253,43 @@ class LastFileItem(QWidget):
         self.color = 'transparent'
         self.update()
 
+    def rotate_wave(self) -> None:
+        if self.isVisible():
+            self.angle += self.angular_velocity
+            if self.angle >= pi * 2:
+                self.angle -= pi * 2
+            self.update()
+
     def paintEvent(self, event):
         super(LastFileItem, self).paintEvent(event)
         if self.isVisible():
             painter = QPainter(self)
-            painter.fillRect(0, 0, self.width(), self.container.item_height - 10, QBrush(QColor('#D9D9D9')))
+            painter.fillRect(0, 0, self.width(), self.container.item_height - 10,
+                             QBrush(QColor(AppColorSchemes.FILE_LIST_ITEM_BODY)))
             painter.fillRect(0, 2, self.width(), self.height(), QBrush(QColor(self.color)))
 
             if self.track_meta_image is not None:
                 painter.drawImage(10, 10, self.track_meta_image)
+
+            if self.is_playing:
+                # painter.fillRect(self.button_open_size.width() - 20,
+                #                  self.button_open_size.height() + 10,
+                #                  5,
+                #                  int(self.button_open_size.height() * abs(sin(self.angle))),
+                #                  QColor(AppColorSchemes.FILE_LIST_ITEM_BODY))
+
+                rect_count = 4
+                rect_width = 10
+                rect_shift = 5
+                rect_height = self.button_open_size.height() * 0.4
+                calc_rect_width: int = rect_shift + rect_width
+                for i in range(0, rect_count):
+                    painter.setBrush(QBrush(QColor(self.color), Qt.BrushStyle.SolidPattern))
+                    painter.fillRect(
+                        int(calc_rect_width * i - ((rect_count) * calc_rect_width / 2) + (self.button_open_size.width() / 2) + rect_shift / 2) + 10,
+                        10 + self.button_open_size.height(),
+                        rect_width,
+                        -int(abs(cos(self.angle + i / pi * 1.2)) * rect_height),
+                        QBrush(QColor("#ffffff"), Qt.BrushStyle.SolidPattern))
 
 

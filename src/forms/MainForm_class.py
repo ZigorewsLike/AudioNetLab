@@ -47,6 +47,8 @@ class MainForm(QMainWindow):
         super().__init__()
         self.params: dict = params
         self.params['main_form_ref'] = self
+        # TODO: Create custom QMenu Bar
+        # self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
 
         self.setAcceptDrops(True)
 
