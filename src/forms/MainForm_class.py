@@ -27,8 +27,9 @@ from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
 from src.core.file_system import LastFileContainer, LastFileProp
-from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget
-from src.enums import StateMode, PlayerState
+from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget,
+                                 MainVerticalTabWidget)
+from src.enums import StateMode, PlayerState, MainTabWidgetIcons
 from src.core.workers import OpenFileWorker
 from src.function_lib.math_lib import fixed_hash
 
@@ -92,6 +93,11 @@ class MainForm(QMainWindow):
         self.audio_player = AudioPlayer(self, self.central_widget)
 
         self.home_page = HomePageWidget(self, self.central_widget)
+
+        self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
+        self.main_tab_widget.add_tab(QPushButton("HOME"), MainTabWidgetIcons.HOME_PAGE)
+        self.main_tab_widget.add_tab(QPushButton("PLAYER"), MainTabWidgetIcons.PLAYER)
+        self.main_tab_widget.add_tab(QPushButton("SETTINGS"), MainTabWidgetIcons.SETTINGS)
 
         # region Overlap widgets
 
@@ -164,6 +170,7 @@ class MainForm(QMainWindow):
         player_action.triggered.connect(lambda: self.set_state_mode(StateMode.PLAYER))
         # icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
         # player_action.setIcon(QIcon(icon))
+
 
         home_page_action = QAction("Home page", self)
         home_page_action.triggered.connect(lambda: self.set_state_mode(StateMode.HOME_PAGE))
@@ -247,6 +254,7 @@ class MainForm(QMainWindow):
         self.drag_widget.resize(self.size())
 
         self.home_page.resize(self.central_widget.size())
+        self.main_tab_widget.resize(self.central_widget.size())
 
     def set_state_mode(self, state: StateMode) -> None:
         player_enabled = state is StateMode.PLAYER

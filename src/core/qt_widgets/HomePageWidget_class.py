@@ -85,9 +85,6 @@ class HomePageWidget(QWidget):
 
         self.mf: Union[MainForm, QWidget] = mf
 
-        # self.button_player = QPushButton("Go to player", self)
-        # self.button_player.clicked.connect(self.open_player)
-
         self.button_open = HomePageButtonWidget(self)
         self.button_open.clicked.connect(self.call_open_dialog)
         self.button_open.move(self.left_padding, 10)

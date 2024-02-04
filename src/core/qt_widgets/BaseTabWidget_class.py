@@ -11,10 +11,9 @@ from src.function_lib.math_lib import median
 
 
 class TabItem:
-    def __init__(self, widget: QWidget, tab_name: str, fixed_width: int):
+    def __init__(self, widget: QWidget, tab_name: str):
         self.widget: QWidget = widget
         self.tab_name: str = tab_name
-        self.fixed_width: int = fixed_width
 
 
 class BaseTabWidget(QWidget):
@@ -38,10 +37,8 @@ class BaseTabWidget(QWidget):
         self._fixed_position = fixed_pos
         self.move(self._fixed_position.x() - self.width(), self._fixed_position.y())
 
-    def add_tab(self, widget: QWidget, tab_name: str, resize: bool = True, fixed_width: Optional[int] = None) -> None:
-        if fixed_width is None:
-            fixed_width = self.content_width
-        self._tab_container.append(TabItem(widget, tab_name, fixed_width))
+    def add_tab(self, widget: QWidget, tab_name: str, resize: bool = True) -> None:
+        self._tab_container.append(TabItem(widget, tab_name))
         self.tab_count += 1
         widget.setParent(self)
         widget.move(self.margin + self.tab_width, self.margin)
@@ -54,8 +51,6 @@ class BaseTabWidget(QWidget):
         self.update()
 
     def active_tab(self, index: int) -> None:
-        self.content_width = self._tab_container[index].fixed_width
-        self.resize(self.tab_width + self.content_width, self.height())
         self._tab_container[self.tab_current_index].widget.hide()
         self.tab_current_index = index
         self._tab_container[self.tab_current_index].widget.show()
