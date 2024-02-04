@@ -12,6 +12,7 @@ import numpy as np
 from multipledispatch import dispatch
 import mutagen
 from mutagen.flac import FLAC
+from mutagen.id3 import APIC
 from mutagen.mp3 import MP3
 import librosa
 
@@ -212,7 +213,8 @@ class AudioPlayer(QWidget):
         if self.player.duration() != 0:
             self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
             self.positionChanged.emit(position / self.player.duration())
-            self.audio_graph.change_scale_graph()
+            if self.isVisible():
+                self.audio_graph.change_scale_graph()
 
     @pyqtSlot(QMediaPlayer.PlaybackState)
     def player_state_changed(self, state: QMediaPlayer.PlaybackState):
@@ -241,6 +243,10 @@ class AudioPlayer(QWidget):
                 self.track_meta_image.loadFromData(self.track_meta_image_bytes)
             elif file_extension.lower() == '.mp3':
                 audio = MP3(path)
+                apic = audio.tags.get("APIC:", None)
+                if apic:
+                    self.track_meta_image_bytes = apic.data
+                    self.track_meta_image.loadFromData(apic.data)
             else:
                 raise ValueError
         except Exception as e:

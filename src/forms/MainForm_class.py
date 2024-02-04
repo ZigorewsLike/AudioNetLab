@@ -28,7 +28,7 @@ from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
 from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.qt_widgets import BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget
-from src.enums import StateMode, PlayerState
+from src.enums import StateMode, PlayerState, DragFileState
 from src.core.workers import OpenFileWorker
 from src.function_lib.math_lib import fixed_hash
 
@@ -194,7 +194,7 @@ class MainForm(QMainWindow):
         return super(MainForm, self).resizeEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if self.state is not StateMode.OPENING and event.mimeData().hasUrls:
+        if self.state is not StateMode.OPENING and not self.preloader.isVisible() and event.mimeData().hasUrls:
             event.setDropAction(Qt.DropAction.CopyAction)
             for path in event.mimeData().urls():
                 if path.isLocalFile():
@@ -203,15 +203,19 @@ class MainForm(QMainWindow):
                     file_path = str(path)
                 _, file_extension = os.path.splitext(file_path)
                 if file_extension.lower() in ['.mp3', '.wave', '.wav', '.flac']:
+                    self.drag_widget.set_state(DragFileState.CORRECT)
                     event.accept()
-                    self.drag_widget.setVisible(True)
+                else:
+                    self.drag_widget.set_state(DragFileState.INCORRECT)
+                    event.accept()
+                self.drag_widget.setVisible(True)
                 break
         else:
             event.ignore()
             self.drag_widget.setVisible(False)
 
     def dropEvent(self, event: QDropEvent) -> None:
-        if event.mimeData().hasUrls:
+        if event.mimeData().hasUrls and self.drag_widget.state is DragFileState.CORRECT:
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
             for path in event.mimeData().urls():
@@ -223,6 +227,7 @@ class MainForm(QMainWindow):
                 break
         else:
             event.ignore()
+            self.drag_widget.setVisible(False)
 
     def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:
         self.drag_widget.setVisible(False)
