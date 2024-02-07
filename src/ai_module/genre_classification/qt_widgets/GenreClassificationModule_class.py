@@ -1,5 +1,6 @@
 import math
 import os
+import time
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import librosa
@@ -15,7 +16,7 @@ from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFon
     QResizeEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog
 
-from src.global_constants import ONNX_INFERENCE
+from src.global_constants import ONNX_INFERENCE, PROFILE
 from src.core.log_system import print_d, print_e, print_i
 from src.core.workers import GenrePredictWorker
 from src.function_lib.math_lib import median
@@ -168,6 +169,7 @@ class GenreClassifierModule(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
         if self.isVisible():
+            start_time: float = time.time()
             painter = QPainter(self)
             painter.fillRect(10, self.graph_y, self.width() - 21, self.graph_height, QBrush(self.genre_gradient))
 
@@ -195,6 +197,8 @@ class GenreClassifierModule(QWidget):
                 genre_text: str = self.genre_dict[self.global_results[index]]
                 genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
                 painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, genre_text)
+            if PROFILE:
+                self.mf.profiling.add_draw_time(self.__class__.__name__, time.time() - start_time)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         super().mouseMoveEvent(event)

@@ -23,6 +23,7 @@ from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME,
                                   LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR,
                                   PATH_TO_LAST_PREVIEW)
 from src.core.log_system import print_e, print_d
+from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
@@ -53,6 +54,7 @@ class MainForm(QMainWindow):
         self.setAcceptDrops(True)
 
         self.create_menu_bars()
+        self.profiling = ProfileDrawWidget()
 
         self.central_widget = QWidget(self)
         self.central_widget.setStyleSheet("""
@@ -154,6 +156,7 @@ class MainForm(QMainWindow):
         menu_bar = self.menuBar()
         file_menu = QMenu("&File", self)
         edit_menu = QMenu("&Edit", self)
+        tools_menu = QMenu("&Tools", self)
 
         open_file_action = QAction("Open file", self)
         open_file_action.triggered.connect(lambda: self.open_file_dialog())
@@ -179,8 +182,14 @@ class MainForm(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(exit_action)
 
+        profiling_action = QAction("Profiling", self)
+        profiling_action.triggered.connect(lambda: self.profiling.show())
+
+        tools_menu.addAction(profiling_action)
+
         menu_bar.addMenu(file_menu)
         menu_bar.addMenu(edit_menu)
+        menu_bar.addMenu(tools_menu)
 
     def showEvent(self, event: QShowEvent) -> None:
         pass
@@ -354,4 +363,6 @@ class MainForm(QMainWindow):
         self.settings.save_to_ini(CONFIG_FILENAME)
 
     def closeEvent(self, event):
+        if self.profiling.isVisible():
+            self.profiling.close()
         self.save_config_app()

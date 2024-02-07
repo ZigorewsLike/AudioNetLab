@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QWidget
 
 from src.core.log_system import print_d
 from src.function_lib.qt_utils import array2d_to_qpolygonf
+from src.global_constants import PROFILE
 
 if TYPE_CHECKING:
     from src.forms.MainForm_class import MainForm
@@ -34,6 +35,7 @@ class GraphPanelBase(QOpenGLWidget):
         self.step_multiplier: int = 2
         self.max_peak_value: float = 1.0
         self.draw_peak_text: bool = False
+        self.profile_class_name: str = ""
 
     def showEvent(self, event: QShowEvent) -> None:
         self.new_width = self.width()
@@ -77,9 +79,10 @@ class GraphPanelBase(QOpenGLWidget):
         x_np_line = np.append(x_np_line, np.append(x_slice_clac, [self.width() + 10]))
         y_np_line = np.append(y_np_line, np.append(y_slice_clac, [self.height() + 50]))
 
-        # print_d("Clac render line. New method: ", time.time() - start_time)
         self.render_lines = array2d_to_qpolygonf(x_np_line, y_np_line)
-        # print_d("Clac render line. Final: ", time.time() - start_time)
+        if PROFILE:
+            module_name: str = self.__class__.__name__ if not self.profile_class_name else self.profile_class_name
+            self.mf.profiling.add_math_time(module_name + "_lines", time.time() - start_time)
 
     def set_shift(self, shift_left: float, shift_right: float):
         start_time: float = time.time()
@@ -105,9 +108,14 @@ class GraphPanelBase(QOpenGLWidget):
             else:
                 painter.setBrush(QBrush(Qt.GlobalColor.transparent, Qt.BrushStyle.SolidPattern))
             if self.lines and self.render_lines:
-                painter.drawPolygon(self.render_lines)
+                if self.brush_graph:
+                    painter.drawPolygon(self.render_lines)
+                else:
+                    painter.drawPolyline(self.render_lines)
 
             if self.draw_peak_text:
                 painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.SolidLine))
                 painter.drawText(10, 10, f"{self.max_peak_value}")
-        # print_d("render call: ", time.time() - start_time)
+        if PROFILE:
+            self.mf.profiling.add_draw_time(self.__class__.__name__ if not self.profile_class_name else self.profile_class_name,
+                                            time.time() - start_time)

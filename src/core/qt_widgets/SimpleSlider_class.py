@@ -108,7 +108,7 @@ class SimpleSlider(QWidget):
             mouse_val /= self.width() - self.left_right_margin * 2  # Normalisation
             self.valueChanged.emit(int((self.maximum - self.minimum) * mouse_val + self.minimum))
             self.sliderMoved.emit(self.value)
-        self.update()
+            self.update()
 
     def leaveEvent(self, event: QEvent) -> None:
         self.front_color = self.simple_color

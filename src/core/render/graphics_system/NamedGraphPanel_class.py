@@ -16,6 +16,7 @@ class NamedGraphPanel(QWidget):
         self.header_padding: int = 30
 
         self.graph = GraphPanelBase(mf, self)
+        self.graph.profile_class_name = "NamedGraphPanel"
 
         self.label = QLabel("Text", self)
         self.label.setFont(QFont("Arial", 14))
