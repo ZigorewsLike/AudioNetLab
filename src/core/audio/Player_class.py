@@ -29,6 +29,7 @@ from src.core.render.graphics_system import GraphPanelAudio
 from src.core.qt_widgets import SimpleSlider
 from src.core.log_system import print_d, print_e
 from src.enums import PlayerState, StateMode
+from src.global_constants import PROFILE
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -129,7 +130,7 @@ class AudioPlayer(QWidget):
         self.label_duration_right = QLabel("0:00:00", self)
         self.label_duration_right.adjustSize()
 
-        self.audio_graph = GraphPanelAudio(self)
+        self.audio_graph = GraphPanelAudio(self.mf, self)
 
         self.graph_visible_button = QPushButton("Скрыть", self)
         self.graph_visible_button.clicked.connect(self.switch_visible_graph)
@@ -147,12 +148,16 @@ class AudioPlayer(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
+        start_time = time.time()
         painter = QPainter(self)
         # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
         painter.drawPixmap(10, 10, self.track_image)
         image_rect = QRect(11, 11, self.image_size - 2, self.image_size - 2)
         painter.drawImage(image_rect, self.track_meta_image)
         painter.fillRect(image_rect, QColor(0, 0, 0, 50))
+
+        if PROFILE:
+            self.mf.profiling.add_draw_time("AudioPlayer", time.time() - start_time)
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -255,7 +260,6 @@ class AudioPlayer(QWidget):
         if audio is None:
             print_e(f'Open file error. {filename}')
             return False
-        print_d('Tags:', audio)
         # endregion
 
         for key, value in audio.items():

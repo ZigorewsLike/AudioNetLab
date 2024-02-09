@@ -1,5 +1,6 @@
 import math
 import os
+import time
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import librosa
@@ -11,7 +12,7 @@ from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFon
     QResizeEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog, QFrame, QScrollArea, QCheckBox
 
-from src.global_constants import DEBUG
+from src.global_constants import DEBUG, PROFILE
 from src.core.log_system import print_d, print_e, print_i
 from .NamedGraphPanel_class import NamedGraphPanel
 
@@ -41,11 +42,13 @@ class LibrosaGraphsModule(QWidget):
 
         self.fourier_graph = NamedGraphPanel(self.mf, self.graphs_frame)
         self.fourier_graph.set_header("Short-time Fourier transform (STFT)")
+        self.fourier_graph.set_header("Short-time Fourier transform (STFT)")
         self.fourier_graph.resize(self.width() - 10, 300)
         self.fourier_graph.move(10, 40)
         self.fourier_graph.graph.step_multiplier = 10
         self.fourier_graph.graph.brush_graph = True
         self.fourier_graph.graph.draw_peak_text = True
+        self.fourier_graph.graph.profile_class_name = "NamedGraphPanel (STFT)"
 
         self.update_all_button = QPushButton("Update all", self.graphs_frame)
         self.update_all_button.clicked.connect(self.update_graphs)
@@ -60,6 +63,7 @@ class LibrosaGraphsModule(QWidget):
 
     @pyqtSlot()
     def update_graphs(self) -> None:
+        start_time: float = time.time()
         if self.mf.audio_player.waveform is not None and self.mf.audio_player.waveform.size > 0:
             hop_length: int = 512
             slice_left: int = int(self.mf.audio_player.waveform.shape[0] * self.cursor_position / hop_length) * hop_length
@@ -67,6 +71,9 @@ class LibrosaGraphsModule(QWidget):
             stff = np.abs(librosa.stft(waveform, n_fft=2048, hop_length=hop_length))
             slice_stff = stff[:, 0]
             self.fourier_graph.graph.set_data(slice_stff, np.float64)
+        if PROFILE:
+            module_name: str = self.__class__.__name__
+            self.mf.profiling.add_math_time(module_name + "_upd_graphs", time.time() - start_time)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
