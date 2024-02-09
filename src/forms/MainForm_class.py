@@ -88,16 +88,19 @@ class MainForm(QMainWindow):
             self.first_run = True
             print_e(e)
 
-        self.tab_widget = VerticalTabWidget(self.central_widget)
-        self.tab_widget.tab_switched.connect(self.tab_switched)
-        self.audio_player = AudioPlayer(self, self.central_widget)
+        self.player_frame = QWidget()
 
-        self.home_page = HomePageWidget(self, self.central_widget)
+        self.tab_widget = VerticalTabWidget(self.player_frame)
+        self.tab_widget.tab_switched.connect(self.tab_switched)
+        self.audio_player = AudioPlayer(self, self.player_frame)
+
+        self.home_page = HomePageWidget(self)
 
         self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
-        self.main_tab_widget.add_tab(QPushButton("HOME"), MainTabWidgetIcons.HOME_PAGE)
-        self.main_tab_widget.add_tab(QPushButton("PLAYER"), MainTabWidgetIcons.PLAYER)
+        self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)
+        self.main_tab_widget.add_tab(self.player_frame, MainTabWidgetIcons.PLAYER)
         self.main_tab_widget.add_tab(QPushButton("SETTINGS"), MainTabWidgetIcons.SETTINGS)
+        self.main_tab_widget.tab_switched.connect(lambda: self.recalculate_size())
 
         # region Overlap widgets
 
@@ -135,6 +138,8 @@ class MainForm(QMainWindow):
         self.worker.mf = self
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
+
+        self.recalculate_size()
 
     def init_ui(self):
         if self.settings.system_settings.form_position == Point(-1, -1):
@@ -244,22 +249,22 @@ class MainForm(QMainWindow):
         self.settings.system_settings.form_width = self.width()
         self.settings.system_settings.form_height = self.height()
 
-        self.audio_player.resize(self.central_widget.width(), self.audio_player.height())
-        self.tab_widget.resize(self.central_widget.width(),
-                               self.central_widget.height() - self.audio_player.height())
+        self.main_tab_widget.resize(self.central_widget.size())
+        self.audio_player.resize(self.player_frame.width(), self.audio_player.height())
+        self.tab_widget.resize(self.player_frame.width(),
+                               self.player_frame.height() - self.audio_player.height())
         self.tab_widget.move(0, self.audio_player.height())
         self.tab_widget.resize_tab_content()
 
         self.preloader.resize(self.size())
         self.drag_widget.resize(self.size())
 
-        self.home_page.resize(self.central_widget.size())
-        self.main_tab_widget.resize(self.central_widget.size())
+        # self.home_page.resize(self.central_widget.size())
 
     def set_state_mode(self, state: StateMode) -> None:
         player_enabled = state is StateMode.PLAYER
-        self.home_page.setVisible(not player_enabled)
-        self.audio_player.setVisible(player_enabled)
+        # self.home_page.setVisible(not player_enabled)
+        # self.audio_player.setVisible(player_enabled)
 
         self.state = state
 
