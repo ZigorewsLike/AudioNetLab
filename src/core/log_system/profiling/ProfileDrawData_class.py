@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 
@@ -44,22 +44,22 @@ class ProfileDrawData:
         return np.array([])
 
     # region Get data from array (for Qt)
-    def get_data_value(self, value) -> float | str:
+    def get_data_value(self, value) -> Union[float, str]:
         if self.fps_mode:
             if value != 0:
                 return round(1000 / value)
             return "inf"
         return value
 
-    def get_mean_time(self, module: str, profile_data_type: ProfileDataType) -> float | str:
+    def get_mean_time(self, module: str, profile_data_type: ProfileDataType) -> Union[float, str]:
         mean = round(self.get_time_list(module, profile_data_type).mean(), self.round_step)
         return self.get_data_value(mean)
 
-    def get_max_time(self, module: str, profile_data_type: ProfileDataType) -> float | str:
+    def get_max_time(self, module: str, profile_data_type: ProfileDataType) -> Union[float, str]:
         data_max = round(self.get_time_list(module, profile_data_type).max(), self.round_step)
         return self.get_data_value(data_max)
 
-    def get_min_time(self, module: str, profile_data_type: ProfileDataType) -> float | str:
+    def get_min_time(self, module: str, profile_data_type: ProfileDataType) -> Union[float, str]:
         data_min = round(self.get_time_list(module, profile_data_type).min(), self.round_step)
         return self.get_data_value(data_min)
     # endregion

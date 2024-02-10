@@ -18,14 +18,14 @@ class AppColorSchemes(str, Enum):
 
 DEFAULT_SCROLLBAR_STYLE = """
     QScrollBar:vertical {
-        width: 10px;
+        width: 12px;
         background-color: """ + AppColorSchemes.SCROLLBAR_BACKGROUND + """;
     }
     
     QScrollBar::handle:vertical {
         min-height: 30px;
-        width: 8px;
-        margin: 1px;
+        width: 6px;
+        margin: 3px;
         margin-top: 2px;
         border-radius: 2px;
         background-color: """ + AppColorSchemes.SCROLLBAR_BODY + """;

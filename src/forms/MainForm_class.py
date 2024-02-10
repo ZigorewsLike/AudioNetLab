@@ -14,7 +14,7 @@ from PyQt6 import QtCore, QtSvg, QtWidgets
 from PyQt6.QtCore import Qt, QRectF, QPoint, QTimer, QThread, pyqtSlot, QSize, QRect
 from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEvent, QKeySequence, QMoveEvent,
                          QMouseEvent, QKeyEvent, QColor, QShowEvent, QCursor, QAction, QDragEnterEvent, QDragLeaveEvent,
-                         QDropEvent)
+                         QDropEvent, QPaintEvent)
 from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDialog, QMessageBox, QVBoxLayout, QMenu,
                              QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem, QSizeGrip)
 
@@ -51,7 +51,7 @@ class MainForm(QMainWindow):
         self.params: dict = params
         self.params['main_form_ref'] = self
         # TODO: Create custom QMenu Bar
-        self.setWindowFlags(Qt.WindowType.CustomizeWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.title_bar = TitleBar(self)
         self.block_update: bool = False
 
@@ -142,14 +142,14 @@ class MainForm(QMainWindow):
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
         # region SizeGrips
-        # self.grip_size = 4
-        # self.side_grips = [
-        #     SideGrip(self, Qt.Edge.LeftEdge),
-        #     SideGrip(self, Qt.Edge.TopEdge),
-        #     SideGrip(self, Qt.Edge.RightEdge),
-        #     SideGrip(self, Qt.Edge.BottomEdge),
-        # ]
-        # self.corner_grips = [QSizeGrip(self) for i in range(4)]
+        self.grip_size = 4
+        self.side_grips = [
+            SideGrip(self, Qt.Edge.LeftEdge),
+            SideGrip(self, Qt.Edge.TopEdge),
+            SideGrip(self, Qt.Edge.RightEdge),
+            SideGrip(self, Qt.Edge.BottomEdge),
+        ]
+        self.corner_grips = [QSizeGrip(self) for i in range(4)]
         # endregion
 
         self.recalculate_size()
@@ -174,23 +174,23 @@ class MainForm(QMainWindow):
         self.setMinimumSize(800, 720)
         self.setWindowIcon(QIcon('Icon.ico'))
 
-    # def update_grips(self):
-    #     self.setContentsMargins(*[self.grip_size] * 4)
-    #
-    #     out_rect = self.rect()
-    #     in_rect = out_rect.adjusted(self.grip_size, self.grip_size, -self.grip_size, -self.grip_size)
-    #
-    #     self.corner_grips[0].setGeometry(QRect(out_rect.topLeft(), in_rect.topLeft()))
-    #     self.corner_grips[1].setGeometry(QRect(out_rect.topRight(), in_rect.topRight()).normalized())
-    #     self.corner_grips[2].setGeometry(QRect(in_rect.bottomRight(), out_rect.bottomRight()))
-    #     self.corner_grips[3].setGeometry(QRect(out_rect.bottomLeft(), in_rect.bottomLeft()).normalized())
-    #
-    #     self.side_grips[0].setGeometry(0, in_rect.top(), self.grip_size, in_rect.height())
-    #     self.side_grips[1].setGeometry(in_rect.left(), 0, in_rect.width(), self.grip_size)
-    #     self.side_grips[2].setGeometry(in_rect.left() + in_rect.width(),
-    #                                    in_rect.top(), self.grip_size, in_rect.height())
-    #     self.side_grips[3].setGeometry(self.grip_size, in_rect.top() + in_rect.height(),
-    #                                    in_rect.width(), self.grip_size)
+    def update_grips(self):
+        self.setContentsMargins(*[self.grip_size] * 4)
+
+        out_rect = self.rect()
+        in_rect = out_rect.adjusted(self.grip_size, self.grip_size, -self.grip_size, -self.grip_size)
+
+        self.corner_grips[0].setGeometry(QRect(out_rect.topLeft(), in_rect.topLeft()))
+        self.corner_grips[1].setGeometry(QRect(out_rect.topRight(), in_rect.topRight()).normalized())
+        self.corner_grips[2].setGeometry(QRect(in_rect.bottomRight(), out_rect.bottomRight()))
+        self.corner_grips[3].setGeometry(QRect(out_rect.bottomLeft(), in_rect.bottomLeft()).normalized())
+
+        self.side_grips[0].setGeometry(0, in_rect.top(), self.grip_size, in_rect.height())
+        self.side_grips[1].setGeometry(in_rect.left(), 0, in_rect.width(), self.grip_size)
+        self.side_grips[2].setGeometry(in_rect.left() + in_rect.width(),
+                                       in_rect.top(), self.grip_size, in_rect.height())
+        self.side_grips[3].setGeometry(self.grip_size, in_rect.top() + in_rect.height(),
+                                       in_rect.width(), self.grip_size)
 
     def create_menu_bars(self) -> None:
         menu_bar = self.title_bar.menu_bar
@@ -250,7 +250,7 @@ class MainForm(QMainWindow):
     def resizeEvent(self, event):
         self.resized.emit()
         super(MainForm, self).resizeEvent(event)
-        # self.update_grips()
+        self.update_grips()
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if self.state is not StateMode.OPENING and not self.preloader.isVisible() and event.mimeData().hasUrls:
@@ -422,3 +422,9 @@ class MainForm(QMainWindow):
         if self.profiling.isVisible():
             self.profiling.close()
         self.save_config_app()
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super(MainForm, self).paintEvent(event)
+        if self.isVisible():
+            painter = QPainter(self)
+            # painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#B3B3B3")))
