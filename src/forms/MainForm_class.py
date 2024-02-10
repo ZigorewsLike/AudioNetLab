@@ -16,7 +16,7 @@ from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEv
                          QMouseEvent, QKeyEvent, QColor, QShowEvent, QCursor, QAction, QDragEnterEvent, QDragLeaveEvent,
                          QDropEvent)
 from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDialog, QMessageBox, QVBoxLayout, QMenu,
-                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem)
+                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem, QSizeGrip)
 
 from src.core.audio.Player_class import MetaListItem
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
@@ -29,7 +29,7 @@ from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
 from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget,
-                                 MainVerticalTabWidget)
+                                 MainVerticalTabWidget, TitleBar, SideGrip)
 from src.enums import StateMode, PlayerState, DragFileState
 from src.enums import StateMode, PlayerState, MainTabWidgetIcons
 from src.core.workers import OpenFileWorker
@@ -51,18 +51,17 @@ class MainForm(QMainWindow):
         self.params: dict = params
         self.params['main_form_ref'] = self
         # TODO: Create custom QMenu Bar
-        # self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.CustomizeWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+        self.title_bar = TitleBar(self)
+        self.block_update: bool = False
 
         self.setAcceptDrops(True)
-
         self.create_menu_bars()
         self.profiling = ProfileDrawWidget()
 
         self.central_widget = QWidget(self)
-        self.central_widget.setStyleSheet("""
-
-        """)
-        self.setCentralWidget(self.central_widget)
+        self.central_widget.move(0, self.title_bar.height())
+        # self.setCentralWidget(self.central_widget)
 
         self.state = StateMode.LOADING
 
@@ -142,6 +141,17 @@ class MainForm(QMainWindow):
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
+        # region SizeGrips
+        # self.grip_size = 4
+        # self.side_grips = [
+        #     SideGrip(self, Qt.Edge.LeftEdge),
+        #     SideGrip(self, Qt.Edge.TopEdge),
+        #     SideGrip(self, Qt.Edge.RightEdge),
+        #     SideGrip(self, Qt.Edge.BottomEdge),
+        # ]
+        # self.corner_grips = [QSizeGrip(self) for i in range(4)]
+        # endregion
+
         self.recalculate_size()
 
     def init_ui(self):
@@ -164,12 +174,31 @@ class MainForm(QMainWindow):
         self.setMinimumSize(800, 720)
         self.setWindowIcon(QIcon('Icon.ico'))
 
+    # def update_grips(self):
+    #     self.setContentsMargins(*[self.grip_size] * 4)
+    #
+    #     out_rect = self.rect()
+    #     in_rect = out_rect.adjusted(self.grip_size, self.grip_size, -self.grip_size, -self.grip_size)
+    #
+    #     self.corner_grips[0].setGeometry(QRect(out_rect.topLeft(), in_rect.topLeft()))
+    #     self.corner_grips[1].setGeometry(QRect(out_rect.topRight(), in_rect.topRight()).normalized())
+    #     self.corner_grips[2].setGeometry(QRect(in_rect.bottomRight(), out_rect.bottomRight()))
+    #     self.corner_grips[3].setGeometry(QRect(out_rect.bottomLeft(), in_rect.bottomLeft()).normalized())
+    #
+    #     self.side_grips[0].setGeometry(0, in_rect.top(), self.grip_size, in_rect.height())
+    #     self.side_grips[1].setGeometry(in_rect.left(), 0, in_rect.width(), self.grip_size)
+    #     self.side_grips[2].setGeometry(in_rect.left() + in_rect.width(),
+    #                                    in_rect.top(), self.grip_size, in_rect.height())
+    #     self.side_grips[3].setGeometry(self.grip_size, in_rect.top() + in_rect.height(),
+    #                                    in_rect.width(), self.grip_size)
+
     def create_menu_bars(self) -> None:
-        menu_bar = self.menuBar()
+        menu_bar = self.title_bar.menu_bar
         file_menu = QMenu("&File", self)
         edit_menu = QMenu("&Edit", self)
         tools_menu = QMenu("&Tools", self)
 
+        # region FileMenu
         open_file_action = QAction("Open file", self)
         open_file_action.triggered.connect(lambda: self.open_file_dialog())
         icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
@@ -179,7 +208,6 @@ class MainForm(QMainWindow):
         player_action.triggered.connect(lambda: self.set_state_mode(StateMode.PLAYER))
         # icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
         # player_action.setIcon(QIcon(icon))
-
 
         home_page_action = QAction("Home page", self)
         home_page_action.triggered.connect(lambda: self.set_state_mode(StateMode.HOME_PAGE))
@@ -194,11 +222,18 @@ class MainForm(QMainWindow):
         file_menu.addAction(home_page_action)
         file_menu.addSeparator()
         file_menu.addAction(exit_action)
+        # endregion
 
+        # region EditMenu
+        edit_menu.addAction(QAction("Aboba", self))
+        # endregion
+
+        # region ToolsMenu
         profiling_action = QAction("Profiling", self)
         profiling_action.triggered.connect(lambda: self.profiling.show())
 
         tools_menu.addAction(profiling_action)
+        # endregion
 
         menu_bar.addMenu(file_menu)
         menu_bar.addMenu(edit_menu)
@@ -208,12 +243,14 @@ class MainForm(QMainWindow):
         pass
 
     def moveEvent(self, event: QMoveEvent) -> None:
-        self.settings.system_settings.form_position.x = event.pos().x()
-        self.settings.system_settings.form_position.y = event.pos().y()
+        if self.windowState() is not Qt.WindowState.WindowMaximized:
+            self.settings.system_settings.form_position.x = event.pos().x()
+            self.settings.system_settings.form_position.y = event.pos().y()
 
     def resizeEvent(self, event):
         self.resized.emit()
-        return super(MainForm, self).resizeEvent(event)
+        super(MainForm, self).resizeEvent(event)
+        # self.update_grips()
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if self.state is not StateMode.OPENING and not self.preloader.isVisible() and event.mimeData().hasUrls:
@@ -261,8 +298,13 @@ class MainForm(QMainWindow):
 
         :return: None
         """
-        self.settings.system_settings.form_width = self.width()
-        self.settings.system_settings.form_height = self.height()
+        title_bar_size = QSize(0, self.title_bar.height())
+        self.central_widget.resize(self.size() - title_bar_size)
+        self.title_bar.resize(self.width(), self.title_bar.height())
+
+        if self.windowState() is not Qt.WindowState.WindowMaximized:
+            self.settings.system_settings.form_width = self.width()
+            self.settings.system_settings.form_height = self.height()
 
         self.main_tab_widget.resize(self.central_widget.size())
         self.audio_player.resize(self.player_frame.width(), self.audio_player.height())

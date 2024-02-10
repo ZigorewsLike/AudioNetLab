@@ -4,6 +4,7 @@ import time
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import librosa
+import soundfile as sf
 import numpy as np
 
 from PyQt6 import QtCore
@@ -40,6 +41,10 @@ class LibrosaGraphsModule(QWidget):
         self.auto_update_graphs_checkbox = QCheckBox("Auto update graphs", self.graphs_frame)
         self.auto_update_graphs_checkbox.move(100, 0)
 
+        self.save_waveform = QPushButton("Save waveform to file", self.graphs_frame)
+        self.save_waveform.move(250, 0)
+        self.save_waveform.clicked.connect(self.save_waveform_to_file)
+
         self.fourier_graph = NamedGraphPanel(self.mf, self.graphs_frame)
         self.fourier_graph.set_header("Short-time Fourier transform (STFT)")
         self.fourier_graph.set_header("Short-time Fourier transform (STFT)")
@@ -74,6 +79,11 @@ class LibrosaGraphsModule(QWidget):
         if PROFILE:
             module_name: str = self.__class__.__name__
             self.mf.profiling.add_math_time(module_name + "_upd_graphs", time.time() - start_time)
+
+    @pyqtSlot()
+    def save_waveform_to_file(self) -> None:
+        if self.mf.audio_player.waveform is not None and self.mf.audio_player.waveform.size > 0:
+            sf.write("data/local/audio.wav", self.mf.audio_player.waveform, self.mf.audio_player.sample_rate)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)

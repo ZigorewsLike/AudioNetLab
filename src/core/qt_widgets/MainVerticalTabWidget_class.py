@@ -65,7 +65,7 @@ class MainVerticalTabWidget(BaseTabWidget):
 
         self.tab_width: int = 0
         self._buttons_container: List[MainVerticalTabButton] = []
-        self.margin = 10
+        self.margin = 0
 
     def add_tab(self, widget: QWidget, tab_type: MainTabWidgetIcons, resize: bool = True) -> None:
         super().add_tab(widget, tab_type.name, resize)

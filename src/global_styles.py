@@ -46,13 +46,11 @@ DEFAULT_SCROLLBAR_STYLE = """
     }
     
     QScrollBar::up-arrow:vertical { 
-        -image:url('./icons/up_48.png'); 
         height: 10px; 
         width: 10px 
     }
     
     QScrollBar::down-arrow:vertical {
-        -image:url('./icons/down_48.png'); 
         height: 10px; 
         width: 10px                              
     }

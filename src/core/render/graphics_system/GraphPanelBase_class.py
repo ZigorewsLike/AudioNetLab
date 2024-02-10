@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from PyQt6.QtCore import QLine, QPointF, Qt
+from PyQt6.QtCore import QLine, QPointF, Qt, QEvent, QObject
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QMouseEvent, QShowEvent, QResizeEvent, QPolygonF
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import QWidget
@@ -61,28 +61,29 @@ class GraphPanelBase(QOpenGLWidget):
         self.update()
 
     def calculate_render_lines(self):
-        start_time: float = time.time()
-        wave_slice = self.lines[0]
-        wave_slice: np.ndarray = wave_slice[wave_slice >= int(self.shift_left * self.lines[1].size)]
-        wave_slice: np.ndarray = wave_slice[wave_slice <= int(self.shift_right * self.lines[1].size)]
-        if wave_slice.size == 0:
-            return
-        # print_d("Clac render line. Slice: ", time.time() - start_time)
-        x_np_line: np.ndarray = np.array([-10])
-        y_np_line: np.ndarray = np.array([self.height() + 50])
-        x_slice = wave_slice[::max(1, int(wave_slice.size / self.width() / self.step_multiplier / self.scale_factor))]
-        y_slice = self.lines[1][x_slice]
+        if not self.mf.block_update and self.isVisible():
+            start_time: float = time.time()
+            wave_slice = self.lines[0]
+            wave_slice: np.ndarray = wave_slice[wave_slice >= int(self.shift_left * self.lines[1].size)]
+            wave_slice: np.ndarray = wave_slice[wave_slice <= int(self.shift_right * self.lines[1].size)]
+            if wave_slice.size == 0:
+                return
+            # print_d("Clac render line. Slice: ", time.time() - start_time)
+            x_np_line: np.ndarray = np.array([-10])
+            y_np_line: np.ndarray = np.array([self.height() + 50])
+            x_slice = wave_slice[::max(1, int(wave_slice.size / self.width() / self.step_multiplier / self.scale_factor))]
+            y_slice = self.lines[1][x_slice]
 
-        x_slice_clac = (x_slice / (self.lines[1].size - 1) - self.shift_left) * self.new_width
-        y_slice_clac = self.height() - y_slice * self.height()
+            x_slice_clac = (x_slice / (self.lines[1].size - 1) - self.shift_left) * self.new_width
+            y_slice_clac = self.height() - y_slice * self.height()
 
-        x_np_line = np.append(x_np_line, np.append(x_slice_clac, [self.width() + 10]))
-        y_np_line = np.append(y_np_line, np.append(y_slice_clac, [self.height() + 50]))
+            x_np_line = np.append(x_np_line, np.append(x_slice_clac, [self.width() + 10]))
+            y_np_line = np.append(y_np_line, np.append(y_slice_clac, [self.height() + 50]))
 
-        self.render_lines = array2d_to_qpolygonf(x_np_line, y_np_line)
-        if PROFILE:
-            module_name: str = self.__class__.__name__ if not self.profile_class_name else self.profile_class_name
-            self.mf.profiling.add_math_time(module_name + "_lines", time.time() - start_time)
+            self.render_lines = array2d_to_qpolygonf(x_np_line, y_np_line)
+            if PROFILE:
+                module_name: str = self.__class__.__name__ if not self.profile_class_name else self.profile_class_name
+                self.mf.profiling.add_math_time(module_name + "_lines", time.time() - start_time)
 
     def set_shift(self, shift_left: float, shift_right: float):
         start_time: float = time.time()
@@ -98,7 +99,7 @@ class GraphPanelBase(QOpenGLWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         start_time: float = time.time()
-        if self.graph_visible and self.isVisible():
+        if not self.mf.block_update and self.graph_visible and self.isVisible():
             painter = QPainter(self)
             painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#4B4B4B")))
 
