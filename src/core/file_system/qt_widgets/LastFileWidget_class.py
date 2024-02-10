@@ -83,6 +83,9 @@ class LastFileList(QWidget):
                 item.widget().resize(self.widget_width - self.right_padding, item.widget().height())
 
     def showEvent(self, event) -> None:
+        super().showEvent(event)
+
+    def update_file_list(self) -> None:
         for i in reversed(range(self.v_layout.count())):
             item = self.v_layout.itemAt(i)
             if item.widget() is not None:

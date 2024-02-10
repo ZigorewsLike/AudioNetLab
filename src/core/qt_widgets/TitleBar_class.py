@@ -124,9 +124,10 @@ class TitleBar(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         super().mousePressEvent(event)
-        self.is_pressing = True
-        self.press_point = event.pos()
-        self.parent().block_update = True
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.is_pressing = True
+            self.press_point = event.pos()
+            self.parent().block_update = False
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         super().mousePressEvent(event)
@@ -139,12 +140,11 @@ class TitleBar(QWidget):
             if self.parent().windowState() is not Qt.WindowState.WindowNoState:
                 delta_size = self.parent().settings.system_settings.form_width  # noqa
                 self.parent().setWindowState(Qt.WindowState.WindowNoState)
-                print_d(delta_size, self.press_point.x() - delta_size // 2)
-                self.press_point.setX(self.press_point.x() - median(0, self.press_point.x() - delta_size // 2,
-                                                                    self.parent().width() - delta_size))
+                print_d(self.press_point.x() - delta_size // 2, median(0, self.press_point.x() - delta_size // 2, self.parent().width() - delta_size))
+                self.parent().move(median(0, self.press_point.x() - delta_size // 2, self.parent().width() - delta_size), 1)
+                self.update()
             else:
-                movement = event.pos() - self.press_point
-                self.parent().move(self.parent().pos() + movement)
+                self.parent().window().windowHandle().startSystemMove()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         self.maximize_window()

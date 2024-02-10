@@ -31,27 +31,28 @@ DEFAULT_SCROLLBAR_STYLE = """
         background-color: """ + AppColorSchemes.SCROLLBAR_BODY + """;
     }
     
+    QScrollBar::handle:vertical:pressed {
+        width: 8px;
+        margin: 2px;
+    }
+    
     QScrollBar::add-line:vertical {
         background: none;
-        height: 10px;
-        subcontrol-position: bottom;
-        subcontrol-origin: margin;
+        height: 0px;
     }
     
     QScrollBar::sub-line:vertical {
         background: none;
-        height: 45px;
-        subcontrol-position: top;
-        subcontrol-origin: margin;
+        height: 0px;
     }
     
     QScrollBar::up-arrow:vertical { 
-        height: 10px; 
-        width: 10px 
+        height: 0px; 
+        width: 0px 
     }
     
     QScrollBar::down-arrow:vertical {
-        height: 10px; 
-        width: 10px                              
+        height: 0px; 
+        width: 0px                              
     }
 """

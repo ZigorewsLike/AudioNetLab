@@ -7,6 +7,7 @@ LOG_IN_FILE = False
 LOG_IN_SIGNAL = False
 AI_ENABLED = True
 ONNX_INFERENCE = True
+CUSTOM_TITLE_BAR = True
 
 APP_NAME = "AudioNetLab"
 APP_TITLE = f"{APP_NAME}"

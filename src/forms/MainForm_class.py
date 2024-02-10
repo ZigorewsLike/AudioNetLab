@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDia
 from src.core.audio.Player_class import MetaListItem
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
                                   LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR,
-                                  PATH_TO_LAST_PREVIEW)
+                                  PATH_TO_LAST_PREVIEW, CUSTOM_TITLE_BAR)
 from src.core.log_system import print_e, print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
@@ -50,9 +50,10 @@ class MainForm(QMainWindow):
         super().__init__()
         self.params: dict = params
         self.params['main_form_ref'] = self
-        # TODO: Create custom QMenu Bar
-        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        if CUSTOM_TITLE_BAR:
+            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.title_bar = TitleBar(self)
+        self.title_bar.setVisible(CUSTOM_TITLE_BAR)
         self.block_update: bool = False
 
         self.setAcceptDrops(True)
@@ -60,8 +61,10 @@ class MainForm(QMainWindow):
         self.profiling = ProfileDrawWidget()
 
         self.central_widget = QWidget(self)
-        self.central_widget.move(0, self.title_bar.height())
-        # self.setCentralWidget(self.central_widget)
+        if CUSTOM_TITLE_BAR:
+            self.central_widget.move(0, self.title_bar.height())
+        else:
+            self.setCentralWidget(self.central_widget)
 
         self.state = StateMode.LOADING
 
@@ -97,6 +100,7 @@ class MainForm(QMainWindow):
         self.audio_player = AudioPlayer(self, self.player_frame)
 
         self.home_page = HomePageWidget(self)
+        self.home_page.last_file.update_file_list()
 
         self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
         self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)
@@ -193,7 +197,10 @@ class MainForm(QMainWindow):
                                        in_rect.width(), self.grip_size)
 
     def create_menu_bars(self) -> None:
-        menu_bar = self.title_bar.menu_bar
+        if CUSTOM_TITLE_BAR:
+            menu_bar = self.title_bar.menu_bar
+        else:
+            menu_bar = self.menuBar()
         file_menu = QMenu("&File", self)
         edit_menu = QMenu("&Edit", self)
         tools_menu = QMenu("&Tools", self)
@@ -298,9 +305,10 @@ class MainForm(QMainWindow):
 
         :return: None
         """
-        title_bar_size = QSize(0, self.title_bar.height())
-        self.central_widget.resize(self.size() - title_bar_size)
-        self.title_bar.resize(self.width(), self.title_bar.height())
+        if CUSTOM_TITLE_BAR:
+            title_bar_size = QSize(0, self.title_bar.height())
+            self.central_widget.resize(self.size() - title_bar_size)
+            self.title_bar.resize(self.width(), self.title_bar.height())
 
         if self.windowState() is not Qt.WindowState.WindowMaximized:
             self.settings.system_settings.form_width = self.width()
@@ -322,7 +330,10 @@ class MainForm(QMainWindow):
         player_enabled = state is StateMode.PLAYER
         # self.home_page.setVisible(not player_enabled)
         # self.audio_player.setVisible(player_enabled)
-
+        if state is StateMode.PLAYER:
+            self.main_tab_widget.active_tab(1)
+        elif state is StateMode.HOME_PAGE:
+            self.main_tab_widget.active_tab(0)
         self.state = state
 
     @pyqtSlot(int)
@@ -399,6 +410,7 @@ class MainForm(QMainWindow):
             self.preloader.setVisible(False)
             return
         self.last_files.add(LastFileProp(path, datetime.now()))
+        self.home_page.last_file.update_file_list()
 
         # region preview
         if self.audio_player.track_meta_image_bytes is not None:
