@@ -110,6 +110,7 @@ class TitleBar(QWidget):
             self.parent().setWindowState(Qt.WindowState.WindowNoState)
         else:
             self.parent().setWindowState(Qt.WindowState.WindowMaximized)
+        self.parent().windowStateChanged.emit()  # noqa
 
     @pyqtSlot()
     def close_window(self) -> None:
@@ -140,7 +141,7 @@ class TitleBar(QWidget):
             if self.parent().windowState() is not Qt.WindowState.WindowNoState:
                 delta_size = self.parent().settings.system_settings.form_width  # noqa
                 self.parent().setWindowState(Qt.WindowState.WindowNoState)
-                print_d(self.press_point.x() - delta_size // 2, median(0, self.press_point.x() - delta_size // 2, self.parent().width() - delta_size))
+                self.parent().windowStateChanged.emit()  # noqa
                 self.parent().move(median(0, self.press_point.x() - delta_size // 2, self.parent().width() - delta_size), 1)
                 self.update()
             else:

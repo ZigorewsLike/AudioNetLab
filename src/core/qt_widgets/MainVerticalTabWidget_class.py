@@ -1,9 +1,9 @@
-from typing import List, Optional
+from typing import List, Optional, Callable, Dict
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize
+from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize, QRectF
 from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion, \
-    QPixmap
+    QPixmap, QPainterPath, QPen
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel
 
 from src.core.log_system import print_d
@@ -24,31 +24,87 @@ class MainVerticalTabButton(QWidget):
         self.tab_type: MainTabWidgetIcons = tab_type
         self.margin: int = 10
         self.index: int = index
+        self.button_size: QSize = QSize(40, 40)
+        self.border_corner: int = 5
+        self.shift_rect: QPoint = QPoint(-6, 0)
+
+        self.sub_buttons: List[MainVerticalTabSubButton] = []
+
         self.is_active: bool = False
+        self.mouse_moved: bool = False
 
-        if tab_type is MainTabWidgetIcons.HOME_PAGE:
-            self.pixmap = QPixmap(RESOURCE_ICON_DIR + "home_page_tab_icon_black.png")
-        elif tab_type is MainTabWidgetIcons.PLAYER:
-            self.pixmap = QPixmap(RESOURCE_ICON_DIR + "player_tab_icon_black.png")
-        elif tab_type is MainTabWidgetIcons.SETTINGS:
-            self.pixmap = QPixmap(RESOURCE_ICON_DIR + "settings_tab_icon_black.png")
-        else:
-            self.pixmap = QPixmap()
+        self.icon_path_dict: Dict[MainTabWidgetIcons, str] = {
+            MainTabWidgetIcons.HOME_PAGE: RESOURCE_ICON_DIR + "home_page_tab_icon_black.png",
+            MainTabWidgetIcons.PLAYER: RESOURCE_ICON_DIR + "player_tab_icon_black.png",
+            MainTabWidgetIcons.SETTINGS: RESOURCE_ICON_DIR + "settings_tab_icon_black.png",
+            MainTabWidgetIcons.OPEN_FILE: RESOURCE_ICON_DIR + "open_file_tab_icon_white.png",
+            MainTabWidgetIcons.GENRE_CLASSIFICATION: RESOURCE_ICON_DIR + "genre_tab_icon_white.png",
+            MainTabWidgetIcons.LIBROSA_PANEL: RESOURCE_ICON_DIR + "librosa_tab_icon_white.png",
+        }
 
-        self.resize(40, 40)
+        icon_path: str = self.icon_path_dict.get(self.tab_type, "")
+        self.pixmap = QPixmap(icon_path)
+
+        self.resize(self.button_size)
+
+    def set_active(self, active: bool) -> None:
+        self.is_active = active
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
-        if self.is_active:
-            painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#B5B5B5")))
-        else:
-            painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#CCCCCC")))
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        border_size: QSize = QSize(40, 40) - self.pixmap.size()
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.shift_rect.x(), self.shift_rect.y(),
+                                   self.width() - self.shift_rect.x(), self.height() - self.shift_rect.y()),
+                            self.border_corner, self.border_corner)
+
+        if self.is_active:
+            painter.fillPath(path, QBrush(QColor("#704D93")))
+        else:
+            painter.fillPath(path, QBrush(QColor("#9E8CAF")))
+
+        if self.mouse_moved:
+            painter.fillPath(path, QBrush(QColor(0, 0, 0, 40)))
+
+        border_size: QSize = self.button_size - self.pixmap.size()
         painter.drawPixmap(round(border_size.width() / 2), round(border_size.height() / 2), self.pixmap)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self.tab_clicked.emit(self.index)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        self.mouse_moved = True
+        self.update()
+
+    def leaveEvent(self, event: QEvent) -> None:
+        super().leaveEvent(event)
+        self.mouse_moved = False
+        self.update()
+
+
+class MainVerticalTabSubButton(MainVerticalTabButton):
+    tab_clicked = QtCore.pyqtSignal(int)
+
+    def __init__(self, tab_type: MainTabWidgetIcons, index: int, *args, **kwargs):
+        super(MainVerticalTabSubButton, self).__init__(tab_type, index, *args, **kwargs)
+        self.setMouseTracking(True)
+
+        self.tab_type: MainTabWidgetIcons = tab_type
+        self.is_active: bool = False
+        self.button_size = QSize(36, 36)
+        self.border_corner = 0
+
+        self.resize(self.button_size)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        if self.index != 0:
+            painter.fillRect(2, 0, self.width() - 4, 1, QBrush(QColor("#CAC7D0")))
+        if self.border_corner == 0:
+            painter.fillRect(2, self.height() - 1, self.width() - 4, 1, QBrush(QColor("#CAC7D0")))
 
 
 class MainVerticalTabWidget(BaseTabWidget):
@@ -66,15 +122,18 @@ class MainVerticalTabWidget(BaseTabWidget):
         self.tab_width: int = 0
         self._buttons_container: List[MainVerticalTabButton] = []
         self.margin = 0
+        self.button_margin_top = 5
 
-    def add_tab(self, widget: QWidget, tab_type: MainTabWidgetIcons, resize: bool = True) -> None:
+    def add_tab(self, widget: QWidget,
+                tab_type: MainTabWidgetIcons,
+                resize: bool = True) -> None:
         super().add_tab(widget, tab_type.name, resize)
 
         tab_button = MainVerticalTabButton(tab_type, self.tab_count-1, self)
         tab_button.tab_clicked.connect(self.active_tab)
 
         if self._buttons_container:
-            tab_button.move(0, self._buttons_container[-1].height() + self._buttons_container[-1].y() + 5)
+            tab_button.move(0, self._buttons_container[-1].height() + self._buttons_container[-1].y() + self.button_margin_top)
         else:
             tab_button.move(0, 20)
 
@@ -83,7 +142,47 @@ class MainVerticalTabWidget(BaseTabWidget):
             tab_button.is_active = True
         for button in self._buttons_container:
             button.raise_()
+            for sub_button  in button.sub_buttons:
+                sub_button.raise_()
         self.update()
+
+    def add_sub_tub(self, button_index: int, tab_type: MainTabWidgetIcons) -> None:
+        sub_list = self._buttons_container[button_index].sub_buttons
+        sub_tab_item = MainVerticalTabSubButton(tab_type, len(sub_list), self)
+        sub_tab_item.shift_rect = QPoint(-6, -6)
+        sub_list.append(sub_tab_item)
+
+        for sub_tab_button in sub_list[:-1]:
+            sub_tab_button.border_corner = 0
+        sub_list[-1].border_corner = 5
+
+    def resize_tab_content(self) -> None:
+        super().resize_tab_content()
+        self.recalc_tab_button_pos()
+
+    def recalc_tab_button_pos(self) -> None:
+        move_shift: int = 20
+        sub_tab_size: int = 36
+        for tab_index, tab_button in enumerate(self._buttons_container):
+            tab_button: MainVerticalTabButton
+
+            if tab_index > 0:
+                y_pos: int = move_shift + tab_button.height() + self.button_margin_top
+
+                if self._buttons_container[tab_index - 1].is_active:
+                    y_pos += len(self._buttons_container[tab_index - 1].sub_buttons) * sub_tab_size
+
+                tab_button.move(tab_button.x(), y_pos)
+                move_shift = y_pos
+
+            for sub_tab_index, sub_tab_button in enumerate(tab_button.sub_buttons):
+                sub_tab_button: MainVerticalTabSubButton
+                if tab_button.is_active:
+                    sub_tab_button.move(0, tab_button.y() + tab_button.height() + sub_tab_size * sub_tab_index)
+                sub_tab_button.setVisible(tab_button.is_active)
+
+    def get_sub_tab_button(self, tab_index: int, sub_button_index: int) -> MainVerticalTabSubButton:
+        return self._buttons_container[tab_index].sub_buttons[sub_button_index]
 
     def active_tab(self, index: int) -> None:
         old_current_index = self.tab_current_index
@@ -91,6 +190,7 @@ class MainVerticalTabWidget(BaseTabWidget):
         if self._buttons_container:
             self._buttons_container[old_current_index].is_active = False
             self._buttons_container[self.tab_current_index].is_active = True
+        self.recalc_tab_button_pos()
         self.update()
 
     def resizeEvent(self, event: QResizeEvent) -> None:

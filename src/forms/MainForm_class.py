@@ -41,6 +41,7 @@ from src.core.render.graphics_system import LibrosaGraphsModule
 
 class MainForm(QMainWindow):
     resized = QtCore.pyqtSignal()
+    windowStateChanged = QtCore.pyqtSignal()
     resource_dir = "resource"
     resource_icon_dir = f"{resource_dir}/2x/"
     data_dir = "data/"
@@ -55,6 +56,7 @@ class MainForm(QMainWindow):
         self.title_bar = TitleBar(self)
         self.title_bar.setVisible(CUSTOM_TITLE_BAR)
         self.block_update: bool = False
+        self.windowStateChanged.connect(self.window_state_changed)
 
         self.setAcceptDrops(True)
         self.create_menu_bars()
@@ -102,20 +104,12 @@ class MainForm(QMainWindow):
         self.home_page = HomePageWidget(self)
         self.home_page.last_file.update_file_list()
 
-        self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
-        self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)
-        self.main_tab_widget.add_tab(self.player_frame, MainTabWidgetIcons.PLAYER)
-        self.main_tab_widget.add_tab(QPushButton("SETTINGS"), MainTabWidgetIcons.SETTINGS)
-        self.main_tab_widget.tab_switched.connect(lambda: self.recalculate_size())
-
         # region Overlap widgets
-
         self.drag_widget = DragFileWidget(self)
         self.drag_widget.setVisible(False)
 
         self.preloader = PreLoaderWidget(self)
         self.preloader.setVisible(False)
-
         # endregion
 
         self.set_state_mode(self.state)
@@ -144,6 +138,23 @@ class MainForm(QMainWindow):
         self.worker.mf = self
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
+
+        self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
+        self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)
+        self.main_tab_widget.add_sub_tub(0, MainTabWidgetIcons.OPEN_FILE)
+        self.main_tab_widget.add_tab(self.player_frame, MainTabWidgetIcons.PLAYER)
+        self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.GENRE_CLASSIFICATION)
+        self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.LIBROSA_PANEL)
+        self.main_tab_widget.add_tab(QWidget(), MainTabWidgetIcons.SETTINGS)
+        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
+        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
+        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
+        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
+        self.main_tab_widget.tab_switched.connect(lambda: self.recalculate_size())
+
+        self.main_tab_widget.get_sub_tab_button(0, 0).tab_clicked.connect(lambda: self.open_file_dialog())
+        self.main_tab_widget.get_sub_tab_button(1, 0).tab_clicked.connect(lambda: self.tab_widget.active_tab(0))
+        self.main_tab_widget.get_sub_tab_button(1, 1).tab_clicked.connect(lambda: self.tab_widget.active_tab(1))
 
         # region SizeGrips
         self.grip_size = 4
@@ -258,6 +269,21 @@ class MainForm(QMainWindow):
         self.resized.emit()
         super(MainForm, self).resizeEvent(event)
         self.update_grips()
+
+    @pyqtSlot()
+    def window_state_changed(self) -> None:
+        grips_enable: bool = True
+        if self.windowState() is Qt.WindowState.WindowMaximized:
+            grips_enable = False
+        elif self.windowState() is Qt.WindowState.WindowNoState:
+            grips_enable = True
+
+        for side_grip in self.side_grips:
+            side_grip.setEnabled(grips_enable)
+            side_grip.setVisible(grips_enable)
+        for corner_grip in self.corner_grips:
+            corner_grip.setEnabled(grips_enable)
+            corner_grip.setVisible(grips_enable)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if self.state is not StateMode.OPENING and not self.preloader.isVisible() and event.mimeData().hasUrls:
