@@ -3,8 +3,9 @@ import time
 
 import numpy as np
 
-from PyQt6.QtCore import QLine, QPointF, Qt, QEvent, QObject
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QMouseEvent, QShowEvent, QResizeEvent, QPolygonF
+from PyQt6.QtCore import QLine, QPointF, Qt, QEvent, QObject, QRectF
+from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QMouseEvent, QShowEvent, QResizeEvent, QPolygonF, \
+    QPainterPath
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import QWidget
 
@@ -36,6 +37,9 @@ class GraphPanelBase(QOpenGLWidget):
         self.max_peak_value: float = 1.0
         self.draw_peak_text: bool = False
         self.profile_class_name: str = ""
+        self.background_color: str = "#4B4B4B"
+        self.background_corner: int = 0
+        self.background_corner_color: str = ""
 
     def showEvent(self, event: QShowEvent) -> None:
         self.new_width = self.width()
@@ -101,7 +105,15 @@ class GraphPanelBase(QOpenGLWidget):
         start_time: float = time.time()
         if not self.mf.block_update and self.graph_visible and self.isVisible():
             painter = QPainter(self)
-            painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#4B4B4B")))
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor(self.background_color)))
+
+            if self.background_corner_color and self.background_corner != 0:
+                path = QPainterPath()
+                path.addRoundedRect(QRectF(0, 0, self.width() - 1, self.height() - 1),
+                                    self.background_corner, self.background_corner)
+                painter.fillPath(path, QBrush(QColor(self.background_corner_color)))
 
             painter.setPen(QPen(self.colors[0], 1.0, Qt.PenStyle.SolidLine))
             if self.brush_graph:

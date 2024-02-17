@@ -16,7 +16,8 @@ from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEv
                          QMouseEvent, QKeyEvent, QColor, QShowEvent, QCursor, QAction, QDragEnterEvent, QDragLeaveEvent,
                          QDropEvent, QPaintEvent)
 from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDialog, QMessageBox, QVBoxLayout, QMenu,
-                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem, QSizeGrip)
+                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem, QSizeGrip,
+                             QListWidget)
 
 from src.core.audio.Player_class import MetaListItem
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
@@ -97,6 +98,12 @@ class MainForm(QMainWindow):
 
         self.player_frame = QWidget()
 
+        self.meta_list = QListWidget(self.player_frame)
+        self.meta_list.move(self.width(), 0)
+        self.meta_list.resize(300, 300)
+        self.meta_list.setContentsMargins(5, 5, 5, 5)
+        # self.meta_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+
         self.tab_widget = VerticalTabWidget(self.player_frame)
         self.tab_widget.tab_switched.connect(self.tab_switched)
         self.audio_player = AudioPlayer(self, self.player_frame)
@@ -155,6 +162,8 @@ class MainForm(QMainWindow):
         self.main_tab_widget.get_sub_tab_button(0, 0).tab_clicked.connect(lambda: self.open_file_dialog())
         self.main_tab_widget.get_sub_tab_button(1, 0).tab_clicked.connect(lambda: self.tab_widget.active_tab(0))
         self.main_tab_widget.get_sub_tab_button(1, 1).tab_clicked.connect(lambda: self.tab_widget.active_tab(1))
+
+        self.meta_list.raise_()
 
         # region SizeGrips
         self.grip_size = 4
@@ -331,6 +340,7 @@ class MainForm(QMainWindow):
 
         :return: None
         """
+
         if CUSTOM_TITLE_BAR:
             title_bar_size = QSize(0, self.title_bar.height())
             self.central_widget.resize(self.size() - title_bar_size)
@@ -342,10 +352,18 @@ class MainForm(QMainWindow):
 
         self.main_tab_widget.resize(self.central_widget.size())
         self.audio_player.resize(self.player_frame.width(), self.audio_player.height())
+        self.audio_player.move(0, self.central_widget.height() - self.audio_player.height())
         self.tab_widget.resize(self.player_frame.width(),
-                               self.player_frame.height() - self.audio_player.height())
-        self.tab_widget.move(0, self.audio_player.height())
+                               self.player_frame.height())
+        self.tab_widget.move(0, 0)
         self.tab_widget.resize_tab_content()
+
+        if self.audio_player.meta_visible:
+            self.meta_list.move(self.width() - self.meta_list.width(),
+                                self.central_widget.height() - self.meta_list.height() - 52)
+        else:
+            self.meta_list.move(self.width(),
+                                self.central_widget.height() - self.meta_list.height() - 52)
 
         self.preloader.resize(self.size())
         self.drag_widget.resize(self.size())
@@ -364,8 +382,8 @@ class MainForm(QMainWindow):
 
     @pyqtSlot(int)
     def tab_switched(self, index: int) -> None:
-        self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
-        self.tab_widget.move(0, self.audio_player.height())
+        # self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
+        # self.tab_widget.move(0, self.audio_player.height())
         self.tab_widget.resize_tab_content()
 
     def load_ann_models(self) -> None:
@@ -451,6 +469,7 @@ class MainForm(QMainWindow):
         gc.collect()
         self.preloader.setVisible(False)
         self.set_state_mode(StateMode.PLAYER)
+        self.audio_player.audio_graph.calculate_render_lines()
 
     def save_config_app(self) -> None:
         self.settings.player_settings.volume = self.audio_player.volume_slider.value

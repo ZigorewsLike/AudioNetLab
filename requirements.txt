@@ -1,4 +1,4 @@
-PyQt6~=6.5.3
+PyQt6~=6.6.1
 multipledispatch~=1.0.0
 mutagen~=1.47.0
 numpy~=1.26.3
@@ -6,3 +6,4 @@ librosa~=0.10.1
 openpyxl~=3.1.2
 onnx~=1.15.0
 onnxruntime-directml~=1.16.3
+pyinstaller~=6.3.0

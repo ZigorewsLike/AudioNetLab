@@ -29,10 +29,10 @@ class SimpleSlider(QWidget):
         self.is_clicked: bool = False
 
         # region Настройка стилей
-        self.background_color: QColor = QColor("#424242")
-        self.simple_color: QColor = QColor("#DADADA")
-        self.hover_color: QColor = QColor("#3980FF")
-        self.flag_color: QColor = QColor("#86CFFF")
+        self.background_color: QColor = QColor("#DADADA")
+        self.simple_color: QColor = QColor("#9C9C9C")
+        self.hover_color: QColor = QColor("#9C9C9C")
+        self.flag_color: QColor = QColor("#333333")
         self.front_color: QColor = self.simple_color
         self.tooltip_sub_text: str = ""
         self.tooltip_visible: bool = False
@@ -56,7 +56,7 @@ class SimpleSlider(QWidget):
     @slider_height.setter
     def slider_height(self, val: int) -> None:
         self._slider_height = val
-        self.resize(self.parent().width(), self._slider_height + self.top_bottom_margin * 2)
+        self.resize(self.width(), self._slider_height + self.top_bottom_margin * 2)
 
     def set_global_margin(self, global_margin: int) -> None:
         self.top_bottom_margin = global_margin
@@ -89,8 +89,8 @@ class SimpleSlider(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self.is_clicked = True
-        mouse_val: int = median(0, event.pos().x() - self.top_bottom_margin, self.width() - self.top_bottom_margin * 2)
-        mouse_val /= self.width() - self.top_bottom_margin * 2  # Normalisation
+        mouse_val: int = median(0, event.pos().x() - self.left_right_margin, self.width() - self.left_right_margin * 2)
+        mouse_val /= self.width() - self.left_right_margin * 2  # Normalisation
         self.valueChanged.emit(round((self.maximum - self.minimum) * mouse_val + self.minimum))
         self.sliderMoved.emit(self.value)
         self.onMousePress.emit()

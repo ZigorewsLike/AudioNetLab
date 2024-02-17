@@ -18,9 +18,11 @@ import librosa
 
 from PyQt6 import QtMultimedia, QtCore
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject
+from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject, QPropertyAnimation, \
+    QEasingCurve
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
-                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent, QImage)
+                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent, QImage,
+                         QRegion, QPainterPath)
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
@@ -54,6 +56,11 @@ class MetaListItem(QWidget):
         self.label.adjustSize()
         self.label.move(5, 0)
 
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self.label.adjustSize()
+        self.setFixedWidth(self.label.width() + 5)
+
 
 class AudioPlayer(QWidget):
     positionChanged = QtCore.pyqtSignal(float)
@@ -61,11 +68,30 @@ class AudioPlayer(QWidget):
     def __init__(self, mf, *args, **kwargs):
         super(AudioPlayer, self).__init__(*args, **kwargs)
         self.mf: Union[MainForm, QWidget] = mf
+        self.setStyleSheet("""
+        QPushButton#PlayerButtons{
+            background-color: transparent;
+            border: 0px;
+        }
+        QLabel#PositionLabel{
+            background-color: transparent;
+            border-radius: 5px;
+            color: #FAFAFA;
+        }
+        QLabel#PositionLabelGray{
+            background-color: transparent;
+            border-radius: 5px;
+            color: #606060;
+        }
+        """)
+        "767676"
+        "EAEAEA"
 
-        self.resize(400, 400)
-        self.image_size: int = 120
+        self.resize(400, 224)
+        self.image_size: int = 25
         self.player_state: PlayerState = PlayerState.NONE
         self.graph_visible: bool = True
+        self.meta_visible: bool = False
 
         self.waveform: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
@@ -73,67 +99,98 @@ class AudioPlayer(QWidget):
         self.track_meta: Optional[Dict[str, Any]] = None
 
         # region UI
-        self.title_tack = QLabel("Player is empty", self)
+        self.title_tack = QLabel("Трек отрой сначала Taa", self)
         self.title_tack.setStyleSheet("""
         QLabel{
-            font-size: 14pt;
+            color: black;
         }
         """)
-        self.title_tack.move(self.image_size + 20, 5)
+        font = QFont("Arima")
+        font.setPointSize(13)
+        font.setBold(True)
+        self.title_tack.setFont(font)
 
-        self.track_image = QPixmap(f'res/TrackImage.png')
-        self.track_image = self.track_image.scaled(self.image_size, self.image_size,
-                                                   Qt.AspectRatioMode.IgnoreAspectRatio,
-                                                   Qt.TransformationMode.SmoothTransformation)
-        print_d(self.track_image.size())
+        self.author_tack = QLabel("Unknown", self)
+        self.author_tack.setStyleSheet("""
+        QLabel{
+            color: black;
+        }
+        """)
+        font = QFont("Arima")
+        font.setPointSize(9)
+        font.setBold(False)
+        self.author_tack.setFont(font)
+
+        # self.track_image = QPixmap(f'res/TrackImage.png')
+        # self.track_image = self.track_image.scaled(self.image_size, self.image_size,
+        #                                            Qt.AspectRatioMode.IgnoreAspectRatio,
+        #                                            Qt.TransformationMode.SmoothTransformation)
 
         self.play_button = QPushButton("", self)
         self.play_button.clicked.connect(self.play_button_click)
         self.play_button.resize(self.image_size, self.image_size)
-        self.play_button.move(10, 10)
-        self.play_button.setIconSize(QSize(60, 60))
-        self.play_button.setStyleSheet("""
-        QPushButton{
-            background-color: transparent;
-            border: 0px;
-        }
-        QPushButton::hover {
-            background-color: rgba(1, 1, 1, 0.1);
-        }
-        QPushButton::pressed {
-            background-color: rgba(0, 0, 0, 0.3);
-        }
-        
-        """)
-
-        self.meta_list = QListWidget(self)
-        self.meta_list.move(self.image_size + 20, 40)
-        self.meta_list.setContentsMargins(5, 5, 5, 5)
+        self.play_button.setIconSize(QSize(25, 25))
+        self.play_button.setObjectName("PlayerButtons")
 
         self.track_meta_image_bytes: Optional[bytes] = None
         self.track_meta_image = QImage()
+        self.track_meta_image_drawable = QImage()
 
         self.position_slider = SimpleSlider(self)
         self.position_slider.set_range(0, 1)
+        self.position_slider.top_bottom_margin = 0
         self.position_slider.sliderMoved.connect(self.set_track_position)
+        self.position_slider.resize(self.width() - 40, 14)
+        self.position_slider.slider_height = 5
 
         self.volume_slider = SimpleSlider(self)
         self.volume_slider.set_range(0, 100)
         self.volume_slider.set_value(50)
         self.volume_slider.sliderMoved.connect(self.set_track_volume)
-        self.volume_slider.move(10, self.image_size + 20)
-        self.volume_slider.setFixedWidth(self.image_size)
-
-        self.label_duration_left = QLabel("0:00:00", self)
-        self.label_duration_left.adjustSize()
-
-        self.label_duration_right = QLabel("0:00:00", self)
-        self.label_duration_right.adjustSize()
+        self.volume_slider.resize(80, 13)
+        self.volume_slider.slider_height = 3
 
         self.audio_graph = GraphPanelAudio(self.mf, self)
+        self.audio_graph.move(20, 10)
+        self.audio_graph.background_corner = 5
+        self.audio_graph.background_corner_color = "#666666"
+        self.audio_graph.background_color = "#B3B3B3"
 
-        self.graph_visible_button = QPushButton("Скрыть", self)
+        self.graph_visible_button = QPushButton("", self)
         self.graph_visible_button.clicked.connect(self.switch_visible_graph)
+        self.graph_visible_button.resize(20, 20)
+        self.graph_visible_button.setIcon(QIcon('res/icons/player_spectrogram_icon_black.png'))
+        self.graph_visible_button.setObjectName("PlayerButtons")
+
+        self.meta_visible_button = QPushButton("", self)
+        self.meta_visible_button.clicked.connect(self.switch_visible_meta)
+        self.meta_visible_button.resize(20, 20)
+        self.meta_visible_button.setIcon(QIcon('res/icons/player_meta_icon_black.png'))
+        self.meta_visible_button.setObjectName("PlayerButtons")
+
+        self.mute_volume_button = QPushButton("", self)
+        # self.mute_volume_button.clicked.connect(self.switch_visible_meta)
+        self.mute_volume_button.resize(22, 20)
+        self.mute_volume_button.setIcon(QIcon('res/icons/player_volume_icon_black.png'))
+        self.mute_volume_button.setIconSize(QSize(22, 20))
+        self.mute_volume_button.setObjectName("PlayerButtons")
+
+        self.meta_show_anim = QPropertyAnimation(self.mf.meta_list, b"pos")
+        self.meta_show_anim.setDuration(200)
+
+        font = QFont("Arima")
+        font.setPointSize(9)
+        font.setBold(False)
+
+        self.label_duration_left = QLabel("00:00", self)
+        self.label_duration_left.setObjectName("PositionLabelGray")
+        self.label_duration_left.setFont(font)
+        self.label_duration_left.adjustSize()
+
+        self.label_duration_right = QLabel("00:00", self)
+        self.label_duration_right.setObjectName("PositionLabelGray")
+        self.label_duration_right.setFont(font)
+        self.label_duration_right.adjustSize()
         # endregion
 
         self.player = QMediaPlayer()
@@ -150,12 +207,21 @@ class AudioPlayer(QWidget):
         super().paintEvent(event)
         start_time = time.time()
         painter = QPainter(self)
-        # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
-        painter.drawPixmap(10, 10, self.track_image)
-        image_rect = QRect(11, 11, self.image_size - 2, self.image_size - 2)
-        painter.drawImage(image_rect, self.track_meta_image)
-        painter.fillRect(image_rect, QColor(0, 0, 0, 50))
 
+        painter.fillRect(0, 0, self.width() - 1, self.height() - 1, QColor("#B3B3B3"))
+
+        # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Difference)
+
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(20, self.height() - 50 - 10, 50, 50), 15, 15)
+        painter.fillPath(path, QColor(255, 255, 255, 255))
+        painter.drawImage(20, self.height() - 50 - 10, self.track_meta_image_drawable)
+
+        # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Exclusion)
+
+        # painter.fillRect(0, 0, self.width() - 1, self.height() - 1, QColor("#B3B3B3"))
+
+        # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         if PROFILE:
             self.mf.profiling.add_draw_time("AudioPlayer", time.time() - start_time)
 
@@ -169,25 +235,41 @@ class AudioPlayer(QWidget):
             self.recalc_sizes()
 
     def recalc_sizes(self) -> None:
-        self.meta_list.resize(self.width() - self.image_size - 30, self.image_size - self.meta_list.y() + 50)
-        self.position_slider.move(10, self.meta_list.y() + self.meta_list.height() + 25)
-        self.position_slider.setFixedWidth(self.width() - 20)
-        self.label_duration_right.move(self.width() - 10 - self.label_duration_right.width(),
-                                       self.meta_list.y() + self.meta_list.height() + 5)
-        self.label_duration_left.move(10, self.meta_list.y() + self.meta_list.height() + 5)
+        self.title_tack.move(80, self.height() - 35 - 21)
+        self.author_tack.move(80, self.height() - 35)
+        self.play_button.move(round(self.width() / 2 - self.play_button.width() / 2),
+                              self.height() - 22 - self.play_button.height())
 
-        self.audio_graph.resize(self.width() - 20, 150)
-        self.audio_graph.move(10, self.position_slider.y() + self.position_slider.height() + 10)
+        self.position_slider.resize(self.width() - 40, 16)
+        self.volume_slider.move(self.width() - self.volume_slider.width() - 142,
+                                self.height() - self.volume_slider.height() - 24)
 
-        self.graph_visible_button.move(10, self.position_slider.y() + self.position_slider.height() + 10)
+        self.audio_graph.resize(self.width() - 40, 120)
+        if self.graph_visible:
+            self.position_slider.move(20, 20 + self.audio_graph.height())
+        else:
+            self.position_slider.move(20, 10)
+
+        self.graph_visible_button.move(self.width() - self.graph_visible_button.width() - 30,
+                                       self.height() - self.graph_visible_button.height() - 25)
+
+        self.meta_visible_button.move(self.graph_visible_button.x() - 20 - self.meta_visible_button.width(),
+                                      self.graph_visible_button.y())
+
+        self.mute_volume_button.move(self.meta_visible_button.x() - 20 - self.mute_volume_button.width(),
+                                     self.meta_visible_button.y())
+        self.label_duration_right.move(self.width() - self.label_duration_right.width() - 20 - 5,
+                                       self.position_slider.y() + 1)
+        self.label_duration_left.move(25, self.position_slider.y() + 1)
 
         self.update()
 
     def change_play_icon(self) -> None:
         if self.player_state is PlayerState.PLAY:
-            self.play_button.setIcon(QIcon('res/PauseButton.png'))
+            self.play_button.setIcon(QIcon('res/icons/player_pause_icon_black.png'))
         else:
-            self.play_button.setIcon(QIcon('res/PlayButton.png'))
+            self.play_button.setIcon(QIcon('res/icons/player_play_icon_black.png'))
+        self.update()
 
     @pyqtSlot()
     def play_button_click(self) -> None:
@@ -200,20 +282,56 @@ class AudioPlayer(QWidget):
     def switch_visible_graph(self) -> None:
         self.graph_visible = not self.graph_visible
         if not self.graph_visible:
-            self.resize(self.width(), self.height() - self.audio_graph.height() + 10)
+            self.resize(self.width(), self.height() - self.audio_graph.height() - 10)
             self.audio_graph.setVisible(False)
         else:
-            self.resize(self.width(), self.height() + self.audio_graph.height() - 10)
+            self.resize(self.width(), self.height() + self.audio_graph.height() + 10)
             self.audio_graph.setVisible(True)
         self.mf.settings.player_settings.graph_visible = self.graph_visible
         self.mf.resized.emit()
 
+    @pyqtSlot()
+    def switch_visible_meta(self) -> None:
+        self.meta_visible = not self.meta_visible
+        self.meta_show_anim.stop()
+        if self.meta_visible:
+            self.meta_show_anim.setEndValue(QPoint(self.width() - self.mf.meta_list.width(),
+                                                   self.mf.meta_list.y()))
+            self.meta_show_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        else:
+            self.meta_show_anim.setEndValue(QPoint(self.width(),
+                                                   self.mf.meta_list.y()))
+            self.meta_show_anim.setEasingCurve(QEasingCurve.Type.InCubic)
+        # self.mf.meta_list.setVisible(self.meta_visible)
+        self.meta_show_anim.start()
+
+    def set_current_time(self, position: float) -> None:
+        self.label_duration_left.setText(f"{datetime.strftime(datetime.fromtimestamp(position / 1000), '%M:%S')}")
+        self.label_duration_left.adjustSize()
+        slider_position: float = self.position_slider.width() * position / self.player.duration()
+        if slider_position - 10 < self.label_duration_left.width():
+            self.label_duration_left.move(int(slider_position) + 5 + self.position_slider.x(),
+                                          self.label_duration_left.y())
+            self.label_duration_left.setObjectName("PositionLabelGray")
+        else:
+            self.label_duration_left.move(5 + self.position_slider.x(), self.label_duration_left.y())
+            self.label_duration_left.setObjectName("PositionLabel")
+
+        if slider_position + 10 > self.position_slider.width() - self.label_duration_right.width():
+            self.label_duration_right.move(int(slider_position) - 5 + self.position_slider.x() - self.label_duration_right.width(),
+                                           self.label_duration_right.y())
+            self.label_duration_right.setObjectName("PositionLabel")
+        else:
+            self.label_duration_right.move(self.position_slider.x() + self.position_slider.width() - self.label_duration_right.width() - 5,
+                                           self.label_duration_left.y())
+            self.label_duration_right.setObjectName("PositionLabelGray")
+        self.label_duration_left.setStyleSheet(self.styleSheet())
+        self.label_duration_right.setStyleSheet(self.styleSheet())
+
     @pyqtSlot('qint64')
     def track_position_changed(self, position: int) -> None:
         self.position_slider.set_value(position)
-        position_time = timedelta(milliseconds=position)
-        self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
-        self.label_duration_left.adjustSize()
+        self.set_current_time(position)
 
         if self.player.duration() != 0:
             self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
@@ -233,11 +351,12 @@ class AudioPlayer(QWidget):
     # region Player methods
     def prepare_to_open_file(self, path: str) -> bool:
         self.player.stop()
-        self.meta_list.clear()
+        self.mf.meta_list.clear()
         print_d(f"Open file: {path}")
 
         self.track_meta_image_bytes = None
         self.track_meta_image = QImage()
+        self.track_meta_image_drawable = QImage()
 
         # region Meta info
         filename, file_extension = os.path.splitext(os.path.basename(path))
@@ -263,16 +382,23 @@ class AudioPlayer(QWidget):
         # endregion
 
         for key, value in audio.items():
-            if key == 'title':
-                continue
             item = QListWidgetItem()
-            self.meta_list.addItem(item)
-            self.meta_list.setItemWidget(item, MetaListItem(key, value))
+            self.mf.meta_list.addItem(item)
+            self.mf.meta_list.setItemWidget(item, MetaListItem(key, value))
+            print(key, value)
 
         track_name = audio.get('title', None)
+        # TODO: mp3 artist parser
+        artist_name = audio.get('artist', None)
 
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
+
+        self.author_tack.setText(", ".join(artist_name) if artist_name is not None else "Unknown")
+        self.author_tack.adjustSize()
+
+        self.track_meta_image_drawable = self.track_meta_image.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                                                                      Qt.TransformationMode.SmoothTransformation)
 
         return True
 
@@ -289,8 +415,7 @@ class AudioPlayer(QWidget):
     @pyqtSlot('qint64')
     def duration_is_changed(self, duration: int) -> None:
         self.position_slider.set_range(0, duration)
-        position_time = timedelta(milliseconds=duration)
-        self.label_duration_right.setText(f"{position_time}".split('.', 2)[0])
+        self.label_duration_right.setText(f"{datetime.strftime(datetime.fromtimestamp(duration / 1000), '%M:%S')}")
         self.label_duration_right.adjustSize()
 
     @pyqtSlot()
@@ -318,9 +443,7 @@ class AudioPlayer(QWidget):
     def set_track_position(self, value: int) -> None:
         if self.mf.state is StateMode.PLAYER:
             self.player.setPosition(value)
-            position_time = timedelta(milliseconds=value)
-            self.label_duration_left.setText(f"{position_time}".split('.', 2)[0])
-            self.label_duration_left.adjustSize()
+            self.set_current_time(value)
             self.positionChanged.emit(value / self.player.duration())
 
     @pyqtSlot(int)

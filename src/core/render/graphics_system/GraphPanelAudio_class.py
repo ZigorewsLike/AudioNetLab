@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING, List
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QLine, QPointF, Qt, QPoint, QRectF, pyqtSlot
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QPolygon, QMouseEvent, QTextOption, QWheelEvent
+from PyQt6.QtCore import QLine, QPointF, Qt, QPoint, QRectF, pyqtSlot, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QPolygon, QMouseEvent, QTextOption, QWheelEvent, \
+    QResizeEvent
 from PyQt6.QtWidgets import QWidget, QSlider
 
 from src.global_constants import DEBUG
@@ -18,12 +19,24 @@ class GraphPanelAudio(GraphPanelBase):
         self.cursor_position: float = 0.0
         self.changeCursorPosition.connect(self.cursor_position_changed)
         self.setMouseTracking(True)
+        self.debug: bool = False
+        self.slider_visible: bool = False
 
         self.step_slider = QSlider(self)
-        self.step_slider.move(0, 30)
         self.step_slider.setRange(1, 20)
         self.step_slider.setValue(self.step_multiplier)
         self.step_slider.valueChanged.connect(self.step_multiplier_changed)
+
+        self.slider_show_anim = QPropertyAnimation(self.step_slider, b"pos")
+        self.slider_show_anim.setDuration(200)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self.step_slider.resize(15, self.height() - 20)
+        if self.slider_visible:
+            self.step_slider.move(self.width() - 20, 10)
+        else:
+            self.step_slider.move(self.width() + 5, 10)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
@@ -31,10 +44,26 @@ class GraphPanelAudio(GraphPanelBase):
         painter.setPen(QPen(Qt.GlobalColor.green, 2.0, Qt.PenStyle.SolidLine))
         cursor_x = int((self.cursor_position - self.shift_left) * self.scale_factor * self.width())
         painter.drawLine(cursor_x, 0, cursor_x, self.height())
-        if DEBUG:
+        if DEBUG and self.debug:
             painter.setPen(QPen(QColor("#FA887F"), 2.0, Qt.PenStyle.SolidLine))
             painter.drawText(5, 40, f'scale:{self.scale_factor}')
             painter.drawText(5, 55, f'shift:{self.shift_left} : {self.shift_right}')
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self.slider_visible:
+            self.slider_visible = True
+            self.slider_show_anim.setEndValue(QPoint(self.width() - 20, 10))
+            self.slider_show_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self.slider_show_anim.start()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        if self.slider_visible:
+            self.slider_visible = False
+            self.slider_show_anim.setEndValue(QPoint(self.width() + 5, 10))
+            self.slider_show_anim.setEasingCurve(QEasingCurve.Type.InCubic)
+            self.slider_show_anim.start()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pass
