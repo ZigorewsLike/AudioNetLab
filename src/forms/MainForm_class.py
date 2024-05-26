@@ -30,7 +30,7 @@ from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
 from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget,
-                                 MainVerticalTabWidget, TitleBar, SideGrip)
+                                 MainVerticalTabWidget, TitleBar, SideGrip, MetaListWidget)
 from src.enums import StateMode, PlayerState, DragFileState
 from src.enums import StateMode, PlayerState, MainTabWidgetIcons
 from src.core.workers import OpenFileWorker
@@ -98,10 +98,10 @@ class MainForm(QMainWindow):
 
         self.player_frame = QWidget()
 
-        self.meta_list = QListWidget(self.player_frame)
+        self.meta_list = MetaListWidget(self.player_frame)
         self.meta_list.move(self.width(), 0)
         self.meta_list.resize(300, 300)
-        self.meta_list.setContentsMargins(5, 5, 5, 5)
+        # self.meta_list.setContentsMargins(5, 5, 5, 5)
         # self.meta_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
 
         self.tab_widget = VerticalTabWidget(self.player_frame)

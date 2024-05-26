@@ -28,38 +28,13 @@ from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushBut
 
 from src.core.file_system import LastFileProp
 from src.core.render.graphics_system import GraphPanelAudio
-from src.core.qt_widgets import SimpleSlider
+from src.core.qt_widgets import SimpleSlider, MetaListItem
 from src.core.log_system import print_d, print_e
 from src.enums import PlayerState, StateMode
 from src.global_constants import PROFILE
 
 if TYPE_CHECKING:
     from src.forms import MainForm
-
-
-class MetaListItem(QWidget):
-    def __init__(self, key: str, values: List[str], *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        tag_str_value: str = ""
-        try:
-            for tag_value in values:
-                if isinstance(tag_value, list):
-                    tag_str_value += ', '.join(tag_value)
-                else:
-                    tag_str_value += str(tag_value)
-        except Exception as e:
-            print_e(e)
-            tag_str_value = 'UNKNOWN'
-        self.label = QLabel(self)
-        self.label.setText(f'<span style=" font-size:8pt; font-weight: bold; color:#36C942;">{key}:</span> '
-                           f'{tag_str_value}')
-        self.label.adjustSize()
-        self.label.move(5, 0)
-
-    def showEvent(self, event: QShowEvent) -> None:
-        super().showEvent(event)
-        self.label.adjustSize()
-        self.setFixedWidth(self.label.width() + 5)
 
 
 class AudioPlayer(QWidget):
@@ -186,11 +161,13 @@ class AudioPlayer(QWidget):
         self.label_duration_left.setObjectName("PositionLabelGray")
         self.label_duration_left.setFont(font)
         self.label_duration_left.adjustSize()
+        self.label_duration_left.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         self.label_duration_right = QLabel("00:00", self)
         self.label_duration_right.setObjectName("PositionLabelGray")
         self.label_duration_right.setFont(font)
         self.label_duration_right.adjustSize()
+        self.label_duration_right.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         # endregion
 
         self.player = QMediaPlayer()
@@ -382,10 +359,9 @@ class AudioPlayer(QWidget):
         # endregion
 
         for key, value in audio.items():
-            item = QListWidgetItem()
-            self.mf.meta_list.addItem(item)
-            self.mf.meta_list.setItemWidget(item, MetaListItem(key, value))
+            self.mf.meta_list.add(MetaListItem(key, value))
             print(key, value)
+        self.mf.meta_list.recalculate_size()
 
         track_name = audio.get('title', None)
         # TODO: mp3 artist parser

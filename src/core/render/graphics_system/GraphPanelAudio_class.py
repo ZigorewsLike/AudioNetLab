@@ -6,6 +6,7 @@ from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QPen, QPolygon, Q
     QResizeEvent
 from PyQt6.QtWidgets import QWidget, QSlider
 
+from src.function_lib.math_lib import median
 from src.global_constants import DEBUG
 from .GraphPanelBase_class import GraphPanelBase
 from src.core.log_system import print_d
@@ -21,6 +22,9 @@ class GraphPanelAudio(GraphPanelBase):
         self.setMouseTracking(True)
         self.debug: bool = False
         self.slider_visible: bool = False
+        self.mouse_clicked: bool = False
+        self.mouse_position: QPoint = QPoint()
+        self.old_shift: List[float] = [self.shift_left, self.shift_right]
 
         self.step_slider = QSlider(self)
         self.step_slider.setRange(1, 20)
@@ -56,6 +60,12 @@ class GraphPanelAudio(GraphPanelBase):
             self.slider_show_anim.setEndValue(QPoint(self.width() - 20, 10))
             self.slider_show_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
             self.slider_show_anim.start()
+        if self.mouse_clicked:
+            delta_pos = self.mouse_position - event.pos()
+            shift_delta = delta_pos.x() / self.scale_factor / self.width()
+            if 0 <= self.old_shift[0] + shift_delta <= 1.0 and 0 <= self.old_shift[1] + shift_delta <= 1.0:
+                self.set_shift(median(0, self.old_shift[0] + shift_delta, 1),
+                               median(0, self.old_shift[1] + shift_delta, 1))
 
     def leaveEvent(self, event) -> None:
         super().leaveEvent(event)
@@ -66,8 +76,12 @@ class GraphPanelAudio(GraphPanelBase):
             self.slider_show_anim.start()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        pass
-        # self.set_shift(event.pos().x() / self.width(), 1.0)
+        self.mouse_position = event.pos()
+        self.mouse_clicked = True
+        self.old_shift = [self.shift_left, self.shift_right]
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self.mouse_clicked = False
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         self.change_scale_graph()

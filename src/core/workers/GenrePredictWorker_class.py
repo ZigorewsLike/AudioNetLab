@@ -43,6 +43,9 @@ class GenrePredictWorker(QObject):
             waveform = self.mf.audio_player.waveform
             sample_rate = self.mf.audio_player.sample_rate
 
+        start_time = time.time()
+        iter_sum_time: float = 0.0
+
         if waveform is not None:
             predict_index_list: List[int] = []
 
@@ -89,7 +92,8 @@ class GenrePredictWorker(QObject):
                 input_data = (input_data - mean) / std
                 input_data = input_data.reshape(1, -1)
 
-                # region Predicta
+                # region Predict
+                predict_time = time.time()
                 if not ONNX_INFERENCE:
                     with torch.set_grad_enabled(False):
                         input_tensor = torch.Tensor(input_data)
@@ -103,10 +107,13 @@ class GenrePredictWorker(QObject):
                                                                     {input_name: input_data.astype(np.float32)}))
                     preds = preds.squeeze()
                 pred = np.argmax(preds)
+                iter_sum_time += (time.time() - predict_time) * 1000
+                print_d(f"Predict iter time: {(time.time() - predict_time) * 1000}ms")
 
                 predict_index_list.append(int(pred))
                 # endregion
             self.preloader_signal.emit(f"Классификация жанра 100%")
+            print_d(f"Predict time: {(time.time() - start_time) * 1000}ms | IterSUmTime: {iter_sum_time}ms")
             self.finished.emit(predict_index_list)
             return predict_index_list
         self.finished.emit([])

@@ -7,3 +7,4 @@ from .DragFileWidget_class import DragFileWidget
 from .MainVerticalTabWidget_class import MainVerticalTabWidget, MainVerticalTabButton
 from .TitleBar_class import TitleBar
 from .SideGrip_class import SideGrip
+from .MetaListWidget_class import MetaListWidget, MetaListItem
