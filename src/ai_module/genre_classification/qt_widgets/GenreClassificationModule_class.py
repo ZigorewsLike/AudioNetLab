@@ -16,7 +16,7 @@ from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFon
     QResizeEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog
 
-from src.global_constants import ONNX_INFERENCE, PROFILE
+from src.global_constants import ONNX_INFERENCE, PROFILE, ONNX_SESS_PROVIDER
 from src.core.log_system import print_d, print_e, print_i
 from src.core.workers import GenrePredictWorker
 from src.function_lib.math_lib import median
@@ -112,7 +112,7 @@ class GenreClassifierModule(QWidget):
 
             # torch.onnx.export(self.model, torch.ones((1, 58)), self.model_path[:-3] + '.onnx')
         else:
-            self.model = load_sess_model(self.model_path)
+            self.model = load_sess_model(self.model_path, ONNX_SESS_PROVIDER)
 
     def predict_current(self) -> None:
         self.worker.moveToThread(self.work_thread)

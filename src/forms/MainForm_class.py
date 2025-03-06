@@ -117,6 +117,8 @@ class MainForm(QMainWindow):
 
         self.preloader = PreLoaderWidget(self)
         self.preloader.setVisible(False)
+        if CUSTOM_TITLE_BAR:
+            self.preloader.move(0, self.title_bar.height())
         # endregion
 
         self.set_state_mode(self.state)
@@ -345,6 +347,9 @@ class MainForm(QMainWindow):
             title_bar_size = QSize(0, self.title_bar.height())
             self.central_widget.resize(self.size() - title_bar_size)
             self.title_bar.resize(self.width(), self.title_bar.height())
+            self.preloader.resize(self.size() - title_bar_size)
+        else:
+            self.preloader.resize(self.size())
 
         if self.windowState() is not Qt.WindowState.WindowMaximized:
             self.settings.system_settings.form_width = self.width()
@@ -365,7 +370,6 @@ class MainForm(QMainWindow):
             self.meta_list.move(self.width(),
                                 self.central_widget.height() - self.meta_list.height() - 52)
 
-        self.preloader.resize(self.size())
         self.drag_widget.resize(self.size())
 
         # self.home_page.resize(self.central_widget.size())
