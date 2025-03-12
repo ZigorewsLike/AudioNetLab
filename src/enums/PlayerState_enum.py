@@ -6,3 +6,5 @@ class PlayerState(Enum):
     WAIT = 1,
     PLAY = 2,
     PAUSE = 3,
+    STOP = 4,
+

@@ -72,7 +72,8 @@ class LibrosaGraphsModule(QWidget):
         if self.mf.audio_player.waveform is not None and self.mf.audio_player.waveform.size > 0:
             hop_length: int = 512
             slice_left: int = int(self.mf.audio_player.waveform.shape[0] * self.cursor_position / hop_length) * hop_length
-            waveform = self.mf.audio_player.waveform[slice_left:slice_left + hop_length]
+            waveform: np.ndarray = self.mf.audio_player.waveform[slice_left:slice_left + hop_length]
+            waveform = waveform[:, 0].astype(np.float16) / np.iinfo(np.int16).max
             stff = np.abs(librosa.stft(waveform, n_fft=2048, hop_length=hop_length))
             slice_stff = stff[:, 0]
             self.fourier_graph.graph.set_data(slice_stff, np.float64)

@@ -9,29 +9,28 @@ from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple, Any
 from math import atan2, cos, sin, pi
 
 import numpy as np
-from multipledispatch import dispatch
+import pyaudio
 import mutagen
 from mutagen.flac import FLAC
-from mutagen.id3 import APIC
 from mutagen.mp3 import MP3
 import librosa
 
 from PyQt6 import QtMultimedia, QtCore
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject, QPropertyAnimation, \
-    QEasingCurve
+    QEasingCurve, QThread
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
                          QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent, QImage,
                          QRegion, QPainterPath)
 from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
     QSlider
 
-from src.core.file_system import LastFileProp
 from src.core.render.graphics_system import GraphPanelAudio
 from src.core.qt_widgets import SimpleSlider, MetaListItem
 from src.core.log_system import print_d, print_e
 from src.enums import PlayerState, StateMode
 from src.global_constants import PROFILE
+from .AudioStreamer_class import AudioStreamer
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -70,6 +69,11 @@ class AudioPlayer(QWidget):
 
         self.waveform: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
+
+        self.pyaudio_port: Optional[pyaudio.PyAudio] = pyaudio.PyAudio()
+        self.pyaudio_stream: Optional[pyaudio.Stream] = None
+        self.audio_streamer: AudioStreamer = AudioStreamer()
+        self.audio_thread: QThread = QThread()
 
         self.track_meta: Optional[Dict[str, Any]] = None
 
@@ -119,8 +123,8 @@ class AudioPlayer(QWidget):
         self.position_slider.slider_height = 5
 
         self.volume_slider = SimpleSlider(self)
-        self.volume_slider.set_range(0, 100)
-        self.volume_slider.set_value(50)
+        self.volume_slider.set_range(0, 1000)
+        self.volume_slider.set_value(500)
         self.volume_slider.sliderMoved.connect(self.set_track_volume)
         self.volume_slider.resize(80, 13)
         self.volume_slider.slider_height = 3
@@ -170,13 +174,16 @@ class AudioPlayer(QWidget):
         self.label_duration_right.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         # endregion
 
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.player.setAudioOutput(self.audio_output)
-        self.audio_output.setVolume(50)
-        self.player.positionChanged.connect(self.track_position_changed)
-        self.player.playbackStateChanged.connect(self.player_state_changed)
-        self.player.durationChanged.connect(self.duration_is_changed)
+        self.audio_streamer.set_volume(50)
+        self.audio_streamer.progress.connect(self.track_position_changed)
+        self.audio_streamer.playbackStateChanged.connect(self.player_state_changed)
+        self.audio_streamer.durationChanged.connect(self.duration_is_changed)
+
+        self.audio_streamer.start()
+
+        # # self.player.positionChanged.connect(self.track_position_changed)
+        # self.player.playbackStateChanged.connect(self.player_state_changed)
+        # self.player.durationChanged.connect(self.duration_is_changed)
 
         self.change_play_icon()
 
@@ -210,6 +217,9 @@ class AudioPlayer(QWidget):
         super().resizeEvent(event)
         if self.isVisible():
             self.recalc_sizes()
+
+    def __del__(self) -> None:
+        self.audio_streamer.close_audio_port()
 
     def recalc_sizes(self) -> None:
         self.title_tack.move(80, self.height() - 35 - 21)
@@ -285,7 +295,7 @@ class AudioPlayer(QWidget):
     def set_current_time(self, position: float) -> None:
         self.label_duration_left.setText(f"{datetime.strftime(datetime.fromtimestamp(position / 1000), '%M:%S')}")
         self.label_duration_left.adjustSize()
-        slider_position: float = self.position_slider.width() * position / self.player.duration()
+        slider_position: float = self.position_slider.width() * position / self.audio_streamer.duration()
         if slider_position - 10 < self.label_duration_left.width():
             self.label_duration_left.move(int(slider_position) + 5 + self.position_slider.x(),
                                           self.label_duration_left.y())
@@ -305,29 +315,29 @@ class AudioPlayer(QWidget):
         self.label_duration_left.setStyleSheet(self.styleSheet())
         self.label_duration_right.setStyleSheet(self.styleSheet())
 
-    @pyqtSlot('qint64')
+    @pyqtSlot(int)
     def track_position_changed(self, position: int) -> None:
         self.position_slider.set_value(position)
         self.set_current_time(position)
 
-        if self.player.duration() != 0:
-            self.audio_graph.changeCursorPosition.emit(position / self.player.duration())
-            self.positionChanged.emit(position / self.player.duration())
+        if self.audio_streamer.duration() != 0:
+            self.audio_graph.changeCursorPosition.emit(position / self.audio_streamer.duration())
+            self.positionChanged.emit(position / self.audio_streamer.duration())
             if self.isVisible():
                 self.audio_graph.change_scale_graph()
 
-    @pyqtSlot(QMediaPlayer.PlaybackState)
-    def player_state_changed(self, state: QMediaPlayer.PlaybackState):
+    @pyqtSlot(PlayerState)
+    def player_state_changed(self, state: PlayerState):
         print_d(state)
-        if state is QMediaPlayer.PlaybackState.StoppedState:
-            self.player.stop()
+        if state is PlayerState.STOP:
+            # self.audio_streamer.stop()
             self.position_slider.set_value(0)
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
     # region Player methods
     def prepare_to_open_file(self, path: str) -> bool:
-        self.player.stop()
+        self.audio_streamer.stop()
         self.mf.meta_list.clear()
         print_d(f"Open file: {path}")
 
@@ -379,16 +389,19 @@ class AudioPlayer(QWidget):
         return True
 
     def open_file_ai(self, path) -> None:
-        waveform_np, sample_rate = librosa.load(path)
-        # print_d(y.shape, waveform_np.shape)
+        waveform_np, sample_rate = librosa.load(path, sr=None, mono=False, dtype=np.int16)
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
-        self.audio_graph.set_data((waveform_np + 1.0) / 2.0, calc_line=False)
+        self.audio_graph.set_data(waveform_np[0] * 1.0, calc_line=False)
         self.audio_graph.set_shift(0, 1)
+
+        waveform_np = np.swapaxes(waveform_np, 0, 1)
 
         self.waveform = waveform_np
         self.sample_rate = sample_rate
 
-    @pyqtSlot('qint64')
+        self.audio_streamer.init_file(waveform_np, sample_rate)
+
+    @pyqtSlot(int)
     def duration_is_changed(self, duration: int) -> None:
         self.position_slider.set_range(0, duration)
         self.label_duration_right.setText(f"{datetime.strftime(datetime.fromtimestamp(duration / 1000), '%M:%S')}")
@@ -397,33 +410,33 @@ class AudioPlayer(QWidget):
     @pyqtSlot()
     def play_music(self) -> None:
         if self.mf.state is StateMode.PLAYER:
-            self.player.play()
+            self.audio_streamer.play()
             self.player_state = PlayerState.PLAY
             self.change_play_icon()
 
     @pyqtSlot()
     def pause_music(self) -> None:
         if self.mf.state is StateMode.PLAYER:
-            self.player.pause()
+            self.audio_streamer.pause()
             self.player_state = PlayerState.PAUSE
             self.change_play_icon()
 
     @pyqtSlot()
     def stop_music(self) -> None:
         if self.mf.state is StateMode.PLAYER:
-            self.player.stop()
+            self.audio_streamer.stop()
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
     @pyqtSlot(int)
     def set_track_position(self, value: int) -> None:
         if self.mf.state is StateMode.PLAYER:
-            self.player.setPosition(value)
+            self.audio_streamer.set_position(value)
             self.set_current_time(value)
-            self.positionChanged.emit(value / self.player.duration())
+            self.positionChanged.emit(value / self.audio_streamer.duration())
 
     @pyqtSlot(int)
     def set_track_volume(self, value: int) -> None:
-        self.audio_output.setVolume(value / 100)
+        self.audio_streamer.set_volume(value / self.volume_slider.maximum)
 
     # endregion

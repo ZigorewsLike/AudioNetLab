@@ -1,6 +1,4 @@
-import configparser
 import gc
-import math
 import os
 import shutil
 import pickle
@@ -8,8 +6,6 @@ import tracemalloc
 from datetime import datetime
 from typing import Optional
 
-import mutagen
-import numpy as np
 from PyQt6 import QtCore, QtSvg, QtWidgets
 from PyQt6.QtCore import Qt, QRectF, QPoint, QTimer, QThread, pyqtSlot, QSize, QRect
 from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEvent, QKeySequence, QMoveEvent,
@@ -19,7 +15,6 @@ from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDia
                              QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem, QSizeGrip,
                              QListWidget)
 
-from src.core.audio.Player_class import MetaListItem
 from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
                                   LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR,
                                   PATH_TO_LAST_PREVIEW, CUSTOM_TITLE_BAR)
@@ -28,6 +23,7 @@ from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
+# from src.core.settings.qt_widgets import SettingsTabWidget
 from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget,
                                  MainVerticalTabWidget, TitleBar, SideGrip, MetaListWidget)
@@ -139,7 +135,7 @@ class MainForm(QMainWindow):
 
         # region apply settings
         self.audio_player.volume_slider.set_value(self.settings.player_settings.volume)
-        self.audio_player.audio_output.setVolume(self.settings.player_settings.volume / 100)
+        self.audio_player.audio_streamer.set_volume(self.settings.player_settings.volume / self.audio_player.volume_slider.maximum)
         # endregion
 
         self.work_thread = QThread(self)
@@ -148,17 +144,16 @@ class MainForm(QMainWindow):
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
+        self.settings_widget = QWidget()
+        # self.settings_widget = SettingsTabWidget(mf=self)
+
         self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
         self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)
         self.main_tab_widget.add_sub_tub(0, MainTabWidgetIcons.OPEN_FILE)
         self.main_tab_widget.add_tab(self.player_frame, MainTabWidgetIcons.PLAYER)
         self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.GENRE_CLASSIFICATION)
         self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.LIBROSA_PANEL)
-        self.main_tab_widget.add_tab(QWidget(), MainTabWidgetIcons.SETTINGS)
-        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
-        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
-        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
-        self.main_tab_widget.add_sub_tub(2, MainTabWidgetIcons.OPEN_FILE)
+        self.main_tab_widget.add_tab(self.settings_widget, MainTabWidgetIcons.SETTINGS)
         self.main_tab_widget.tab_switched.connect(lambda: self.recalculate_size())
 
         self.main_tab_widget.get_sub_tab_button(0, 0).tab_clicked.connect(lambda: self.open_file_dialog())
@@ -360,6 +355,7 @@ class MainForm(QMainWindow):
         self.audio_player.move(0, self.central_widget.height() - self.audio_player.height())
         self.tab_widget.resize(self.player_frame.width(),
                                self.player_frame.height())
+        self.settings_widget.resize(self.central_widget.size())
         self.tab_widget.move(0, 0)
         self.tab_widget.resize_tab_content()
 

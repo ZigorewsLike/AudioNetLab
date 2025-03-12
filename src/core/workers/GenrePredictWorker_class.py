@@ -48,6 +48,7 @@ class GenrePredictWorker(QObject):
 
         if waveform is not None:
             predict_index_list: List[int] = []
+            waveform = waveform[:, 0].astype(np.float16) / np.iinfo(np.int16).max
 
             sample_len: int = math.ceil(waveform.shape[0] / sample_rate / self.pattern_length)
             for step in range(sample_len):

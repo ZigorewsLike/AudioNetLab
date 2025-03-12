@@ -22,6 +22,7 @@ class GraphPanelAudio(GraphPanelBase):
         self.setMouseTracking(True)
         self.debug: bool = False
         self.slider_visible: bool = False
+        self.reset_graph_scale: bool = True
         self.mouse_clicked: bool = False
         self.mouse_position: QPoint = QPoint()
         self.old_shift: List[float] = [self.shift_left, self.shift_right]
@@ -88,6 +89,7 @@ class GraphPanelAudio(GraphPanelBase):
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 5)
+        self.reset_graph_scale = self.scale_factor == 1.0
         self.change_scale_graph()
 
     @pyqtSlot(int)
@@ -97,15 +99,16 @@ class GraphPanelAudio(GraphPanelBase):
         self.update()
 
     def change_scale_graph(self) -> None:
-        region_size: float = 1 / self.scale_factor
-        n_l = self.cursor_position - region_size / 2
-        n_r = self.cursor_position + region_size / 2
-        new_shift_l = n_l - min(.0, n_l) - max(.0, n_r - 1.0)
-        new_shift_r = n_r - min(.0, n_l) - max(.0, n_r - 1.0)
-        if (new_shift_l, new_shift_r) != (self.shift_left, self.shift_right):
-            self.set_shift(new_shift_l, new_shift_r)
-
-        self.update()
+        if self.scale_factor != 1.0 or self.reset_graph_scale:
+            region_size: float = 1 / self.scale_factor
+            n_l = self.cursor_position - region_size / 2
+            n_r = self.cursor_position + region_size / 2
+            new_shift_l = n_l - min(.0, n_l) - max(.0, n_r - 1.0)
+            new_shift_r = n_r - min(.0, n_l) - max(.0, n_r - 1.0)
+            if (new_shift_l, new_shift_r) != (self.shift_left, self.shift_right):
+                self.set_shift(new_shift_l, new_shift_r)
+            self.reset_graph_scale = False
+            self.update()
 
     @pyqtSlot(float)
     def cursor_position_changed(self, position: float) -> None:

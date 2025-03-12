@@ -59,6 +59,10 @@ class BaseTabWidget(QWidget):
         self.tab_switched.emit(index, True)
         self.update()
 
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self.resize_tab_content()
+
     def resize_tab_content(self) -> None:
         if self.is_active and self._tab_container:
             self.content_width = self.width() - self.tab_width

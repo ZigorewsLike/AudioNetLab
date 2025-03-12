@@ -1,0 +1,1 @@
+from .SettingsTabWidget_class import SettingsTabWidget
