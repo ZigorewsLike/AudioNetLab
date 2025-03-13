@@ -48,7 +48,7 @@ class GenrePredictWorker(QObject):
 
         if waveform is not None:
             predict_index_list: List[int] = []
-            waveform = waveform[:, 0].astype(np.float16) / np.iinfo(np.int16).max
+            waveform = waveform[:, 0].astype(np.float16) / np.iinfo(waveform.dtype).max
 
             sample_len: int = math.ceil(waveform.shape[0] / sample_rate / self.pattern_length)
             for step in range(sample_len):
@@ -109,7 +109,7 @@ class GenrePredictWorker(QObject):
                     preds = preds.squeeze()
                 pred = np.argmax(preds)
                 iter_sum_time += (time.time() - predict_time) * 1000
-                print_d(f"Predict iter time: {(time.time() - predict_time) * 1000}ms")
+                # print_d(f"Predict iter time: {(time.time() - predict_time) * 1000}ms")
 
                 predict_index_list.append(int(pred))
                 # endregion

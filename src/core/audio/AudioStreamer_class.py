@@ -1,16 +1,18 @@
 import time
 import math
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pyaudio
 import wavio
+import sounddevice as sd
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QObject, QThread
 
 from src.core.log_system import print_d
 from src.enums import PlayerState
+from src.function_lib.audio import equalizer_10band, equalize_signal, equalizer_librosa
 
 
 class AudioStreamer(QThread):
@@ -23,20 +25,21 @@ class AudioStreamer(QThread):
         super().__init__()
         self._position: int = 0
         self.player_state = PlayerState.NONE
-        # self.stream_ref: Optional[pyaudio.Stream] = None
         self.waveform_ref: Optional[np.ndarray] = None
-        self.sample_rate: Optional[float] = None
+        self.sample_rate: Optional[int] = None
         self.thread_stop: bool = False
-        self._chunk_size: int = 1024 * 2
+        self._chunk_size: int = 512 * 2
         self._duration: int = 0
         self._channels: int = 2
         self._volume: float = 1.0
         self.log_volume: bool = True
+        self.eq_gains: List[float] = [1.0 for _ in range(10)]
+        self.bands: List[tuple] = []
 
         self.pyaudio_port: pyaudio.PyAudio = pyaudio.PyAudio()
         self.pyaudio_stream: Optional[pyaudio.Stream] = None
 
-    def init_file(self, waveform: np.ndarray, sample_rate: float) -> None:
+    def init_file(self, waveform: np.ndarray, sample_rate: int) -> None:
         self.stop()
         time.sleep(self._chunk_size / sample_rate + 0.01)
         self.waveform_ref = waveform
@@ -51,6 +54,7 @@ class AudioStreamer(QThread):
                                                      channels=self._channels,
                                                      rate=int(self.sample_rate),
                                                      output=True)
+        self.print_all_devices()
 
     def close_audio_port(self) -> None:
         self.pyaudio_port.terminate()
@@ -63,7 +67,15 @@ class AudioStreamer(QThread):
             if self.player_state is PlayerState.PLAY:
                 wave_crop = self.waveform_ref[self._position:self._position + self._chunk_size]
                 wave_type = wave_crop.dtype
-                wave_crop = (wave_crop * self._volume).astype(wave_type)
+                wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max
+                # region EQ
+                # bands = [(20, 40), (40, 80), (80, 160), (160, 300), (300, 600), (600, 1200), (1200, 2400),
+                #          (2400, 5000), (5000, 10000), (10000, 20000)]
+                wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands)
+                wave_crop = (wave_crop * self._volume)
+                wave_crop = np.clip(wave_crop, -1.0, 1.0)
+                wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
+                # endregion
                 if wave_crop.size == 0:
                     self.stop()
                 data = wavio._array2wav(wave_crop, 2)
@@ -102,5 +114,13 @@ class AudioStreamer(QThread):
 
     def duration(self) -> int:
         return self._duration
+
+    def print_all_devices(self):
+        print_d(sd.query_devices())
+        # for i in range(self.pyaudio_port.get_device_count()):
+        #     device_info = self.pyaudio_port.get_device_info_by_index(i)
+        #     # print_d(device_info)
+        #     if device_info['maxOutputChannels'] > 0:
+        #         print_d(f"Device {i}: {device_info['name']}")
 
 

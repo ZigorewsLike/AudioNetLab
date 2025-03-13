@@ -66,6 +66,7 @@ class AudioPlayer(QWidget):
         self.player_state: PlayerState = PlayerState.NONE
         self.graph_visible: bool = True
         self.meta_visible: bool = False
+        self.mute_audio: bool = False
 
         self.waveform: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
@@ -148,7 +149,7 @@ class AudioPlayer(QWidget):
         self.meta_visible_button.setObjectName("PlayerButtons")
 
         self.mute_volume_button = QPushButton("", self)
-        # self.mute_volume_button.clicked.connect(self.switch_visible_meta)
+        self.mute_volume_button.clicked.connect(self.switch_mute_audio)
         self.mute_volume_button.resize(22, 20)
         self.mute_volume_button.setIcon(QIcon('res/icons/player_volume_icon_black.png'))
         self.mute_volume_button.setIconSize(QSize(22, 20))
@@ -179,8 +180,7 @@ class AudioPlayer(QWidget):
         self.audio_streamer.playbackStateChanged.connect(self.player_state_changed)
         self.audio_streamer.durationChanged.connect(self.duration_is_changed)
 
-        self.audio_streamer.start()
-
+        self.audio_streamer.start(QThread.Priority.TimeCriticalPriority)
         # # self.player.positionChanged.connect(self.track_position_changed)
         # self.player.playbackStateChanged.connect(self.player_state_changed)
         # self.player.durationChanged.connect(self.duration_is_changed)
@@ -292,6 +292,16 @@ class AudioPlayer(QWidget):
         # self.mf.meta_list.setVisible(self.meta_visible)
         self.meta_show_anim.start()
 
+    @pyqtSlot()
+    def switch_mute_audio(self) -> None:
+        self.mute_audio = not self.mute_audio
+        if not self.mute_audio:
+            self.mute_volume_button.setIcon(QIcon('res/icons/player_volume_icon_black.png'))
+            self.set_track_volume(self.volume_slider.value)
+        else:
+            self.mute_volume_button.setIcon(QIcon('res/icons/player_volume_off_black_2.png'))
+            self.audio_streamer.set_volume(0)
+
     def set_current_time(self, position: float) -> None:
         self.label_duration_left.setText(f"{datetime.strftime(datetime.fromtimestamp(position / 1000), '%M:%S')}")
         self.label_duration_left.adjustSize()
@@ -391,7 +401,7 @@ class AudioPlayer(QWidget):
     def open_file_ai(self, path) -> None:
         waveform_np, sample_rate = librosa.load(path, sr=None, mono=False, dtype=np.int16)
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
-        self.audio_graph.set_data(waveform_np[0] * 1.0, calc_line=False)
+        self.audio_graph.set_data(waveform_np[0, ::sample_rate // 22100 * 10] * 1.0, calc_line=False)
         self.audio_graph.set_shift(0, 1)
 
         waveform_np = np.swapaxes(waveform_np, 0, 1)
@@ -399,7 +409,8 @@ class AudioPlayer(QWidget):
         self.waveform = waveform_np
         self.sample_rate = sample_rate
 
-        self.audio_streamer.init_file(waveform_np, sample_rate)
+        self.audio_streamer.init_file(waveform_np, int(sample_rate))
+        print_d(self.pyaudio_port.get_default_output_device_info())
 
     @pyqtSlot(int)
     def duration_is_changed(self, duration: int) -> None:
@@ -437,6 +448,11 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot(int)
     def set_track_volume(self, value: int) -> None:
-        self.audio_streamer.set_volume(value / self.volume_slider.maximum)
+        if not self.mute_audio:
+            self.audio_streamer.set_volume(value / self.volume_slider.maximum)
+
+    @pyqtSlot(list)
+    def set_eq_gains(self, gains: List[int]) -> None:
+        self.audio_streamer.eq_gains = gains
 
     # endregion

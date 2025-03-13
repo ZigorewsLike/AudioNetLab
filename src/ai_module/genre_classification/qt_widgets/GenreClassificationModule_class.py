@@ -21,6 +21,7 @@ from src.core.log_system import print_d, print_e, print_i
 from src.core.workers import GenrePredictWorker
 from src.function_lib.math_lib import median
 from src.function_lib.ai import load_sess_model
+from src.core.settings.qt_widgets.SettingsEQWidget_class import EQWidget
 
 if not ONNX_INFERENCE:
     try:
@@ -76,6 +77,8 @@ class GenreClassifierModule(QWidget):
         self.global_results = []
         self.drawing_text_pos: Optional[QPoint] = None
 
+        self.eq = EQWidget(self)
+
         self.genre_dict: Dict[int, str] = {
             0: "Electronic",
             1: "Experimental",
@@ -128,7 +131,9 @@ class GenreClassifierModule(QWidget):
             for step in range(len(self.global_results)):
                 self.genre_gradient.setColorAt(step / len(self.global_results),
                                                QColor(self.genre_color[self.global_results[step]]))
-            self.update()
+        self.eq.move(int(self.width() / 2 - self.eq.width() / 2),
+                     self.best_of_label.y() + self.best_of_label.height() + 10)
+        self.update()
 
     @pyqtSlot(list)
     def predict_finished(self, out: List[int]) -> None:
@@ -149,6 +154,8 @@ class GenreClassifierModule(QWidget):
                              f"{self.genre_dict[inx]}</span> : {round(count / counts.sum() * 100, 2)}%<br>")
         self.best_of_label.setText(best_of_text)
         self.best_of_label.adjustSize()
+        self.eq.move(int(self.width() / 2 - self.eq.width() / 2),
+                     self.best_of_label.y() + self.best_of_label.height() + 10)
 
         print_d(f"Final genre: {np.argmax(counts)}, name: {self.genre_dict[int(np.argmax(counts))]}")
         self.status_label.setText(f"<span style=' font-size:8pt; font-weight: bold; color:#4477C9;'>ИТОГ:</span> "
@@ -158,6 +165,7 @@ class GenreClassifierModule(QWidget):
 
         self.mf.preloader.setVisible(False)
         self.worker_reset()
+        self.resize(self.width(), self.eq.y() + self.eq.height())
 
     def worker_reset(self) -> None:
         self.work_thread.exit(0)

@@ -23,7 +23,7 @@ from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
 from src.core.settings import SettingsDataObject
 from src.core.audio import AudioPlayer
-# from src.core.settings.qt_widgets import SettingsTabWidget
+from src.core.settings.qt_widgets import SettingsTabWidget
 from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget,
                                  MainVerticalTabWidget, TitleBar, SideGrip, MetaListWidget)
@@ -144,8 +144,11 @@ class MainForm(QMainWindow):
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
-        self.settings_widget = QWidget()
-        # self.settings_widget = SettingsTabWidget(mf=self)
+        # self.settings_widget = QWidget()
+        self.settings_widget = SettingsTabWidget(mf=self)
+
+        self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
+        self.audio_player.audio_streamer.bands = self.genre_widget.eq.bands
 
         self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
         self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)

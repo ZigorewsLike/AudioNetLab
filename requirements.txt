@@ -7,3 +7,6 @@ openpyxl~=3.1.2
 onnx~=1.15.0
 onnxruntime-directml~=1.16.3
 pyinstaller~=6.3.0
+PyAudio~=0.2.14
+wavio~=0.0.9
+sounddevice~=0.5.1

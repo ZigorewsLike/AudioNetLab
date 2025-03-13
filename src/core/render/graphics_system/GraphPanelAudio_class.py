@@ -26,6 +26,7 @@ class GraphPanelAudio(GraphPanelBase):
         self.mouse_clicked: bool = False
         self.mouse_position: QPoint = QPoint()
         self.old_shift: List[float] = [self.shift_left, self.shift_right]
+        self.step_multiplier: int = 20
 
         self.step_slider = QSlider(self)
         self.step_slider.setRange(1, 20)
@@ -97,6 +98,7 @@ class GraphPanelAudio(GraphPanelBase):
         self.step_multiplier = val
         self.calculate_render_lines()
         self.update()
+        print_d(val)
 
     def change_scale_graph(self) -> None:
         if self.scale_factor != 1.0 or self.reset_graph_scale:
