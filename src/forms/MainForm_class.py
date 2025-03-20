@@ -100,7 +100,7 @@ class MainForm(QMainWindow):
         # self.meta_list.setContentsMargins(5, 5, 5, 5)
         # self.meta_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
 
-        self.tab_widget = VerticalTabWidget(self.player_frame)
+        self.tab_widget = BaseTabWidget(self.player_frame)
         self.tab_widget.tab_switched.connect(self.tab_switched)
         self.audio_player = AudioPlayer(self, self.player_frame)
 
@@ -148,6 +148,7 @@ class MainForm(QMainWindow):
         self.settings_widget = SettingsTabWidget(mf=self)
 
         self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
+        self.genre_widget.eq.activeSwitched.connect(self.audio_player.audio_streamer.set_eq_active)
         self.audio_player.audio_streamer.bands = self.genre_widget.eq.bands
 
         self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
@@ -356,10 +357,10 @@ class MainForm(QMainWindow):
         self.main_tab_widget.resize(self.central_widget.size())
         self.audio_player.resize(self.player_frame.width(), self.audio_player.height())
         self.audio_player.move(0, self.central_widget.height() - self.audio_player.height())
-        self.tab_widget.resize(self.player_frame.width(),
+        self.tab_widget.resize(self.player_frame.width() - 50,
                                self.player_frame.height())
         self.settings_widget.resize(self.central_widget.size())
-        self.tab_widget.move(0, 0)
+        self.tab_widget.move(50, 0)
         self.tab_widget.resize_tab_content()
 
         if self.audio_player.meta_visible:
@@ -473,6 +474,7 @@ class MainForm(QMainWindow):
         self.preloader.setVisible(False)
         self.set_state_mode(StateMode.PLAYER)
         self.audio_player.audio_graph.calculate_render_lines()
+        self.genre_widget.reset_result()
 
     def save_config_app(self) -> None:
         self.settings.player_settings.volume = self.audio_player.volume_slider.value

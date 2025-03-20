@@ -21,7 +21,8 @@ from src.core.log_system import print_d, print_e, print_i
 from src.core.workers import GenrePredictWorker
 from src.function_lib.math_lib import median
 from src.function_lib.ai import load_sess_model
-from src.core.settings.qt_widgets.SettingsEQWidget_class import EQWidget
+from src.core.qt_widgets import EQWidget
+from src.enums import EQType
 
 if not ONNX_INFERENCE:
     try:
@@ -74,10 +75,12 @@ class GenreClassifierModule(QWidget):
         self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
         self.genre_gradient.setColorAt(0.0, QColor("#2A2A2A"))
         self.genre_gradient.setColorAt(1.0, QColor("#2A2A2A"))
-        self.global_results = []
+        self.global_results: Optional[list] = None
         self.drawing_text_pos: Optional[QPoint] = None
 
-        self.eq = EQWidget(self)
+        self.eq = EQWidget(EQType.ACTIVE, self)
+        self.genre_eq = np.random.rand(8, 20)
+        self.current_genre: str = ""
 
         self.genre_dict: Dict[int, str] = {
             0: "Electronic",
@@ -125,12 +128,23 @@ class GenreClassifierModule(QWidget):
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
-        if self.global_results:
-            self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
+        self.recalc_sizes()
 
-            for step in range(len(self.global_results)):
-                self.genre_gradient.setColorAt(step / len(self.global_results),
-                                               QColor(self.genre_color[self.global_results[step]]))
+    def set_gradient_color(self, genre_result: List[int]) -> None:
+        self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
+        sample_width = self.mf.audio_player.sample_rate * 3
+        for step, result in enumerate(genre_result):
+            self.genre_gradient.setColorAt(
+                (step * sample_width + sample_width / 2) / self.mf.audio_player.waveform.shape[0],
+                QColor(self.genre_color[result]))
+            self.genre_gradient.setColorAt(
+                ((step + 1) * sample_width) / self.mf.audio_player.waveform.shape[0],
+                QColor(self.genre_color[result]))
+
+
+    def recalc_sizes(self) -> None:
+        if self.global_results:
+            self.set_gradient_color(self.global_results)
         self.eq.move(int(self.width() / 2 - self.eq.width() / 2),
                      self.best_of_label.y() + self.best_of_label.height() + 10)
         self.update()
@@ -140,12 +154,9 @@ class GenreClassifierModule(QWidget):
         if not out:
             # TODO: Сообщить о том, что выход пустой
             return
-        self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
-        sample_len: int = math.ceil(self.mf.audio_player.waveform.shape[0] / self.mf.audio_player.sample_rate / 3)
-        for step in range(sample_len):
-            self.genre_gradient.setColorAt(step / sample_len, QColor(self.genre_color[out[step]]))
-
+        self.set_gradient_color(out)
         self.global_results = out
+        print_d(out)
         counts = np.bincount(np.array(out))
 
         best_of_text: str = ""
@@ -179,20 +190,20 @@ class GenreClassifierModule(QWidget):
         if self.isVisible():
             start_time: float = time.time()
             painter = QPainter(self)
-            painter.fillRect(10, self.graph_y, self.width() - 21, self.graph_height, QBrush(self.genre_gradient))
+            painter.fillRect(0, self.graph_y, self.width(), self.graph_height, QBrush(self.genre_gradient))
 
             painter.setPen(QPen(QColor("#FA6900"), 1.0, Qt.PenStyle.DashLine))
-            cursor_x: int = round(self.cursor_position * (self.width() - 21) + 10)
+            cursor_x: int = round(self.cursor_position * (self.width()))
             painter.drawLine(cursor_x, self.graph_y, cursor_x, self.graph_y + self.graph_height)
 
-            if self.drawing_text_pos is not None and len(self.global_results) > 0:
+            if self.drawing_text_pos is not None and self.global_results is not None and len(self.global_results) > 0:
                 painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
                 painter.setFont(QFont("Arial", 14))
                 painter.drawLine(self.drawing_text_pos.x(), self.graph_y, self.drawing_text_pos.x(),
                                  self.graph_y + self.graph_height)
 
                 # painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
-                index_factor: float = (self.drawing_text_pos.x() - 10) / (self.width() - 21)
+                index_factor: float = (self.drawing_text_pos.x()) / (self.width())
                 index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
                 genre_text: str = self.genre_dict[self.global_results[index]]
                 genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
@@ -201,10 +212,10 @@ class GenreClassifierModule(QWidget):
             elif self.global_results:
                 painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
                 painter.setFont(QFont("Arial", 14))
-                index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
-                genre_text: str = self.genre_dict[self.global_results[index]]
-                genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
-                painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, genre_text)
+                # index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
+                # genre_text: str = self.genre_dict[self.global_results[index]]
+                genre_text_width: int = painter.fontMetrics().boundingRect(self.current_genre).width()
+                painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, self.current_genre)
             if PROFILE:
                 self.mf.profiling.add_draw_time(self.__class__.__name__, time.time() - start_time)
 
@@ -277,9 +288,26 @@ class GenreClassifierModule(QWidget):
 
         wb.save('data/local/analysis.xlsx')
 
+    def reset_result(self) -> None:
+        self.global_results = None
+        self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
+        self.genre_gradient.setColorAt(0.0, QColor("#2A2A2A"))
+        self.genre_gradient.setColorAt(1.0, QColor("#2A2A2A"))
+        self.best_of_label.setText("")
+        self.best_of_label.adjustSize()
+        self.recalc_sizes()
+
     @pyqtSlot(float)
     def set_cursor_position(self, position: float) -> None:
         self.cursor_position = position
+        if self.global_results is not None:
+            position *= self.mf.audio_player.waveform[:, 0].size
+            genre: int = self.global_results[int(position / self.mf.audio_player.sample_rate / 3)]
+            self.current_genre = self.genre_dict[genre]
+            if self.eq.auto_eq:
+                gains: np.ndarray = self.genre_eq[genre]
+                gains = (gains * 200).astype(np.uint8)
+                self.eq.set_sliders(gains.tolist())
         self.update()
 
 

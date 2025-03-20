@@ -8,7 +8,7 @@ import wavio
 import sounddevice as sd
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QObject, QThread
+from PyQt6.QtCore import QObject, QThread, pyqtSlot
 
 from src.core.log_system import print_d
 from src.enums import PlayerState
@@ -33,7 +33,8 @@ class AudioStreamer(QThread):
         self._channels: int = 2
         self._volume: float = 1.0
         self.log_volume: bool = True
-        self.eq_gains: List[float] = [1.0 for _ in range(10)]
+        self.eq_active: bool = True
+        self.eq_gains: List[float] = [1.0 for _ in range(20)]
         self.bands: List[tuple] = []
 
         self.pyaudio_port: pyaudio.PyAudio = pyaudio.PyAudio()
@@ -54,7 +55,7 @@ class AudioStreamer(QThread):
                                                      channels=self._channels,
                                                      rate=int(self.sample_rate),
                                                      output=True)
-        self.print_all_devices()
+        # self.print_all_devices()
 
     def close_audio_port(self) -> None:
         self.pyaudio_port.terminate()
@@ -69,11 +70,10 @@ class AudioStreamer(QThread):
                 wave_type = wave_crop.dtype
                 wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max
                 # region EQ
-                # bands = [(20, 40), (40, 80), (80, 160), (160, 300), (300, 600), (600, 1200), (1200, 2400),
-                #          (2400, 5000), (5000, 10000), (10000, 20000)]
-                wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands)
+                if self.eq_active:
+                    wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands, n_fft=2048)
+                    wave_crop = np.clip(wave_crop, -1.0, 1.0)
                 wave_crop = (wave_crop * self._volume)
-                wave_crop = np.clip(wave_crop, -1.0, 1.0)
                 wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
                 # endregion
                 if wave_crop.size == 0:
@@ -115,12 +115,12 @@ class AudioStreamer(QThread):
     def duration(self) -> int:
         return self._duration
 
+    @pyqtSlot(bool)
+    def set_eq_active(self, eq_active: bool) -> None:
+        self.eq_active = eq_active
+
     def print_all_devices(self):
         print_d(sd.query_devices())
-        # for i in range(self.pyaudio_port.get_device_count()):
-        #     device_info = self.pyaudio_port.get_device_info_by_index(i)
-        #     # print_d(device_info)
-        #     if device_info['maxOutputChannels'] > 0:
-        #         print_d(f"Device {i}: {device_info['name']}")
+
 
 

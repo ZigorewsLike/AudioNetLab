@@ -8,3 +8,4 @@ from .MainVerticalTabWidget_class import MainVerticalTabWidget, MainVerticalTabB
 from .TitleBar_class import TitleBar
 from .SideGrip_class import SideGrip
 from .MetaListWidget_class import MetaListWidget, MetaListItem
+from .EQWidget_class import EQWidget

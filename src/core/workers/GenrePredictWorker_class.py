@@ -54,7 +54,7 @@ class GenrePredictWorker(QObject):
             for step in range(sample_len):
                 self.preloader_signal.emit(f"Классификация жанра {round(step / sample_len * 100)}%")
                 waveform_part = waveform[step * sample_rate * self.pattern_length:
-                                         (step + 1) * sample_rate * self.pattern_length]
+                                         (step + 1) * sample_rate * self.pattern_length:2]
 
                 input_data = get_genre_input_data(waveform_part, sample_rate)
                 input_data = np.array(input_data)

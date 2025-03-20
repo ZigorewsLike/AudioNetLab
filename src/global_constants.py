@@ -25,3 +25,5 @@ ONNX_SESS_PROVIDER = "CPUExecutionProvider"  # DmlExecutionProvider, CPUExecutio
 
 LAST_FILE_LIMIT = 60
 LAST_FILE_FILENAME = "local_history.bin"
+
+EQ_SLIDER_COUNT = 20
