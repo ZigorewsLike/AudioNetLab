@@ -54,6 +54,7 @@ class AudioStreamer(QThread):
         self.pyaudio_stream = self.pyaudio_port.open(format=self.pyaudio_port.get_format_from_width(2),
                                                      channels=self._channels,
                                                      rate=int(self.sample_rate),
+                                                     frames_per_buffer=self._chunk_size,
                                                      output=True)
         # self.print_all_devices()
 
@@ -66,19 +67,24 @@ class AudioStreamer(QThread):
         print_d("AudioStreamer is running")
         while not self.thread_stop:
             if self.player_state is PlayerState.PLAY:
-                wave_crop = self.waveform_ref[self._position:self._position + self._chunk_size]
+                left_padding = self._chunk_size
+                right_padding = self._chunk_size
+                if self._position == 0:
+                    left_padding = 0
+                    right_padding = self._chunk_size
+                wave_crop = self.waveform_ref[self._position - left_padding:self._position + self._chunk_size + right_padding]
                 wave_type = wave_crop.dtype
                 wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max
                 # region EQ
                 if self.eq_active:
-                    wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands, n_fft=2048)
+                    wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands)
                     wave_crop = np.clip(wave_crop, -1.0, 1.0)
                 wave_crop = (wave_crop * self._volume)
                 wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
                 # endregion
                 if wave_crop.size == 0:
                     self.stop()
-                data = wavio._array2wav(wave_crop, 2)
+                data = wavio._array2wav(wave_crop[left_padding:self._chunk_size+left_padding], 2)
                 self.pyaudio_stream.write(data)
                 self._position += self._chunk_size
                 self.progress.emit(int(self._position / self.sample_rate * 1000))

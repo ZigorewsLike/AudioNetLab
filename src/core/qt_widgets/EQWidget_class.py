@@ -1,6 +1,6 @@
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
-
+import numpy as np
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread, QSize, QRect
 from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont,
@@ -30,6 +30,8 @@ class EQWidget(QWidget):
         self.label_container: List[QLabel] = []
         self.slider_gains: List[int] = [0 for _ in range(self.slider_count)]
         self.eq_type: EQType = eq_type
+        self.accuracy: int = 1000
+        self.interpolation_step: int = 10
 
         self.active_fx: bool = True
         self.auto_eq: bool = False
@@ -48,8 +50,8 @@ class EQWidget(QWidget):
             vert_slider.setObjectName("verticalSlider")
             vert_slider.setGeometry(QRect(self.slider_padding + self.slider_padding * slider_index,
                                           20, 22, 130))
-            vert_slider.setValue(100)
-            vert_slider.setRange(0, 200)
+            vert_slider.setRange(0, self.accuracy * 2)
+            vert_slider.setValue(self.accuracy)
             vert_slider.setOrientation(Qt.Orientation.Vertical)
             vert_slider.valueChanged.connect(self.on_slider_value_changed)
             self.slider_container.append(vert_slider)
@@ -91,7 +93,7 @@ class EQWidget(QWidget):
 
     @pyqtSlot(int)
     def on_slider_value_changed(self, value: int) -> None:
-        self.slider_gains = [slider.value() / 100 for slider in self.slider_container]
+        self.slider_gains = [slider.value() / self.accuracy for slider in self.slider_container]
         self.slidersValueChange.emit(self.slider_gains)
 
     def set_enabled_eq(self, enabled: Optional[bool] = None) -> None:
@@ -124,15 +126,26 @@ class EQWidget(QWidget):
         if self.auto_eq:
             return
         for slider in self.slider_container:
-            slider.setValue(100)
+            slider.setValue(self.accuracy)
 
-    def set_sliders(self, gains: List[int]) -> None:
+    def set_sliders(self, gains: Union[List[int], np.ndarray], interpolation: bool = False) -> None:
         for index, gain in enumerate(gains):
             slider = self.slider_container[index]
-            slider.setValue(gain)
+            if interpolation:
+                if abs(gain - slider.value()) < self.interpolation_step:
+                    slider.setValue(gain)
+                else:
+                    slider.setValue(round(slider.value() + (gain - slider.value()) / self.interpolation_step))
+            else:
+                slider.setValue(gain)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
         painter = QPainter(self)
+        painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.SolidLine))
+        painter.drawLine(self.slider_padding + self.button_padding, 85, self.width() - self.slider_padding, 85)
+        painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.DashLine))
+        painter.drawLine(self.slider_padding + self.button_padding, 53, self.width() - self.slider_padding, 53)
+        painter.drawLine(self.slider_padding + self.button_padding, 108, self.width() - self.slider_padding, 108)
         # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
 

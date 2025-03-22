@@ -1,8 +1,11 @@
 import inspect
 import os
+import sys
 from datetime import datetime
+from traceback import TracebackException
+from typing import Optional
 
-from src.global_constants import DEBUG
+from src.global_constants import DEBUG, SHOW_TRACEBACK
 
 
 class ConsoleColors:
@@ -88,3 +91,14 @@ def print_e(*text: any) -> None:
         module_name = "UNKNOWN"
     print_base("ERROR", text, f"{module_name}:{current_frame.lineno} ",
                [ConsoleColors.ERROR_HEADER, ConsoleColors.ERROR_BODY])
+
+
+def print_traceback(exc_info: Optional[tuple] = None, limit: Optional[int] = None, chain: bool = True) -> None:
+    if SHOW_TRACEBACK:
+        if exc_info is None:
+            exc_type, value, tb = sys.exc_info()
+        else:
+            exc_type, value, tb = exc_info
+        for line in TracebackException(type(value), value, tb, limit=limit).format(chain=chain):
+            print(f"{ConsoleColors.ERROR_BODY}{line}{ConsoleColors.SIMPLE}", end="")
+

@@ -2,6 +2,7 @@ import os
 
 DEBUG = True
 PROFILE = True
+SHOW_TRACEBACK = True
 TRACE = False
 LOG_IN_FILE = False
 LOG_IN_SIGNAL = False
@@ -16,6 +17,7 @@ VERSION = "0.0.0.3"
 APP_ROAMING_DIR = os.path.join(os.getenv('APPDATA'), APP_NAME)
 CONFIG_FILENAME = "config_app.ini"
 RESOURCE_ICON_DIR = "res/icons/"
+RESOURCE_DIR = "res/"
 PATH_TO_LAST_PREVIEW = "data/preview/"
 
 # region AI MODULES
@@ -27,3 +29,15 @@ LAST_FILE_LIMIT = 60
 LAST_FILE_FILENAME = "local_history.bin"
 
 EQ_SLIDER_COUNT = 20
+
+GENRE_DICT = {
+    0: "Electronic",
+    1: "Experimental",
+    2: "Folk",
+    3: "Hip-Hop",
+    4: "Instrumental",
+    5: "International",
+    6: "Pop",
+    7: "Rock",
+}
+

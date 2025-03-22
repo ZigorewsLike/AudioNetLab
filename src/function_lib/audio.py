@@ -6,6 +6,8 @@ from scipy import ifft
 from scipy.signal import butter, lfilter
 from sympy import fft
 
+from src.core.log_system.profiling.line_profiler import profile
+
 
 # region librosa
 def get_mfcc(waveform: Optional[np.ndarray] = None,
@@ -189,6 +191,7 @@ def equalize_signal(x, fs, gains, bands):
     return x_eq
 
 
+@profile
 def equalizer_librosa(audio, sr, gains, bands, n_fft=2048, hop_length=None):
     """
     Функция эквалайзера с использованием библиотеки librosa.

@@ -150,6 +150,8 @@ class MainForm(QMainWindow):
         self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
         self.genre_widget.eq.activeSwitched.connect(self.audio_player.audio_streamer.set_eq_active)
         self.audio_player.audio_streamer.bands = self.genre_widget.eq.bands
+        self.genre_widget.genre_eq = self.settings_widget.eq_settings.load_preset_from_file()
+        self.settings_widget.eq_settings.onPresetChanged.connect(self.genre_widget.on_preset_changed)
 
         self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
         self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)

@@ -411,6 +411,7 @@ class AudioPlayer(QWidget):
 
         self.audio_streamer.init_file(waveform_np, int(sample_rate))
         print_d(self.pyaudio_port.get_default_output_device_info())
+        self.audio_graph.changeCursorPosition.emit(0)
 
     @pyqtSlot(int)
     def duration_is_changed(self, duration: int) -> None:
@@ -452,7 +453,7 @@ class AudioPlayer(QWidget):
             self.audio_streamer.set_volume(value / self.volume_slider.maximum)
 
     @pyqtSlot(list)
-    def set_eq_gains(self, gains: List[int]) -> None:
+    def set_eq_gains(self, gains: List[float]) -> None:
         self.audio_streamer.eq_gains = gains
 
     # endregion
