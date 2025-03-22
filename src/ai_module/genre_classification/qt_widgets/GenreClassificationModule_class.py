@@ -197,7 +197,9 @@ class GenreClassifierModule(QWidget):
                 index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
                 genre_text: str = self.genre_dict[self.global_results[index]]
                 genre_text_width: int = painter.fontMetrics().boundingRect(genre_text).width()
-                painter.drawText(int(self.drawing_text_pos.x() - genre_text_width/2), self.graph_y - 10, genre_text)
+                text_pos_x = int(self.drawing_text_pos.x() - genre_text_width/2)
+                painter.drawText(median(0, text_pos_x, self.width() - genre_text_width - 10),
+                                 self.graph_y - 10, genre_text)
                 # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
             elif self.global_results:
                 painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
@@ -205,7 +207,8 @@ class GenreClassifierModule(QWidget):
                 # index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
                 # genre_text: str = self.genre_dict[self.global_results[index]]
                 genre_text_width: int = painter.fontMetrics().boundingRect(self.current_genre).width()
-                painter.drawText(int(cursor_x - genre_text_width / 2), self.graph_y - 10, self.current_genre)
+                painter.drawText(median(0, int(cursor_x - genre_text_width / 2), self.width() - genre_text_width - 10),
+                                 self.graph_y - 10, self.current_genre)
             if PROFILE:
                 self.mf.profiling.add_draw_time(self.__class__.__name__, time.time() - start_time)
 

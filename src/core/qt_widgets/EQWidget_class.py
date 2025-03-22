@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog,
 from src.global_constants import EQ_SLIDER_COUNT, RESOURCE_ICON_DIR
 from src.core.log_system import print_d, print_e, print_i
 from src.enums import EQType
+from .ScrollButtonWidget_class import ScrollButtonWidget
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -91,6 +92,13 @@ class EQWidget(QWidget):
             self.auto_eq_button.move(5, self.active_button.y() + self.active_button.height() + 10)
             self.auto_eq_button.clicked.connect(self.switch_auto_eq)
 
+            self.interpolation_button = ScrollButtonWidget("", self)
+            self.interpolation_button.resize(28, 28)
+            self.interpolation_button.set_range(2, 20)
+            self.interpolation_button.set_value(10)
+            self.interpolation_button.move(5, self.auto_eq_button.y() + self.auto_eq_button.height() + 10)
+            self.interpolation_button.valueChanged.connect(self.set_interpolation)
+
     @pyqtSlot(int)
     def on_slider_value_changed(self, value: int) -> None:
         self.slider_gains = [slider.value() / self.accuracy for slider in self.slider_container]
@@ -127,6 +135,10 @@ class EQWidget(QWidget):
             return
         for slider in self.slider_container:
             slider.setValue(self.accuracy)
+
+    @pyqtSlot(int)
+    def set_interpolation(self, value: int) -> None:
+        self.interpolation_step = value
 
     def set_sliders(self, gains: Union[List[int], np.ndarray], interpolation: bool = False) -> None:
         for index, gain in enumerate(gains):
