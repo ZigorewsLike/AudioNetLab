@@ -16,7 +16,7 @@ from src.enums import MainTabWidgetIcons
 class MainVerticalTabButton(QWidget):
     tab_clicked = QtCore.pyqtSignal(int)
 
-    def __init__(self, tab_type: MainTabWidgetIcons, index: int, *args, **kwargs):
+    def __init__(self, tab_type: MainTabWidgetIcons, index: int, icon_size: Optional[QSize], *args, **kwargs):
         super(MainVerticalTabButton, self).__init__(*args, **kwargs)
         self.setMouseTracking(True)
 
@@ -25,6 +25,7 @@ class MainVerticalTabButton(QWidget):
         self.margin: int = 10
         self.index: int = index
         self.button_size: QSize = QSize(40, 40)
+        self.icon_size: Optional[QSize] = icon_size
         self.border_corner: int = 5
         self.shift_rect: QPoint = QPoint(-6, 0)
 
@@ -40,10 +41,15 @@ class MainVerticalTabButton(QWidget):
             MainTabWidgetIcons.OPEN_FILE: RESOURCE_ICON_DIR + "open_file_tab_icon_white.png",
             MainTabWidgetIcons.GENRE_CLASSIFICATION: RESOURCE_ICON_DIR + "genre_tab_icon_white.png",
             MainTabWidgetIcons.LIBROSA_PANEL: RESOURCE_ICON_DIR + "librosa_tab_icon_white.png",
+            MainTabWidgetIcons.SETTINGS_EQ: RESOURCE_ICON_DIR + "equalizer_presets.png",
+            MainTabWidgetIcons.SETTINGS_AUDIO: RESOURCE_ICON_DIR + "media_output.png",
         }
 
         icon_path: str = self.icon_path_dict.get(self.tab_type, "")
         self.pixmap = QPixmap(icon_path)
+        if icon_size is not None:
+            self.pixmap = self.pixmap.scaled(self.icon_size, aspectRatioMode=Qt.AspectRatioMode.KeepAspectRatio,
+                                             transformMode=Qt.TransformationMode.SmoothTransformation)
 
         self.resize(self.button_size)
 
@@ -87,8 +93,8 @@ class MainVerticalTabButton(QWidget):
 class MainVerticalTabSubButton(MainVerticalTabButton):
     tab_clicked = QtCore.pyqtSignal(int)
 
-    def __init__(self, tab_type: MainTabWidgetIcons, index: int, *args, **kwargs):
-        super(MainVerticalTabSubButton, self).__init__(tab_type, index, *args, **kwargs)
+    def __init__(self, tab_type: MainTabWidgetIcons, index: int, icon_size: Optional[QSize], *args, **kwargs):
+        super(MainVerticalTabSubButton, self).__init__(tab_type, index, icon_size, *args, **kwargs)
         self.setMouseTracking(True)
 
         self.tab_type: MainTabWidgetIcons = tab_type
@@ -126,10 +132,12 @@ class MainVerticalTabWidget(BaseTabWidget):
 
     def add_tab(self, widget: QWidget,
                 tab_type: MainTabWidgetIcons,
-                resize: bool = True) -> None:
+                resize: bool = True,
+                icon_size: Optional[QSize] = None) -> int:
         super().add_tab(widget, tab_type.name, resize)
 
-        tab_button = MainVerticalTabButton(tab_type, self.tab_count-1, self)
+        new_index: int = self.tab_count-1
+        tab_button = MainVerticalTabButton(tab_type, new_index, icon_size, self)
         tab_button.tab_clicked.connect(self.active_tab)
 
         if self._buttons_container:
@@ -142,13 +150,14 @@ class MainVerticalTabWidget(BaseTabWidget):
             tab_button.is_active = True
         for button in self._buttons_container:
             button.raise_()
-            for sub_button  in button.sub_buttons:
+            for sub_button in button.sub_buttons:
                 sub_button.raise_()
         self.update()
+        return new_index
 
-    def add_sub_tub(self, button_index: int, tab_type: MainTabWidgetIcons) -> None:
+    def add_sub_tub(self, button_index: int, tab_type: MainTabWidgetIcons, icon_size: Optional[QSize] = None) -> None:
         sub_list = self._buttons_container[button_index].sub_buttons
-        sub_tab_item = MainVerticalTabSubButton(tab_type, len(sub_list), self)
+        sub_tab_item = MainVerticalTabSubButton(tab_type, len(sub_list), icon_size, self)
         sub_tab_item.shift_rect = QPoint(-6, -6)
         sub_list.append(sub_tab_item)
 

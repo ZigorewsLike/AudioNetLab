@@ -23,6 +23,7 @@ PATH_TO_LAST_PREVIEW = "data/preview/"
 # region AI MODULES
 GENRE_MODEL_PATH = "models/best_cls_genre_fma_3s_0.0001.onnx"
 ONNX_SESS_PROVIDER = "CPUExecutionProvider"  # DmlExecutionProvider, CPUExecutionProvider
+PATTERN_SIZE = 3
 # endregion
 
 LAST_FILE_LIMIT = 60

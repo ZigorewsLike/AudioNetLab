@@ -159,12 +159,16 @@ class MainForm(QMainWindow):
         self.main_tab_widget.add_tab(self.player_frame, MainTabWidgetIcons.PLAYER)
         self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.GENRE_CLASSIFICATION)
         self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.LIBROSA_PANEL)
-        self.main_tab_widget.add_tab(self.settings_widget, MainTabWidgetIcons.SETTINGS)
+        settings_index = self.main_tab_widget.add_tab(self.settings_widget, MainTabWidgetIcons.SETTINGS)
+        self.main_tab_widget.add_sub_tub(settings_index, MainTabWidgetIcons.SETTINGS_AUDIO, icon_size=QSize(32, 32))
+        self.main_tab_widget.add_sub_tub(settings_index, MainTabWidgetIcons.SETTINGS_EQ, icon_size=QSize(32, 32))
         self.main_tab_widget.tab_switched.connect(lambda: self.recalculate_size())
 
         self.main_tab_widget.get_sub_tab_button(0, 0).tab_clicked.connect(lambda: self.open_file_dialog())
         self.main_tab_widget.get_sub_tab_button(1, 0).tab_clicked.connect(lambda: self.tab_widget.active_tab(0))
         self.main_tab_widget.get_sub_tab_button(1, 1).tab_clicked.connect(lambda: self.tab_widget.active_tab(1))
+        self.main_tab_widget.get_sub_tab_button(settings_index, 0).tab_clicked.connect(lambda: self.settings_widget.tab_widget.active_tab(0))
+        self.main_tab_widget.get_sub_tab_button(settings_index, 1).tab_clicked.connect(lambda: self.settings_widget.tab_widget.active_tab(1))
 
         self.meta_list.raise_()
 

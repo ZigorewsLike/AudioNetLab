@@ -29,7 +29,7 @@ class ScrollButtonWidget(QPushButton):
         self.valueChanged.emit(self._value)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        value = round(self._value - event.angleDelta().y() / 5)
+        value = round(self._value - event.angleDelta().y() / 50)
         self.set_value(value)
 
 

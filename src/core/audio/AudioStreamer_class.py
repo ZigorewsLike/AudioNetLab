@@ -12,7 +12,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSlot
 
 from src.core.log_system import print_d
 from src.enums import PlayerState
-from src.function_lib.audio import equalizer_10band, equalize_signal, equalizer_librosa
+from src.function_lib.audio import equalizer_librosa
 
 
 class AudioStreamer(QThread):
@@ -73,6 +73,8 @@ class AudioStreamer(QThread):
                     left_padding = 0
                     right_padding = self._chunk_size
                 wave_crop = self.waveform_ref[self._position - left_padding:self._position + self._chunk_size + right_padding]
+                if wave_crop is None or wave_crop.size == 0:
+                    self.stop()
                 wave_type = wave_crop.dtype
                 wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max
                 # region EQ
@@ -82,8 +84,6 @@ class AudioStreamer(QThread):
                 wave_crop = (wave_crop * self._volume)
                 wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
                 # endregion
-                if wave_crop.size == 0:
-                    self.stop()
                 data = wavio._array2wav(wave_crop[left_padding:self._chunk_size+left_padding], 2)
                 self.pyaudio_stream.write(data)
                 self._position += self._chunk_size
@@ -114,9 +114,15 @@ class AudioStreamer(QThread):
             self._volume = math.pow(volume, 2.0)
         else:
             self._volume = volume
+
+    def get_volume(self) -> float:
+        return self._volume
         
     def set_chunk_size(self, chunk_size: int) -> None:
         self._chunk_size = chunk_size
+
+    def get_chunk_size(self) -> int:
+        return self._chunk_size
 
     def duration(self) -> int:
         return self._duration

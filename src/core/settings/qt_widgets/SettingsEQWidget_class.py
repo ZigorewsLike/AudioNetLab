@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class SettingsEQWidget(QWidget):
     onPresetChanged = QtCore.pyqtSignal(dict)
 
-    def __init__(self, mf, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.preset_combo_box = QComboBox(self)
         self.preset_combo_box.addItems(list(GENRE_DICT.values()))
@@ -43,7 +43,7 @@ class SettingsEQWidget(QWidget):
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
-        self.eq.resize(self.size())
+        self.eq.adjustSize()
         
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)

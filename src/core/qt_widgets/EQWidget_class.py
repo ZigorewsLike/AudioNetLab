@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import numpy as np
@@ -14,6 +15,23 @@ from .ScrollButtonWidget_class import ScrollButtonWidget
 
 if TYPE_CHECKING:
     from src.forms import MainForm
+
+
+class EQWidgetSliderFrame(QFrame):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.slider_padding: int = 26
+        self.color: str = "#4C4C4C"
+        self.setAutoFillBackground(True)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setPen(QPen(QColor(self.color), 1.0, Qt.PenStyle.SolidLine))
+        painter.drawLine(self.slider_padding, 85, self.width() - self.slider_padding, 85)
+        painter.setPen(QPen(QColor(self.color), 1.0, Qt.PenStyle.DashLine))
+        painter.drawLine(self.slider_padding, 53, self.width() - self.slider_padding, 53)
+        painter.drawLine(self.slider_padding, 108, self.width() - self.slider_padding, 108)
 
 
 class EQWidget(QWidget):
@@ -36,14 +54,21 @@ class EQWidget(QWidget):
 
         self.active_fx: bool = True
         self.auto_eq: bool = False
+        self.dark_theme: bool = True
 
-        self.slider_frame = QFrame(self)
+        self.slider_frame = EQWidgetSliderFrame(self)
         self.slider_frame.move(self.button_padding, 0)
 
         frequencies = [22_000 // 2 ** x for x in range(self.slider_count // 2)]
         frequencies += [16_000 // 2 ** x for x in range(self.slider_count // 2)]
         frequencies.sort()
         self.bands = list(zip(frequencies[:-1], frequencies[1:]))
+
+        transparent_style = """
+        QSlider::handle:vertical{
+            background-color: transparent;
+        }
+        """
 
         for slider_index in range(self.slider_count):
             # Sliders
@@ -55,6 +80,8 @@ class EQWidget(QWidget):
             vert_slider.setValue(self.accuracy)
             vert_slider.setOrientation(Qt.Orientation.Vertical)
             vert_slider.valueChanged.connect(self.on_slider_value_changed)
+            vert_slider.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            # vert_slider.setStyleSheet(None)
             self.slider_container.append(vert_slider)
             # Labels
             freq = frequencies[slider_index]
@@ -151,13 +178,17 @@ class EQWidget(QWidget):
             else:
                 slider.setValue(gain)
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.update()
+
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.SolidLine))
-        painter.drawLine(self.slider_padding + self.button_padding, 85, self.width() - self.slider_padding, 85)
-        painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.DashLine))
-        painter.drawLine(self.slider_padding + self.button_padding, 53, self.width() - self.slider_padding, 53)
-        painter.drawLine(self.slider_padding + self.button_padding, 108, self.width() - self.slider_padding, 108)
+        # painter = QPainter(self)
+        # painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.SolidLine))
+        # painter.drawLine(self.slider_padding + self.button_padding, 85, self.width() - self.slider_padding, 85)
+        # painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.DashLine))
+        # painter.drawLine(self.slider_padding + self.button_padding, 53, self.width() - self.slider_padding, 53)
+        # painter.drawLine(self.slider_padding + self.button_padding, 108, self.width() - self.slider_padding, 108)
         # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
 

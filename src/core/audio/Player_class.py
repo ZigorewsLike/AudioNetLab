@@ -447,6 +447,10 @@ class AudioPlayer(QWidget):
             self.set_current_time(value)
             self.positionChanged.emit(value / self.audio_streamer.duration())
 
+    def set_log_volume(self, log_volume: bool) -> None:
+        self.audio_streamer.log_volume = log_volume
+        self.set_track_volume(self.volume_slider.value)
+
     @pyqtSlot(int)
     def set_track_volume(self, value: int) -> None:
         if not self.mute_audio:

@@ -16,7 +16,7 @@ from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFon
     QResizeEvent
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog
 
-from src.global_constants import ONNX_INFERENCE, PROFILE, ONNX_SESS_PROVIDER, GENRE_DICT
+from src.global_constants import ONNX_INFERENCE, PROFILE, ONNX_SESS_PROVIDER, GENRE_DICT, PATTERN_SIZE
 from src.core.log_system import print_d, print_e, print_i
 from src.core.workers import GenrePredictWorker
 from src.function_lib.math_lib import median
@@ -123,7 +123,7 @@ class GenreClassifierModule(QWidget):
 
     def set_gradient_color(self, genre_result: List[int]) -> None:
         self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
-        sample_width = self.mf.audio_player.sample_rate * 3
+        sample_width = self.mf.audio_player.sample_rate * PATTERN_SIZE
         for step, result in enumerate(genre_result):
             self.genre_gradient.setColorAt(
                 (step * sample_width + sample_width / 2) / self.mf.audio_player.waveform.shape[0],
@@ -295,7 +295,7 @@ class GenreClassifierModule(QWidget):
         self.cursor_position = position
         if self.global_results is not None:
             position *= self.mf.audio_player.waveform[:, 0].size
-            genre: int = self.global_results[int(position / self.mf.audio_player.sample_rate / 3)]
+            genre: int = self.global_results[int(position / self.mf.audio_player.sample_rate / PATTERN_SIZE)]
             self.current_genre = self.genre_dict[genre]
             if self.eq.auto_eq:
                 gains: np.ndarray = np.array(self.genre_eq[genre])
