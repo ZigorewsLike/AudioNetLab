@@ -100,6 +100,60 @@ def get_genre_input_data(waveform: Optional[np.ndarray] = None, sample_rate: Opt
     return input_data
 
 
+def bandpass_filter(data, lowcut, highcut, fs, order=5):
+    """
+    Applies a bandpass filter to the input data.
+
+    Args:
+        data (numpy.ndarray): The input audio data.
+        lowcut (float): The lower cutoff frequency in Hz.
+        highcut (float): The upper cutoff frequency in Hz.
+        fs (int): The sampling rate of the audio data in Hz.
+        order (int): The order of the filter. Higher orders result in steeper
+            cutoff but can introduce more artifacts.
+
+    Returns:
+        numpy.ndarray: The filtered audio data.
+    """
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='bandpass', analog=False)
+    filtered = lfilter(b, a, data)
+    return filtered
+
+
+def equalizer_10band(data, fs,
+                     gain1=0, gain2=0, gain3=0, gain4=0, gain5=0,
+                     gain6=0, gain7=0, gain8=0, gain9=0, gain10=0):
+    """
+    Applies a 10-band equalizer to the input data.
+
+    Args:
+        data (numpy.ndarray): The input audio data.
+        fs (int): The sampling rate of the audio data in Hz.
+        gain1 through gain10 (float): The gain in dB for each of the 10 bands.
+
+    Returns:
+        numpy.ndarray: The equalized audio data.
+    """
+    order = 5
+    band1 = bandpass_filter(data, 20, 39, fs, order=order) * 10**(gain1/20)
+    band2 = bandpass_filter(data, 40, 79, fs, order=order) * 10**(gain2/20)
+    band3 = bandpass_filter(data, 80, 159, fs, order=order) * 10**(gain3/20)
+    band4 = bandpass_filter(data, 160, 299, fs, order=order) * 10**(gain4/20)
+    band5 = bandpass_filter(data, 300, 599, fs, order=order) * 10**(gain5/20)
+    band6 = bandpass_filter(data, 600, 1199, fs, order=order) * 10**(gain6/20)
+    band7 = bandpass_filter(data, 1200, 2399, fs, order=order) * 10**(gain7/20)
+    band8 = bandpass_filter(data, 2400, 4999, fs, order=order) * 10**(gain8/20)
+    band9 = bandpass_filter(data, 5000, 9999, fs, order=order) * 10**(gain9/20)
+    band10 = bandpass_filter(data, 10000, 20000, fs, order=order) * 10**(gain10/20)
+
+    signal = (band1 + band2 + band3 + band4 + band5 +
+              band6 + band7 + band8 + band9 + band10)
+    return signal
+
+
 @profile
 def equalizer_librosa(audio, sr, gains, bands, n_fft=2048, hop_length=None):
     """

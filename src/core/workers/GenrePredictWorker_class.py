@@ -7,15 +7,9 @@ import numpy as np
 from PyQt6 import QtCore
 from PyQt6.QtCore import QObject
 
-from src.global_constants import ONNX_INFERENCE, PATTERN_SIZE
+from src.global_constants import ONNX_INFERENCE, PATTERN_SIZE, SAMPLING_RATE_AI
 from src.core.log_system import print_d
 from src.function_lib.audio import get_genre_input_data
-
-if not ONNX_INFERENCE:
-    try:
-        import torch
-    except ImportError as ie:
-        ONNX_INFERENCE = True
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -50,7 +44,7 @@ class GenrePredictWorker(QObject):
         if waveform is not None:
             predict_index_list: List[int] = []
             waveform = waveform[:, 0].astype(np.float32) / np.iinfo(waveform.dtype).max
-            target_sr: int = 22050
+            target_sr: int = SAMPLING_RATE_AI
             if sample_rate != target_sr:
                 waveform = librosa.resample(waveform, orig_sr=sample_rate, target_sr=target_sr)
                 sample_rate = target_sr
@@ -99,37 +93,6 @@ class GenrePredictWorker(QObject):
                 input_data = get_genre_input_data(waveform_part, sample_rate)
                 input_data = np.array(input_data)
 
-                # mean = [4.65794183e-01, 7.56923074e-02, 1.75278169e-01, 3.53687662e-03,
-                #         2.36513015e+03, 8.65998300e+05, 2.90494794e+03, 4.84263694e+05,
-                #         4.81949597e+03, 4.16501501e+06, 4.80947586e-02, 9.56769801e-04,
-                #         -3.48522517e-04, 2.93626296e-02, 3.34480087e-06, 5.69036781e-03,
-                #         1.39183726e+02, -1.91072294e+02, 2.37301114e+03, 1.59078602e+02,
-                #         6.75706720e+02, -1.88325523e+01, 3.48202761e+02, 3.56565234e+01,
-                #         2.12379951e+02, -1.52812168e+00, 1.62954354e+02, 1.69534464e+01,
-                #         1.07463146e+02, -5.18542953e+00, 8.58433578e+01, 8.20993444e+00,
-                #         7.11997186e+01, -3.38350816e+00, 6.44747266e+01, 3.16680723e+00,
-                #         5.84344926e+01, -2.98458318e+00, 5.31788696e+01, 1.89226012e+00,
-                #         4.87689249e+01, -2.64430875e+00, 4.56208247e+01, 6.60866663e-01,
-                #         4.27977404e+01, -2.07463014e+00, 4.19299321e+01, -5.57927175e-01,
-                #         4.03947766e+01, -2.05823175e+00, 3.89586422e+01, -7.81601063e-01,
-                #         3.72989379e+01, -1.44632929e+00, 3.65980088e+01, -1.41274723e+00,
-                #         3.57718628e+01]
-                # std = [1.34538276e-01, 1.83422578e-02, 1.04214487e-01, 5.07240789e-03,
-                #        1.19858623e+03, 1.35105118e+06, 1.06031667e+03, 5.40962425e+05,
-                #        2.68551526e+03, 5.44036557e+06, 3.57847893e-02, 2.37333131e-03,
-                #        2.54191743e-02, 3.47412696e-02, 7.91604646e-03, 8.49746226e-03,
-                #        4.62836146e+01, 1.13558014e+02, 3.03508051e+03, 4.29392635e+01,
-                #        7.14188402e+02, 3.49900998e+01, 3.81109975e+02, 2.18456206e+01,
-                #        2.15433274e+02, 1.80858464e+01, 1.50943534e+02, 1.50182327e+01,
-                #        9.81591260e+01, 1.28878977e+01, 7.40304476e+01, 1.14847443e+01,
-                #        5.82715215e+01, 9.89746341e+00, 5.23177415e+01, 1.02060374e+01,
-                #        4.69283439e+01, 8.43668452e+00, 4.12172066e+01, 8.74769353e+00,
-                #        3.71584428e+01, 7.77320893e+00, 3.52159278e+01, 7.79376749e+00,
-                #        3.26370998e+01, 7.07310210e+00, 3.24069896e+01, 7.30336456e+00,
-                #        3.22349163e+01, 6.63882341e+00, 3.05405514e+01, 6.87173314e+00,
-                #        2.90217838e+01, 6.35420504e+00, 2.81950325e+01, 6.52260829e+00,
-                #        2.81537207e+01]
-
                 input_data = (input_data - mean) / std
                 input_data = input_data.reshape(1, -1)
 
@@ -141,14 +104,13 @@ class GenrePredictWorker(QObject):
                 preds = np.array(self.mf.genre_widget.model.run([output_name],
                                                                 {input_name: input_data.astype(np.float32)}))
                 preds = preds.squeeze()
-                print_d(step, (preds * 100).round(1))
+                # print_d(step, (preds * 100).round(1))
                 pred = np.argmax(preds)
                 if last_predict is not None and preds[pred] < 0.85:
                     pred = last_predict
                 else:
                     last_predict = pred
                 iter_sum_time += (time.time() - predict_time) * 1000
-                # print_d(f"Predict iter time: {(time.time() - predict_time) * 1000}ms")
 
                 predict_index_list.append(int(pred))
                 # endregion

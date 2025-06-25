@@ -2,19 +2,16 @@ import os
 import subprocess
 import sys
 from datetime import datetime
-from math import pi, sin, cos
-from typing import List, Optional, Union, TYPE_CHECKING
+from math import pi, cos
+from typing import Optional, TYPE_CHECKING
 
-from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize, QTimer
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion, \
-    QPen, QPixmap, QIcon, QShowEvent, QImage, QHideEvent
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu, QStyle
+from PyQt6.QtCore import QRect, Qt, QSize, QTimer
+from PyQt6.QtGui import QPainter, QBrush, QColor, QResizeEvent, QFont, QPixmap, QIcon, QShowEvent, QImage, QHideEvent
+from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu
 
-from src.core.log_system import print_d
 from src.core.file_system import LastFileProp
-from src.function_lib.math_lib import fixed_hash
 from src.enums import StateMode, PlayerState
+from src.function_lib.math_lib import fixed_hash
 from src.global_constants import RESOURCE_ICON_DIR, PATH_TO_LAST_PREVIEW
 from src.global_styles import DEFAULT_SCROLLBAR_STYLE, AppColorSchemes
 
@@ -275,12 +272,6 @@ class LastFileItem(QWidget):
                 painter.drawImage(10, 10, self.track_meta_image)
 
             if self.is_playing:
-                # painter.fillRect(self.button_open_size.width() - 20,
-                #                  self.button_open_size.height() + 10,
-                #                  5,
-                #                  int(self.button_open_size.height() * abs(sin(self.angle))),
-                #                  QColor(AppColorSchemes.FILE_LIST_ITEM_BODY))
-
                 rect_count = 4
                 rect_width = 10
                 rect_shift = 5
@@ -289,7 +280,7 @@ class LastFileItem(QWidget):
                 for i in range(0, rect_count):
                     painter.setBrush(QBrush(QColor(self.color), Qt.BrushStyle.SolidPattern))
                     painter.fillRect(
-                        int(calc_rect_width * i - ((rect_count) * calc_rect_width / 2) + (self.button_open_size.width() / 2) + rect_shift / 2) + 10,
+                        int(calc_rect_width * i - (rect_count * calc_rect_width / 2) + (self.button_open_size.width() / 2) + rect_shift / 2) + 10,
                         10 + self.button_open_size.height(),
                         rect_width,
                         -int(abs(cos(self.angle + i / pi * 1.2)) * rect_height),

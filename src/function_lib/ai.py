@@ -1,12 +1,11 @@
 import os
 
 import onnxruntime as rt
-from onnxruntime.capi.onnxruntime_inference_collection import InferenceSession
 
 from src.core.log_system import print_e, log_i, print_d
 
 
-def load_sess_model(path: str, sess_provider: str = "DmlExecutionProvider") -> InferenceSession:
+def load_sess_model(path: str, sess_provider: str = "DmlExecutionProvider") -> rt.InferenceSession:
     """
     Загрузка модели и создание сессии для предсказания
 

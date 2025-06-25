@@ -6,15 +6,13 @@ import os
 import sys
 import traceback
 import tracemalloc
-from datetime import datetime, timedelta
-import pickle
+from datetime import datetime
 
 from src.core.log_system import print_e, print_d, OutputBuffer
-from src.global_constants import APP_NAME, DEBUG, VERSION, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_PREVIEW
+from src.global_constants import APP_NAME, DEBUG, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_PREVIEW
 
-from PyQt6.QtCore import QRect, QPoint
 from PyQt6.QtGui import QIcon
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QMessageBox
 from src.forms import MainForm
 
@@ -80,9 +78,6 @@ if __name__ == '__main__':
     screen = app.primaryScreen()
     size = screen.size()
     # endregion
-
-    # splash_screen = SplashScreen()
-    # splash_screen.show()
 
     # Параметры окна (ширина и высота)
     params_dist: dict = {"size_width": size.width(), "size_height": size.height()}

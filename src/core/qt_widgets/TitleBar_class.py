@@ -1,13 +1,7 @@
-import math
+from PyQt6.QtCore import pyqtSlot, QPoint, Qt
+from PyQt6.QtGui import QPaintEvent, QPainter, QColor, QMouseEvent, QIcon, QPixmap, QResizeEvent
+from PyQt6.QtWidgets import QWidget, QLabel, QMenuBar, QPushButton
 
-from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QPoint, Qt
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QAction, QIcon, QPixmap, \
-    QResizeEvent, QPalette
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QMenu, QMenuBar, QPushButton
-
-from src.core.log_system import print_d
-from src.enums import StateMode
 from src.function_lib.math_lib import median
 from src.global_constants import RESOURCE_ICON_DIR
 from src.global_styles import AppColorSchemes
@@ -20,7 +14,6 @@ class TitleBar(QWidget):
         self.resize(900, 46)
         self.setMouseTracking(True)
         self.setAutoFillBackground(True)
-        # self.setBackgroundRole(QPalette.ColorRole.Highlight)
 
         self.menu_bar = QMenuBar(self)
         self.menu_bar.move(56, 0)
@@ -64,7 +57,6 @@ class TitleBar(QWidget):
             color: white;
         }
         """)
-        "#E65249"
 
         self._pixmap = QPixmap(RESOURCE_ICON_DIR + "app_logo.png")
         self._pixmap = self._pixmap.scaled(30, 30)

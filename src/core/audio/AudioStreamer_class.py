@@ -8,7 +8,7 @@ import wavio
 import sounddevice as sd
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QObject, QThread, pyqtSlot
+from PyQt6.QtCore import QThread, pyqtSlot
 
 from src.core.log_system import print_d
 from src.enums import PlayerState

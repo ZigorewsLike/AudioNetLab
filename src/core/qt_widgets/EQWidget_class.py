@@ -1,20 +1,17 @@
-from enum import Enum
-from typing import Dict, Union, TYPE_CHECKING, Optional, List
+from typing import Union, TYPE_CHECKING, Optional, List
 
 import numpy as np
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread, QSize, QRect
-from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont,
-                         QResizeEvent, QIcon)
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog, QSlider, QFrame
+from PyQt6.QtCore import pyqtSlot, Qt, QSize, QRect
+from PyQt6.QtGui import QPaintEvent, QPainter, QColor, QPen, QIcon
+from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QSlider, QFrame
 
-from src.global_constants import EQ_SLIDER_COUNT, RESOURCE_ICON_DIR
-from src.core.log_system import print_d, print_e, print_i
 from src.enums import EQType
+from src.global_constants import EQ_SLIDER_COUNT, RESOURCE_ICON_DIR
 from .ScrollButtonWidget_class import ScrollButtonWidget
 
 if TYPE_CHECKING:
-    from src.forms import MainForm
+    pass
 
 
 class EQWidgetSliderFrame(QFrame):
@@ -184,11 +181,4 @@ class EQWidget(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
-        # painter = QPainter(self)
-        # painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.SolidLine))
-        # painter.drawLine(self.slider_padding + self.button_padding, 85, self.width() - self.slider_padding, 85)
-        # painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.DashLine))
-        # painter.drawLine(self.slider_padding + self.button_padding, 53, self.width() - self.slider_padding, 53)
-        # painter.drawLine(self.slider_padding + self.button_padding, 108, self.width() - self.slider_padding, 108)
-        # painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
 

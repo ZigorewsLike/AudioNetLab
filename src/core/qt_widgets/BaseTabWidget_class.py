@@ -1,22 +1,24 @@
-from typing import List, Optional
+from typing import List
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion, \
-    QPen
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel
-
-from src.core.log_system import print_d
-from src.function_lib.math_lib import median
+from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtGui import QPaintEvent, QPainter, QColor, QResizeEvent, QPen
+from PyQt6.QtWidgets import QWidget
 
 
 class TabItem:
+    """
+    Класс вкладки
+    """
     def __init__(self, widget: QWidget, tab_name: str):
         self.widget: QWidget = widget
         self.tab_name: str = tab_name
 
 
 class BaseTabWidget(QWidget):
+    """
+    Класс базового виджета переключения вкладок
+    """
     tab_switched = QtCore.pyqtSignal(int, bool)
 
     def __init__(self, *args, **kwargs):

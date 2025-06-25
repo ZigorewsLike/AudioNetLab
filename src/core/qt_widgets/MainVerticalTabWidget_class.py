@@ -1,19 +1,20 @@
-from typing import List, Optional, Callable, Dict
+from typing import List, Optional, Dict
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint, QSize, QRectF
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion, \
-    QPixmap, QPainterPath, QPen
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel
+from PyQt6.QtCore import QEvent, Qt, QPoint, QSize, QRectF
+from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QResizeEvent, QFont, QRegion, \
+    QPixmap, QPainterPath
+from PyQt6.QtWidgets import QWidget
 
-from src.core.log_system import print_d
-from src.function_lib.math_lib import median
-from .BaseTabWidget_class import BaseTabWidget, TabItem
-from src.global_constants import RESOURCE_ICON_DIR
 from src.enums import MainTabWidgetIcons
+from src.global_constants import RESOURCE_ICON_DIR
+from .BaseTabWidget_class import BaseTabWidget
 
 
 class MainVerticalTabButton(QWidget):
+    """
+    Класс кнопки переключения вкладки
+    """
     tab_clicked = QtCore.pyqtSignal(int)
 
     def __init__(self, tab_type: MainTabWidgetIcons, index: int, icon_size: Optional[QSize], *args, **kwargs):
@@ -91,6 +92,9 @@ class MainVerticalTabButton(QWidget):
 
 
 class MainVerticalTabSubButton(MainVerticalTabButton):
+    """
+    Класс подраздела вкладки
+    """
     tab_clicked = QtCore.pyqtSignal(int)
 
     def __init__(self, tab_type: MainTabWidgetIcons, index: int, icon_size: Optional[QSize], *args, **kwargs):
@@ -114,6 +118,9 @@ class MainVerticalTabSubButton(MainVerticalTabButton):
 
 
 class MainVerticalTabWidget(BaseTabWidget):
+    """
+    Класс многоуровневого TabWidget'a для главного окна
+    """
     def __init__(self, *args, **kwargs):
         super(MainVerticalTabWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)

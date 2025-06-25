@@ -1,39 +1,35 @@
 import gc
 import os
-import shutil
 import pickle
-import tracemalloc
+import shutil
 from datetime import datetime
 from typing import Optional
 
-from PyQt6 import QtCore, QtSvg, QtWidgets
-from PyQt6.QtCore import Qt, QRectF, QPoint, QTimer, QThread, pyqtSlot, QSize, QRect
-from PyQt6.QtGui import (QPainter, QPen, QFont, QPixmap, QIcon, QBrush, QWheelEvent, QKeySequence, QMoveEvent,
-                         QMouseEvent, QKeyEvent, QColor, QShowEvent, QCursor, QAction, QDragEnterEvent, QDragLeaveEvent,
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt, QThread, pyqtSlot, QSize, QRect
+from PyQt6.QtGui import (QPainter, QPixmap, QIcon, QMoveEvent,
+                         QShowEvent, QAction, QDragEnterEvent, QDragLeaveEvent,
                          QDropEvent, QPaintEvent)
-from PyQt6.QtWidgets import (QPushButton, QMainWindow, QSlider, QLabel, QFileDialog, QMessageBox, QVBoxLayout, QMenu,
-                             QFrame, QSpinBox, QProgressBar, QWidget, QApplication, QListWidgetItem, QSizeGrip,
-                             QListWidget)
+from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
+                             QWidget, QApplication, QSizeGrip)
 
-from src.global_constants import (APP_NAME, APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, LAST_FILE_LIMIT, RESOURCE_ICON_DIR,
-                                  PATH_TO_LAST_PREVIEW, CUSTOM_TITLE_BAR)
+from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
+from src.core.audio import AudioPlayer
+from src.core.file_system import LastFileContainer, LastFileProp
 from src.core.log_system import print_e, print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
-from src.core.settings import SettingsDataObject
-from src.core.audio import AudioPlayer
-from src.core.settings.qt_widgets import SettingsTabWidget
-from src.core.file_system import LastFileContainer, LastFileProp
-from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, VerticalTabWidget, HomePageWidget, DragFileWidget,
+from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, HomePageWidget, DragFileWidget,
                                  MainVerticalTabWidget, TitleBar, SideGrip, MetaListWidget)
-from src.enums import StateMode, PlayerState, DragFileState
-from src.enums import StateMode, PlayerState, MainTabWidgetIcons
-from src.core.workers import OpenFileWorker
-from src.function_lib.math_lib import fixed_hash
-
-from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 from src.core.render.graphics_system import LibrosaGraphsModule
+from src.core.settings import SettingsDataObject
+from src.core.settings.qt_widgets import SettingsTabWidget
+from src.core.workers import OpenFileWorker
+from src.enums import StateMode, PlayerState, MainTabWidgetIcons, DragFileState
+from src.function_lib.math_lib import fixed_hash
+from src.global_constants import (APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
+                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, RESOURCE_ICON_DIR,
+                                  PATH_TO_LAST_PREVIEW, CUSTOM_TITLE_BAR)
 
 
 class MainForm(QMainWindow):
@@ -347,14 +343,17 @@ class MainForm(QMainWindow):
 
         :return: None
         """
+        preloader_size: QSize = self.size()
+        if self.audio_player.isVisible():
+            preloader_size = preloader_size - QSize(0, self.audio_player.height())
 
         if CUSTOM_TITLE_BAR:
             title_bar_size = QSize(0, self.title_bar.height())
             self.central_widget.resize(self.size() - title_bar_size)
             self.title_bar.resize(self.width(), self.title_bar.height())
-            self.preloader.resize(self.size() - title_bar_size)
+            self.preloader.resize(preloader_size - title_bar_size)
         else:
-            self.preloader.resize(self.size())
+            self.preloader.resize(preloader_size)
 
         if self.windowState() is not Qt.WindowState.WindowMaximized:
             self.settings.system_settings.form_width = self.width()
@@ -381,14 +380,16 @@ class MainForm(QMainWindow):
         # self.home_page.resize(self.central_widget.size())
 
     def set_state_mode(self, state: StateMode) -> None:
-        player_enabled = state is StateMode.PLAYER
-        # self.home_page.setVisible(not player_enabled)
-        # self.audio_player.setVisible(player_enabled)
         if state is StateMode.PLAYER:
             self.main_tab_widget.active_tab(1)
         elif state is StateMode.HOME_PAGE:
             self.main_tab_widget.active_tab(0)
         self.state = state
+        # self.recalculate_size()
+
+    def show_preloader(self) -> None:
+        self.preloader.setVisible(True)
+        self.recalculate_size()
 
     @pyqtSlot(int)
     def tab_switched(self, index: int) -> None:
@@ -429,7 +430,7 @@ class MainForm(QMainWindow):
             error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
             error_msg.exec()
             return
-        self.preloader.setVisible(True)
+        self.show_preloader()
         self.preloader.set_help_text("Открытие файла")
         if not self.audio_player.prepare_to_open_file(file_path):
             error_msg = QMessageBox()

@@ -1,33 +1,23 @@
-import gc
-import math
 import os
 import time
-from copy import deepcopy
-from datetime import timedelta, datetime
-from gettext import find
-from typing import TYPE_CHECKING, Union, Optional, List, Dict, Tuple, Any
-from math import atan2, cos, sin, pi
+from datetime import datetime
+from typing import TYPE_CHECKING, Union, Optional, List, Dict, Any
 
+import librosa
+import mutagen
 import numpy as np
 import pyaudio
-import mutagen
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt, QPoint, QRectF, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve, QThread
+from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QColor, QResizeEvent, QIcon, QShowEvent, QImage,
+                         QPainterPath)
+from PyQt6.QtWidgets import QWidget, QLabel, QPushButton
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
-import librosa
 
-from PyQt6 import QtMultimedia, QtCore
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PyQt6.QtCore import Qt, QPoint, QRectF, QRect, QUrl, QDir, pyqtSlot, QSize, QObject, QPropertyAnimation, \
-    QEasingCurve, QThread
-from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QBrush, QColor, QPen, QMouseEvent, QLinearGradient, QCursor,
-                         QWheelEvent, QKeyEvent, QPolygon, QDropEvent, QResizeEvent, QPixmap, QIcon, QShowEvent, QImage,
-                         QRegion, QPainterPath)
-from PyQt6.QtWidgets import QWidget, QMessageBox, QApplication, QLabel, QPushButton, QListWidget, QListWidgetItem, \
-    QSlider
-
-from src.core.render.graphics_system import GraphPanelAudio
-from src.core.qt_widgets import SimpleSlider, MetaListItem
 from src.core.log_system import print_d, print_e
+from src.core.qt_widgets import SimpleSlider, MetaListItem
+from src.core.render.graphics_system import GraphPanelAudio
 from src.enums import PlayerState, StateMode
 from src.global_constants import PROFILE
 from .AudioStreamer_class import AudioStreamer
@@ -100,11 +90,6 @@ class AudioPlayer(QWidget):
         font.setPointSize(9)
         font.setBold(False)
         self.author_tack.setFont(font)
-
-        # self.track_image = QPixmap(f'res/TrackImage.png')
-        # self.track_image = self.track_image.scaled(self.image_size, self.image_size,
-        #                                            Qt.AspectRatioMode.IgnoreAspectRatio,
-        #                                            Qt.TransformationMode.SmoothTransformation)
 
         self.play_button = QPushButton("", self)
         self.play_button.clicked.connect(self.play_button_click)
@@ -181,10 +166,6 @@ class AudioPlayer(QWidget):
         self.audio_streamer.durationChanged.connect(self.duration_is_changed)
 
         self.audio_streamer.start(QThread.Priority.TimeCriticalPriority)
-        # # self.player.positionChanged.connect(self.track_position_changed)
-        # self.player.playbackStateChanged.connect(self.player_state_changed)
-        # self.player.durationChanged.connect(self.duration_is_changed)
-
         self.change_play_icon()
 
     def paintEvent(self, event: QPaintEvent) -> None:
@@ -194,18 +175,11 @@ class AudioPlayer(QWidget):
 
         painter.fillRect(0, 0, self.width() - 1, self.height() - 1, QColor("#B3B3B3"))
 
-        # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Difference)
-
         path = QPainterPath()
         path.addRoundedRect(QRectF(20, self.height() - 50 - 10, 50, 50), 15, 15)
         painter.fillPath(path, QColor(255, 255, 255, 255))
         painter.drawImage(20, self.height() - 50 - 10, self.track_meta_image_drawable)
 
-        # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Exclusion)
-
-        # painter.fillRect(0, 0, self.width() - 1, self.height() - 1, QColor("#B3B3B3"))
-
-        # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         if PROFILE:
             self.mf.profiling.add_draw_time("AudioPlayer", time.time() - start_time)
 
@@ -289,7 +263,6 @@ class AudioPlayer(QWidget):
             self.meta_show_anim.setEndValue(QPoint(self.width(),
                                                    self.mf.meta_list.y()))
             self.meta_show_anim.setEasingCurve(QEasingCurve.Type.InCubic)
-        # self.mf.meta_list.setVisible(self.meta_visible)
         self.meta_show_anim.start()
 
     @pyqtSlot()
@@ -340,7 +313,6 @@ class AudioPlayer(QWidget):
     def player_state_changed(self, state: PlayerState):
         print_d(state)
         if state is PlayerState.STOP:
-            # self.audio_streamer.stop()
             self.position_slider.set_value(0)
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
@@ -459,5 +431,4 @@ class AudioPlayer(QWidget):
     @pyqtSlot(list)
     def set_eq_gains(self, gains: List[float]) -> None:
         self.audio_streamer.eq_gains = gains
-
     # endregion

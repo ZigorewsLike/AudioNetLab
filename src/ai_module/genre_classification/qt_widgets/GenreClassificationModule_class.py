@@ -1,35 +1,24 @@
-import math
 import os
 import time
 from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import librosa
 import numpy as np
-
+from PyQt6.QtCore import pyqtSlot, Qt, QPoint, QThread
+from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QLinearGradient, QPen,
+                         QFont, QResizeEvent)
+from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFileDialog
 from openpyxl.styles import Font, NamedStyle
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont, \
-    QResizeEvent
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog
-
-from src.global_constants import ONNX_INFERENCE, PROFILE, ONNX_SESS_PROVIDER, GENRE_DICT, PATTERN_SIZE
 from src.core.log_system import print_d, print_e, print_i
-from src.core.workers import GenrePredictWorker
-from src.function_lib.math_lib import median
-from src.function_lib.ai import load_sess_model
 from src.core.qt_widgets import EQWidget
+from src.core.workers import GenrePredictWorker
 from src.enums import EQType
-
-if not ONNX_INFERENCE:
-    try:
-        import torch
-        from src.ai_module.genre_classification.model import GenreClassifier
-    except ImportError as ie:
-        ONNX_INFERENCE = True
+from src.function_lib.ai import load_sess_model
+from src.function_lib.math_lib import median
+from src.global_constants import ONNX_INFERENCE, PROFILE, ONNX_SESS_PROVIDER, GENRE_DICT, PATTERN_SIZE
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -41,10 +30,7 @@ class GenreClassifierModule(QWidget):
         self.model_path: str = model_path
         self.setMouseTracking(True)
 
-        if not ONNX_INFERENCE:
-            self.model = GenreClassifier(input_shape=57)
-        else:
-            self.model = None
+        self.model = None
         self.model_path = model_path
 
         self.mf: Union[QWidget, MainForm] = main_form
@@ -99,23 +85,13 @@ class GenreClassifierModule(QWidget):
 
     def load_model(self) -> None:
         print_i(f"AI inference mode: {'ONNX' if ONNX_INFERENCE else 'PyTorch'}")
-        if not ONNX_INFERENCE:
-            try:
-                self.model.classifier.load_state_dict(torch.load(self.model_path))
-            except Exception as e:
-                print_e("CUDA load model error: ", e, '\n Switch to CPU')
-                self.model.classifier.load_state_dict(torch.load(self.model_path, map_location='cpu'))
-            self.model.eval()
-
-            # torch.onnx.export(self.model, torch.ones((1, 58)), self.model_path[:-3] + '.onnx')
-        else:
-            self.model = load_sess_model(self.model_path, ONNX_SESS_PROVIDER)
+        self.model = load_sess_model(self.model_path, ONNX_SESS_PROVIDER)
 
     def predict_current(self) -> None:
         self.worker.moveToThread(self.work_thread)
         self.work_thread.started.connect(self.worker.run)
         self.work_thread.start()
-        self.mf.preloader.setVisible(True)
+        self.mf.show_preloader()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
