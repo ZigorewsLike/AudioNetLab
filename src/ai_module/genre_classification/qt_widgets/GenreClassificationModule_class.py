@@ -6,7 +6,7 @@ import librosa
 import numpy as np
 from PyQt6.QtCore import pyqtSlot, Qt, QPoint, QThread
 from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QLinearGradient, QPen,
-                         QFont, QResizeEvent)
+                         QFont, QResizeEvent, QShowEvent)
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFileDialog
 from openpyxl.styles import Font, NamedStyle
 from openpyxl.workbook import Workbook
@@ -19,6 +19,7 @@ from src.enums import EQType
 from src.function_lib.ai import load_sess_model
 from src.function_lib.math_lib import median
 from src.global_constants import ONNX_INFERENCE, PROFILE, ONNX_SESS_PROVIDER, GENRE_DICT, PATTERN_SIZE
+from src.global_styles import AppColorSchemes
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -54,6 +55,7 @@ class GenreClassifierModule(QWidget):
         self.analysis_button = QPushButton("Анализ", self)
         self.analysis_button.move(self.status_label.x() + self.status_label.width() + 10, 5)
         self.analysis_button.clicked.connect(self.do_analysis)
+        self.analysis_button.setVisible(False)
 
         self.best_of_label = QLabel("", self)
         self.best_of_label.move(10, self.graph_y + self.graph_height + 10)
@@ -82,6 +84,10 @@ class GenreClassifierModule(QWidget):
             0: "#FAF550",
             6: "#ADBDFA",
         }
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self.recalc_sizes()
 
     def load_model(self) -> None:
         print_i(f"AI inference mode: {'ONNX' if ONNX_INFERENCE else 'PyTorch'}")
@@ -162,13 +168,12 @@ class GenreClassifierModule(QWidget):
             cursor_x: int = round(self.cursor_position * (self.width()))
             painter.drawLine(cursor_x, self.graph_y, cursor_x, self.graph_y + self.graph_height)
 
+            painter.setPen(QPen(Qt.GlobalColor.black, 1.0, Qt.PenStyle.DashLine))
+            painter.setFont(QFont("Arial", 14))
             if self.drawing_text_pos is not None and self.global_results is not None and len(self.global_results) > 0:
-                painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
-                painter.setFont(QFont("Arial", 14))
                 painter.drawLine(self.drawing_text_pos.x(), self.graph_y, self.drawing_text_pos.x(),
                                  self.graph_y + self.graph_height)
 
-                # painter.setCompositionMode(QPainter.CompositionMode.RasterOp_SourceXorDestination)
                 index_factor: float = (self.drawing_text_pos.x()) / (self.width())
                 index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
                 genre_text: str = self.genre_dict[self.global_results[index]]
@@ -176,12 +181,7 @@ class GenreClassifierModule(QWidget):
                 text_pos_x = int(self.drawing_text_pos.x() - genre_text_width/2)
                 painter.drawText(median(0, text_pos_x, self.width() - genre_text_width - 10),
                                  self.graph_y - 10, genre_text)
-                # painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
             elif self.global_results:
-                painter.setPen(QPen(Qt.GlobalColor.white, 1.0, Qt.PenStyle.DashLine))
-                painter.setFont(QFont("Arial", 14))
-                # index: int = median(0, round((len(self.global_results) - 1) * self.cursor_position), len(self.global_results) - 1)
-                # genre_text: str = self.genre_dict[self.global_results[index]]
                 genre_text_width: int = painter.fontMetrics().boundingRect(self.current_genre).width()
                 painter.drawText(median(0, int(cursor_x - genre_text_width / 2), self.width() - genre_text_width - 10),
                                  self.graph_y - 10, self.current_genre)

@@ -65,8 +65,8 @@ class GraphPanelBase(QOpenGLWidget):
             self.calculate_render_lines()
         self.update()
 
-    def calculate_render_lines(self):
-        if not self.mf.block_update and self.isVisible():
+    def calculate_render_lines(self, forcedly: bool = False):
+        if (not self.mf.block_update and self.isVisible()) or forcedly:
             start_time: float = time.time()
             wave_slice = self.lines[0]
             wave_slice: np.ndarray = wave_slice[wave_slice >= int(self.shift_left * self.lines[1].size)]
@@ -91,14 +91,12 @@ class GraphPanelBase(QOpenGLWidget):
                 self.mf.profiling.add_math_time(module_name + "_lines", time.time() - start_time)
 
     def set_shift(self, shift_left: float, shift_right: float):
-        start_time: float = time.time()
         self.shift_left = shift_left
         self.shift_right = shift_right
         shift: float = (1 - self.shift_right) + self.shift_left
         self.new_width = self.width()
         if shift != 1:
             self.new_width *= abs(1 / (1 - shift))
-        # print_d("Set shift: ", time.time() - start_time)
         self.calculate_render_lines()
         self.update()
 

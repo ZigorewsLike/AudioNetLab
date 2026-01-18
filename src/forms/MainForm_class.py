@@ -1,35 +1,32 @@
 import gc
 import os
-import pickle
-import shutil
-from datetime import datetime
 from typing import Optional
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QThread, pyqtSlot, QSize, QRect
 from PyQt6.QtGui import (QPainter, QPixmap, QIcon, QMoveEvent,
                          QShowEvent, QAction, QDragEnterEvent, QDragLeaveEvent,
-                         QDropEvent, QPaintEvent)
+                         QDropEvent, QPaintEvent, QBrush, QColor)
 from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
-                             QWidget, QApplication, QSizeGrip)
+                             QWidget, QApplication, QSizeGrip, QTabWidget)
 
 from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
 from src.core.audio import AudioPlayer
-from src.core.file_system import LastFileContainer, LastFileProp
-from src.core.log_system import print_e, print_d
+from src.core.file_system import FileMetaController
+from src.core.log_system import print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
-from src.core.qt_widgets import (BaseTabWidget, PreLoaderWidget, HomePageWidget, DragFileWidget,
-                                 MainVerticalTabWidget, TitleBar, SideGrip, MetaListWidget)
-from src.core.render.graphics_system import LibrosaGraphsModule
+from src.core.qt_widgets import (PreLoaderWidget, HomePageWidget, DragFileWidget,
+                                 MainVerticalTabWidget, TitleBar, SideGrip)
 from src.core.settings import SettingsDataObject
 from src.core.settings.qt_widgets import SettingsTabWidget
 from src.core.workers import OpenFileWorker
 from src.enums import StateMode, PlayerState, MainTabWidgetIcons, DragFileState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import (APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  LAST_FILE_FILENAME, APP_ROAMING_DIR, RESOURCE_ICON_DIR,
-                                  PATH_TO_LAST_PREVIEW, CUSTOM_TITLE_BAR)
+                                  RESOURCE_ICON_DIR,
+                                  PATH_TO_LAST_REGISTRY, CUSTOM_TITLE_BAR)
+from src.global_styles import AppColorSchemes
 
 
 class MainForm(QMainWindow):
@@ -50,6 +47,7 @@ class MainForm(QMainWindow):
         self.title_bar.setVisible(CUSTOM_TITLE_BAR)
         self.block_update: bool = False
         self.windowStateChanged.connect(self.window_state_changed)
+        self.file_meta_controller = FileMetaController()
 
         self.setAcceptDrops(True)
         self.create_menu_bars()
@@ -73,35 +71,48 @@ class MainForm(QMainWindow):
         self.init_ui()
         self.resized.connect(self.recalculate_size)
 
-        self.first_run: bool = False
-
-        try:
-            if not os.path.exists(LAST_FILE_FILENAME):
-                if os.path.exists(os.path.join(APP_ROAMING_DIR, LAST_FILE_FILENAME)):
-                    shutil.copy(os.path.join(APP_ROAMING_DIR, LAST_FILE_FILENAME), LAST_FILE_FILENAME)
-                else:
-                    raise FileNotFoundError
-            with open(LAST_FILE_FILENAME, "rb") as f:
-                self.last_files: LastFileContainer = pickle.load(f)
-        except Exception as e:
-            self.last_files: LastFileContainer = LastFileContainer()
-            self.first_run = True
-            print_e(e)
-
-        self.player_frame = QWidget()
-
-        self.meta_list = MetaListWidget(self.player_frame)
-        self.meta_list.move(self.width(), 0)
-        self.meta_list.resize(300, 300)
         # self.meta_list.setContentsMargins(5, 5, 5, 5)
         # self.meta_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
 
-        self.tab_widget = BaseTabWidget(self.player_frame)
-        self.tab_widget.tab_switched.connect(self.tab_switched)
-        self.audio_player = AudioPlayer(self, self.player_frame)
+        self.tab_widget = QTabWidget(self.central_widget)
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        self.tab_widget.setStyleSheet(f"""
+        QWidget{{
+            background-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
+            color: black;
+        }}
+        QTabWidget{{
+            background-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
+            padding: 0px;
+        }}
+        QTabBar::tab {{
+            color: black;
+            background-color: #e0e0e0;
+            border: 1px solid #939393;
+            border-bottom-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+            min-width: 100px;
+            min-height: 25px;
+            padding: 0px 10px;
+            margin-left: 2px;
+        }}
+        
+        QTabBar::tab:selected {{
+            color: black;
+            background-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
+            border-bottom-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
+            font-weight: bold;
+        }}
+        """)
+        "AFAFAF"
+        # self.tab_widget.tab_switched.connect(self.tab_switched)
+        self.audio_player = AudioPlayer(self, self.central_widget)
+        # self.audio_player.show()
 
-        self.home_page = HomePageWidget(self)
+        self.home_page = HomePageWidget(self, self.central_widget)
         self.home_page.last_file.update_file_list()
+        self.tab_widget.addTab(self.home_page, 'Home')
 
         # region Overlap widgets
         self.drag_widget = DragFileWidget(self)
@@ -113,20 +124,12 @@ class MainForm(QMainWindow):
             self.preloader.move(0, self.title_bar.height())
         # endregion
 
-        self.set_state_mode(self.state)
-
         # region AI MODULES
         self.genre_widget = GenreClassifierModule(model_path=GENRE_MODEL_PATH, main_form=self)
+        self.tab_widget.addTab(self.genre_widget, 'EQ AI')
         if AI_ENABLED:
             self.genre_widget.load_model()
         self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
-
-        # librosa graphs
-        self.librosa_module = LibrosaGraphsModule(self)
-        self.audio_player.positionChanged.connect(self.librosa_module.set_cursor_position)
-
-        self.tab_widget.add_tab(self.genre_widget, "Жанр")
-        self.tab_widget.add_tab(self.librosa_module, "Librosa")
         # endregion
 
         # region apply settings
@@ -142,6 +145,7 @@ class MainForm(QMainWindow):
 
         # self.settings_widget = QWidget()
         self.settings_widget = SettingsTabWidget(mf=self)
+        self.tab_widget.addTab(self.settings_widget, 'Settings')
 
         self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
         self.genre_widget.eq.activeSwitched.connect(self.audio_player.audio_streamer.set_eq_active)
@@ -149,24 +153,9 @@ class MainForm(QMainWindow):
         self.genre_widget.genre_eq = self.settings_widget.eq_settings.load_preset_from_file()
         self.settings_widget.eq_settings.onPresetChanged.connect(self.genre_widget.on_preset_changed)
 
-        self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
-        self.main_tab_widget.add_tab(self.home_page, MainTabWidgetIcons.HOME_PAGE)
-        self.main_tab_widget.add_sub_tub(0, MainTabWidgetIcons.OPEN_FILE)
-        self.main_tab_widget.add_tab(self.player_frame, MainTabWidgetIcons.PLAYER)
-        self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.GENRE_CLASSIFICATION)
-        self.main_tab_widget.add_sub_tub(1, MainTabWidgetIcons.LIBROSA_PANEL)
-        settings_index = self.main_tab_widget.add_tab(self.settings_widget, MainTabWidgetIcons.SETTINGS)
-        self.main_tab_widget.add_sub_tub(settings_index, MainTabWidgetIcons.SETTINGS_AUDIO, icon_size=QSize(32, 32))
-        self.main_tab_widget.add_sub_tub(settings_index, MainTabWidgetIcons.SETTINGS_EQ, icon_size=QSize(32, 32))
-        self.main_tab_widget.tab_switched.connect(lambda: self.recalculate_size())
+        # self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
 
-        self.main_tab_widget.get_sub_tab_button(0, 0).tab_clicked.connect(lambda: self.open_file_dialog())
-        self.main_tab_widget.get_sub_tab_button(1, 0).tab_clicked.connect(lambda: self.tab_widget.active_tab(0))
-        self.main_tab_widget.get_sub_tab_button(1, 1).tab_clicked.connect(lambda: self.tab_widget.active_tab(1))
-        self.main_tab_widget.get_sub_tab_button(settings_index, 0).tab_clicked.connect(lambda: self.settings_widget.tab_widget.active_tab(0))
-        self.main_tab_widget.get_sub_tab_button(settings_index, 1).tab_clicked.connect(lambda: self.settings_widget.tab_widget.active_tab(1))
-
-        self.meta_list.raise_()
+        self.audio_player.meta_list.raise_()
 
         # region SizeGrips
         self.grip_size = 4
@@ -230,17 +219,15 @@ class MainForm(QMainWindow):
 
         # region FileMenu
         open_file_action = QAction("Open file", self)
-        open_file_action.triggered.connect(lambda: self.open_file_dialog())
+        open_file_action.triggered.connect(lambda: self.add_file_dialog())
         icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
         open_file_action.setIcon(QIcon(icon))
 
         player_action = QAction("Open player", self)
-        player_action.triggered.connect(lambda: self.set_state_mode(StateMode.PLAYER))
         # icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
         # player_action.setIcon(QIcon(icon))
 
         home_page_action = QAction("Home page", self)
-        home_page_action.triggered.connect(lambda: self.set_state_mode(StateMode.HOME_PAGE))
         icon = QPixmap(RESOURCE_ICON_DIR + "home_FILL0_wght400_GRAD0_opsz24.png")
         home_page_action.setIcon(QIcon(icon))
 
@@ -255,7 +242,7 @@ class MainForm(QMainWindow):
         # endregion
 
         # region EditMenu
-        edit_menu.addAction(QAction("Aboba", self))
+        edit_menu.addAction(QAction("", self))
         # endregion
 
         # region ToolsMenu
@@ -325,9 +312,9 @@ class MainForm(QMainWindow):
             for path in event.mimeData().urls():
                 self.drag_widget.setVisible(False)
                 if path.isLocalFile():
-                    self.open_file(path.path()[1:])
+                    self.add_file(path.path()[1:])
                 else:
-                    self.open_file(str(path))
+                    self.add_file(str(path))
                 break
         else:
             event.ignore()
@@ -344,8 +331,8 @@ class MainForm(QMainWindow):
         :return: None
         """
         preloader_size: QSize = self.size()
-        if self.audio_player.isVisible():
-            preloader_size = preloader_size - QSize(0, self.audio_player.height())
+        # if self.audio_player.isVisible():
+        #     preloader_size = preloader_size - QSize(0, self.audio_player.height())
 
         if CUSTOM_TITLE_BAR:
             title_bar_size = QSize(0, self.title_bar.height())
@@ -359,43 +346,27 @@ class MainForm(QMainWindow):
             self.settings.system_settings.form_width = self.width()
             self.settings.system_settings.form_height = self.height()
 
-        self.main_tab_widget.resize(self.central_widget.size())
-        self.audio_player.resize(self.player_frame.width(), self.audio_player.height())
+        # self.main_tab_widget.resize(self.central_widget.size())
+        self.audio_player.resize(self.central_widget.width(), self.audio_player.height())
         self.audio_player.move(0, self.central_widget.height() - self.audio_player.height())
-        self.tab_widget.resize(self.player_frame.width() - 50,
-                               self.player_frame.height())
-        self.settings_widget.resize(self.central_widget.size())
-        self.tab_widget.move(50, 0)
-        self.tab_widget.resize_tab_content()
-
-        if self.audio_player.meta_visible:
-            self.meta_list.move(self.width() - self.meta_list.width(),
-                                self.central_widget.height() - self.meta_list.height() - 52)
-        else:
-            self.meta_list.move(self.width(),
-                                self.central_widget.height() - self.meta_list.height() - 52)
+        self.tab_widget.resize(self.central_widget.width(),
+                               self.central_widget.height() - self.audio_player.height())
+        # self.settings_widget.resize(self.central_widget.size())
 
         self.drag_widget.resize(self.size())
-
-        # self.home_page.resize(self.central_widget.size())
-
-    def set_state_mode(self, state: StateMode) -> None:
-        if state is StateMode.PLAYER:
-            self.main_tab_widget.active_tab(1)
-        elif state is StateMode.HOME_PAGE:
-            self.main_tab_widget.active_tab(0)
-        self.state = state
-        # self.recalculate_size()
 
     def show_preloader(self) -> None:
         self.preloader.setVisible(True)
         self.recalculate_size()
 
-    @pyqtSlot(int)
-    def tab_switched(self, index: int) -> None:
-        # self.tab_widget.resize(self.width(), self.height() - self.audio_player.height())
-        # self.tab_widget.move(0, self.audio_player.height())
-        self.tab_widget.resize_tab_content()
+    def show_error_message_log(self, title: str, text: str) -> None:
+        error_msg = QMessageBox()
+        error_msg.setText(text)
+        error_msg.setIcon(QMessageBox.Icon.Critical)
+        error_msg.setWindowTitle(title)
+        error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
+        error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        error_msg.exec()
 
     def load_ann_models(self) -> None:
         pass
@@ -409,7 +380,7 @@ class MainForm(QMainWindow):
         self.work_thread.exit(0)
         self.work_thread.wait()
 
-    def open_file_dialog(self) -> None:
+    def add_file_dialog(self) -> None:
         dialog_filter = f"Все музыкальные форматы (*.mp3 *.flac *.wave);;" \
                         f"MP3 (*.mp3);;FLAC (*.flac);;WAVE (*.wave *.wav);;" \
                         f"Все файлы (*.*)"
@@ -418,30 +389,41 @@ class MainForm(QMainWindow):
                                                dialog_filter)[0]
         if filename:
             self.settings.system_settings.last_folder = os.path.dirname(filename)
-            self.open_file(filename)
+            self.add_file(filename)
 
-    def open_file(self, file_path) -> None:
+    def add_file(self, file_path: str) -> None:
         if not os.path.exists(file_path):
-            error_msg = QMessageBox()
-            error_msg.setText("Файл не найден. Возможно он удалён")
-            error_msg.setIcon(QMessageBox.Icon.Critical)
-            error_msg.setWindowTitle("Ошибка открытия файла")
-            error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
-            error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-            error_msg.exec()
+            self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
+            return
+        filename, file_extension = os.path.splitext(os.path.basename(file_path))
+        meta = self.file_meta_controller.read_track_file(file_path)
+        track_name = meta.get('title')
+        title = track_name[0] if track_name is not None else filename
+        track_id: int = self.home_page.last_file.add(title, file_path)
+        if track_id is None:
+            return
+        self.file_meta_controller.save_meta_in_registry(track_id)
+        self.home_page.last_file.update_file_list()
+
+    def open_file(self, file_path, track_id: int = 6) -> None:
+        if not os.path.exists(file_path):
+            self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
             return
         self.show_preloader()
         self.preloader.set_help_text("Открытие файла")
-        if not self.audio_player.prepare_to_open_file(file_path):
-            error_msg = QMessageBox()
-            error_msg.setText("Не возможно открыть файл!")
-            error_msg.setIcon(QMessageBox.Icon.Critical)
-            error_msg.setWindowTitle("Ошибка открытия файла")
-            error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
-            error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-            error_msg.exec()
+
+        meta = self.file_meta_controller.get_track_meta(track_id)
+        if not self.audio_player.prepare_to_open_file(file_path, meta):
+            self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
             self.preloader.setVisible(False)
             return
+        cover = self.file_meta_controller.get_preview_cover(track_id)
+        if cover is None:
+            icon_index: int = fixed_hash(str(track_id)) % 6
+            self.audio_player.set_default_track_cover(icon_index=icon_index)
+        else:
+            self.audio_player.set_track_cover(cover)
+        self.audio_player.player_state_changed = PlayerState.OPENING
         self.state = StateMode.OPENING
 
         self.worker.file_path = file_path
@@ -455,32 +437,22 @@ class MainForm(QMainWindow):
         self.reset_open_workers()
         self.drag_widget.setVisible(False)
         if not path:
-            error_msg = QMessageBox()
-            error_msg.setText("Не возможно открыть файл!")
-            error_msg.setIcon(QMessageBox.Icon.Critical)
-            error_msg.setWindowTitle("Ошибка открытия файла")
-            error_msg.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), error_msg.sizeHint()).center())
-            error_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-            error_msg.exec()
+            self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
             self.preloader.setVisible(False)
             return
-        self.last_files.add(LastFileProp(path, datetime.now()))
+        # filename, file_extension = os.path.splitext(path)
+        # track_name = self.file_meta_controller.track_meta.get('title')
+        # title = track_name[0] if track_name is not None else filename
+        # track_id: int = self.home_page.last_file.add(title, path)
         self.home_page.last_file.update_file_list()
+        # self.file_meta_controller.save_meta_in_registry(track_id)
 
-        # region preview
-        if self.audio_player.track_meta_image_bytes is not None:
-            path_hash = fixed_hash(path)
-            with open(f"{PATH_TO_LAST_PREVIEW}/{path_hash}.byte", "wb") as binary_file:
-                binary_file.write(self.audio_player.track_meta_image_bytes)
-        # endregion
-
-        self.audio_player.player_state = PlayerState.WAIT
+        self.audio_player.play_music()
         self.settings.system_settings.open_filename = path
         self.save_config_app()
         gc.collect()
         self.preloader.setVisible(False)
-        self.set_state_mode(StateMode.PLAYER)
-        self.audio_player.audio_graph.calculate_render_lines()
+        self.audio_player.audio_graph.calculate_render_lines(forcedly=True)
         self.genre_widget.reset_result()
 
     def save_config_app(self) -> None:
@@ -492,8 +464,11 @@ class MainForm(QMainWindow):
             self.profiling.close()
         self.save_config_app()
 
+    def on_tab_changed(self, index: int):
+        pass
+
     def paintEvent(self, event: QPaintEvent) -> None:
         super(MainForm, self).paintEvent(event)
         if self.isVisible():
             painter = QPainter(self)
-            # painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#B3B3B3")))
+            painter.fillRect(0, 0, self.width(), self.height(), QBrush(QColor("#B3B3B3")))

@@ -25,14 +25,8 @@ class OpenFileWorker(QObject):
 
     def run(self) -> None:
         try:
-            # self.preloader_signal.emit("Открытие файла. Загрузка потока")
-            # if self.mf.audio_player.player.isPlaying():
-            #     self.mf.audio_player.player.stop()
-            # url = QUrl.fromLocalFile(self.file_path)
-            # self.mf.audio_player.player.setSource(url)
-
             self.preloader_signal.emit("Открытие файла. Загрузка каких-то данных")
-            self.mf.audio_player.open_file_ai(self.file_path)
+            self.mf.audio_player.open_file(self.file_path)
 
             self.preloader_signal.emit("Открытие файла. Почти всё")
             self.finished.emit(self.file_path)

@@ -26,7 +26,7 @@ class SettingsTabWidget(QWidget):
     def __init__(self, mf, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
-        self.left_tab_padding = 50
+        self.left_tab_padding = 10
 
         self.setStyleSheet("""
         QWidget{

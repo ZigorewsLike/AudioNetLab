@@ -117,6 +117,7 @@ class EQWidget(QWidget):
             self.auto_eq_button.clicked.connect(self.switch_auto_eq)
 
             self.interpolation_button = ScrollButtonWidget("", self)
+            self.interpolation_button
             self.interpolation_button.resize(28, 28)
             self.interpolation_button.set_range(2, 20)
             self.interpolation_button.set_value(10)

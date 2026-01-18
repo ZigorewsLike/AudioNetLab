@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Union, Optional, List, Dict, Any
 
 import librosa
-import mutagen
 import numpy as np
 import pyaudio
 from PyQt6 import QtCore
@@ -12,13 +11,11 @@ from PyQt6.QtCore import Qt, QPoint, QRectF, pyqtSlot, QSize, QPropertyAnimation
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QColor, QResizeEvent, QIcon, QShowEvent, QImage,
                          QPainterPath)
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton
-from mutagen.flac import FLAC
-from mutagen.mp3 import MP3
 
-from src.core.log_system import print_d, print_e
-from src.core.qt_widgets import SimpleSlider, MetaListItem
+from src.core.log_system import print_d
+from src.core.qt_widgets import SimpleSlider, MetaListItem, MetaListWidget
 from src.core.render.graphics_system import GraphPanelAudio
-from src.enums import PlayerState, StateMode
+from src.enums import PlayerState
 from src.global_constants import PROFILE
 from .AudioStreamer_class import AudioStreamer
 
@@ -51,7 +48,7 @@ class AudioPlayer(QWidget):
         "767676"
         "EAEAEA"
 
-        self.resize(400, 224)
+        self.resize(400, 135)
         self.image_size: int = 25
         self.player_state: PlayerState = PlayerState.NONE
         self.graph_visible: bool = True
@@ -69,7 +66,7 @@ class AudioPlayer(QWidget):
         self.track_meta: Optional[Dict[str, Any]] = None
 
         # region UI
-        self.title_tack = QLabel("Трек отрой сначала Taa", self)
+        self.title_tack = QLabel("", self)
         self.title_tack.setStyleSheet("""
         QLabel{
             color: black;
@@ -80,7 +77,7 @@ class AudioPlayer(QWidget):
         font.setBold(True)
         self.title_tack.setFont(font)
 
-        self.author_tack = QLabel("Unknown", self)
+        self.author_tack = QLabel("", self)
         self.author_tack.setStyleSheet("""
         QLabel{
             color: black;
@@ -98,7 +95,6 @@ class AudioPlayer(QWidget):
         self.play_button.setObjectName("PlayerButtons")
 
         self.track_meta_image_bytes: Optional[bytes] = None
-        self.track_meta_image = QImage()
         self.track_meta_image_drawable = QImage()
 
         self.position_slider = SimpleSlider(self)
@@ -122,7 +118,7 @@ class AudioPlayer(QWidget):
         self.audio_graph.background_color = "#B3B3B3"
 
         self.graph_visible_button = QPushButton("", self)
-        self.graph_visible_button.clicked.connect(self.switch_visible_graph)
+        self.graph_visible_button.clicked.connect(self.switch_graph_visible)
         self.graph_visible_button.resize(20, 20)
         self.graph_visible_button.setIcon(QIcon('res/icons/player_spectrogram_icon_black.png'))
         self.graph_visible_button.setObjectName("PlayerButtons")
@@ -139,9 +135,6 @@ class AudioPlayer(QWidget):
         self.mute_volume_button.setIcon(QIcon('res/icons/player_volume_icon_black.png'))
         self.mute_volume_button.setIconSize(QSize(22, 20))
         self.mute_volume_button.setObjectName("PlayerButtons")
-
-        self.meta_show_anim = QPropertyAnimation(self.mf.meta_list, b"pos")
-        self.meta_show_anim.setDuration(200)
 
         font = QFont("Arima")
         font.setPointSize(9)
@@ -168,12 +161,23 @@ class AudioPlayer(QWidget):
         self.audio_streamer.start(QThread.Priority.TimeCriticalPriority)
         self.change_play_icon()
 
+        self.meta_list = MetaListWidget(self.parent())
+        self.meta_list.move(self.width(), 0)
+        self.meta_list.resize(300, 300)
+
+        self.meta_show_anim = QPropertyAnimation(self.meta_list, b"pos")
+        self.meta_show_anim.setDuration(200)
+
+        self.set_graph_visible(False)
+        self.set_default_track_cover()
+
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
         start_time = time.time()
         painter = QPainter(self)
 
         painter.fillRect(0, 0, self.width() - 1, self.height() - 1, QColor("#B3B3B3"))
+        # painter.fillRect(0, 0, self.width() - 1, 1, QColor("#7F7F7F"))
 
         path = QPainterPath()
         path.addRoundedRect(QRectF(20, self.height() - 50 - 10, 50, 50), 15, 15)
@@ -211,6 +215,13 @@ class AudioPlayer(QWidget):
         else:
             self.position_slider.move(20, 10)
 
+        if self.meta_visible:
+            self.meta_list.move(self.width() - self.meta_list.width(),
+                                self.mf.central_widget.height() - self.meta_list.height() - 52)
+        else:
+            self.meta_list.move(self.width(),
+                                self.mf.central_widget.height() - self.meta_list.height() - 52)
+
         self.graph_visible_button.move(self.width() - self.graph_visible_button.width() - 30,
                                        self.height() - self.graph_visible_button.height() - 25)
 
@@ -239,15 +250,20 @@ class AudioPlayer(QWidget):
         elif self.player_state is PlayerState.PLAY:
             self.pause_music()
 
-    @pyqtSlot()
-    def switch_visible_graph(self) -> None:
-        self.graph_visible = not self.graph_visible
-        if not self.graph_visible:
-            self.resize(self.width(), self.height() - self.audio_graph.height() - 10)
-            self.audio_graph.setVisible(False)
-        else:
-            self.resize(self.width(), self.height() + self.audio_graph.height() + 10)
+    def set_graph_visible(self, visible: bool) -> None:
+        if visible:
             self.audio_graph.setVisible(True)
+            self.audio_graph.calculate_render_lines(forcedly=True)
+            self.resize(self.width(), self.height() + self.audio_graph.height() + 10)
+        else:
+            self.audio_graph.setVisible(False)
+            self.resize(self.width(), self.height() - self.audio_graph.height() - 10)
+        self.graph_visible = visible
+
+    @pyqtSlot()
+    def switch_graph_visible(self) -> None:
+        self.graph_visible = not self.graph_visible
+        self.set_graph_visible(self.graph_visible)
         self.mf.settings.player_settings.graph_visible = self.graph_visible
         self.mf.resized.emit()
 
@@ -256,12 +272,12 @@ class AudioPlayer(QWidget):
         self.meta_visible = not self.meta_visible
         self.meta_show_anim.stop()
         if self.meta_visible:
-            self.meta_show_anim.setEndValue(QPoint(self.width() - self.mf.meta_list.width(),
-                                                   self.mf.meta_list.y()))
+            self.meta_show_anim.setEndValue(QPoint(self.width() - self.meta_list.width(),
+                                                   self.meta_list.y()))
             self.meta_show_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         else:
             self.meta_show_anim.setEndValue(QPoint(self.width(),
-                                                   self.mf.meta_list.y()))
+                                                   self.meta_list.y()))
             self.meta_show_anim.setEasingCurve(QEasingCurve.Type.InCubic)
         self.meta_show_anim.start()
 
@@ -318,59 +334,46 @@ class AudioPlayer(QWidget):
             self.change_play_icon()
 
     # region Player methods
-    def prepare_to_open_file(self, path: str) -> bool:
+    def prepare_to_open_file(self, path: str, track_meta: Optional[dict]) -> bool:
         self.audio_streamer.stop()
-        self.mf.meta_list.clear()
+        self.meta_list.clear()
         print_d(f"Open file: {path}")
 
-        self.track_meta_image_bytes = None
-        self.track_meta_image = QImage()
         self.track_meta_image_drawable = QImage()
-
-        # region Meta info
         filename, file_extension = os.path.splitext(os.path.basename(path))
-        try:
-            if file_extension.lower() == '.flac':
-                audio = FLAC(path)
-                self.track_meta_image_bytes = audio.pictures[0].data
-                self.track_meta_image.loadFromData(self.track_meta_image_bytes)
-            elif file_extension.lower() == '.mp3':
-                audio = MP3(path)
-                apic = audio.tags.get("APIC:", None)
-                if apic:
-                    self.track_meta_image_bytes = apic.data
-                    self.track_meta_image.loadFromData(apic.data)
-            else:
-                raise ValueError
-        except Exception as e:
-            print_e("Meta read error", e)
-            audio = mutagen.File(path)
-        if audio is None:
-            print_e(f'Open file error. {filename}')
-            return False
-        # endregion
 
-        for key, value in audio.items():
-            self.mf.meta_list.add(MetaListItem(key, value))
-            print(key, value)
-        self.mf.meta_list.recalculate_size()
+        if track_meta is not None:
+            for key, value in track_meta.items():
+                self.meta_list.add(MetaListItem(key, value))
+                print_d(key, value)
+            self.meta_list.recalculate_size()
+        else:
+            track_meta = {}
 
-        track_name = audio.get('title', None)
-        # TODO: mp3 artist parser
-        artist_name = audio.get('artist', None)
+        track_name = track_meta.get('title')
+        artist_name = track_meta.get('artist')
 
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
 
         self.author_tack.setText(", ".join(artist_name) if artist_name is not None else "Unknown")
         self.author_tack.adjustSize()
-
-        self.track_meta_image_drawable = self.track_meta_image.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
-                                                                      Qt.TransformationMode.SmoothTransformation)
-
         return True
 
-    def open_file_ai(self, path) -> None:
+    def set_default_track_cover(self, icon_index: int = 0) -> None:
+        img = QImage()
+        img.load(f"res/icons/track_default_cover_{icon_index + 1}.png")
+        self.track_meta_image_drawable = img.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                                                    Qt.TransformationMode.SmoothTransformation)
+
+    def set_track_cover(self, image: Optional[QImage]) -> None:
+        if image is not None:
+            self.track_meta_image_drawable = image.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                                                          Qt.TransformationMode.SmoothTransformation)
+        else:
+            self.set_default_track_cover()
+
+    def open_file(self, path) -> None:
         waveform_np, sample_rate = librosa.load(path, sr=None, mono=False, dtype=np.int16)
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
         self.audio_graph.set_data(waveform_np[0, ::sample_rate // 22100 * 10] * 1.0, calc_line=False)
@@ -391,30 +394,34 @@ class AudioPlayer(QWidget):
         self.label_duration_right.setText(f"{datetime.strftime(datetime.fromtimestamp(duration / 1000), '%M:%S')}")
         self.label_duration_right.adjustSize()
 
+    @property
+    def is_playable(self) -> bool:
+        return self.player_state is not PlayerState.NONE and self.player_state is not PlayerState.OPENING
+
     @pyqtSlot()
     def play_music(self) -> None:
-        if self.mf.state is StateMode.PLAYER:
+        if self.is_playable:
             self.audio_streamer.play()
             self.player_state = PlayerState.PLAY
             self.change_play_icon()
 
     @pyqtSlot()
     def pause_music(self) -> None:
-        if self.mf.state is StateMode.PLAYER:
+        if self.is_playable:
             self.audio_streamer.pause()
             self.player_state = PlayerState.PAUSE
             self.change_play_icon()
 
     @pyqtSlot()
     def stop_music(self) -> None:
-        if self.mf.state is StateMode.PLAYER:
+        if self.is_playable:
             self.audio_streamer.stop()
             self.player_state = PlayerState.WAIT
             self.change_play_icon()
 
     @pyqtSlot(int)
     def set_track_position(self, value: int) -> None:
-        if self.mf.state is StateMode.PLAYER:
+        if self.is_playable:
             self.audio_streamer.set_position(value)
             self.set_current_time(value)
             self.positionChanged.emit(value / self.audio_streamer.duration())

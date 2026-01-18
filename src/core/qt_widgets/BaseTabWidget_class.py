@@ -75,10 +75,3 @@ class BaseTabWidget(QWidget):
         super().update()
         if self._tab_container:
             self._tab_container[self.tab_current_index].widget.update()
-
-    def paintEvent(self, event: QPaintEvent) -> None:
-        super(BaseTabWidget, self).paintEvent(event)
-        if self.isVisible():
-            painter = QPainter(self)
-            painter.setPen(QPen(QColor("#4C4C4C"), 1.0, Qt.PenStyle.SolidLine))
-            painter.drawRect(0, 0, self.width() - 1, self.height() - 1)

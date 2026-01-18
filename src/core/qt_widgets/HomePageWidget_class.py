@@ -1,14 +1,11 @@
-from typing import List, Optional, Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QRect, Qt, QPoint
-from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QResizeEvent, QFont, QRegion,
-                         QPen, QPixmap)
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFrame
+from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtGui import (QPaintEvent, QPainter, QColor, QMouseEvent, QResizeEvent, QFont, QPixmap)
+from PyQt6.QtWidgets import QWidget, QLabel, QFrame
 
-from src.core.log_system import print_d
 from src.core.file_system.qt_widgets import LastFileList
-from src.enums import StateMode
 from src.global_constants import RESOURCE_ICON_DIR
 from src.global_styles import AppColorSchemes
 
@@ -80,7 +77,7 @@ class HomePageWidget(QWidget):
         self.setAutoFillBackground(True)
 
         self.top_panel_height: int = 80
-        self.left_padding = 40
+        self.left_padding = 10
         self.right_padding = 0
 
         self.mf: Union[MainForm, QWidget] = mf
@@ -100,11 +97,7 @@ class HomePageWidget(QWidget):
 
     @pyqtSlot()
     def call_open_dialog(self) -> None:
-        self.mf.open_file_dialog()
-
-    @pyqtSlot()
-    def open_player(self) -> None:
-        self.mf.set_state_mode(StateMode.PLAYER)
+        self.mf.add_file_dialog()
 
     def update(self) -> None:
         super().update()

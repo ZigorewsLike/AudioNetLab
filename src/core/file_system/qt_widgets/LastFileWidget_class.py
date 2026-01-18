@@ -3,16 +3,18 @@ import subprocess
 import sys
 from datetime import datetime
 from math import pi, cos
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Union, Dict
 
 from PyQt6.QtCore import QRect, Qt, QSize, QTimer
-from PyQt6.QtGui import QPainter, QBrush, QColor, QResizeEvent, QFont, QPixmap, QIcon, QShowEvent, QImage, QHideEvent
+from PyQt6.QtGui import QPainter, QBrush, QColor, QResizeEvent, QFont, QPixmap, QIcon, QShowEvent, QImage, QHideEvent, \
+    QMouseEvent
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu
 
-from src.core.file_system import LastFileProp
-from src.enums import StateMode, PlayerState
+from src.api.db.db_handler import DBHandler
+from src.api.db.models import Track
+from src.core.log_system import print_d
 from src.function_lib.math_lib import fixed_hash
-from src.global_constants import RESOURCE_ICON_DIR, PATH_TO_LAST_PREVIEW
+from src.global_constants import RESOURCE_ICON_DIR, PATH_TO_LAST_REGISTRY
 from src.global_styles import DEFAULT_SCROLLBAR_STYLE, AppColorSchemes
 
 if TYPE_CHECKING:
@@ -29,6 +31,8 @@ class LastFileList(QWidget):
         self.mf: MainForm = mf
 
         self.item_height: int = 100
+        self.playing_track_id: Optional[int] = None
+        self.item_track_map: Dict[int, int] = {}
 
         self.setStyleSheet("""
         QLabel{
@@ -64,6 +68,7 @@ class LastFileList(QWidget):
         self.right_padding = 30
 
         self.file_frame.resize(width - self.right_padding, 145 * 1)
+        self.db = DBHandler()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -83,39 +88,75 @@ class LastFileList(QWidget):
         super().showEvent(event)
 
     def update_file_list(self) -> None:
+        self.item_track_map.clear()
         for i in reversed(range(self.v_layout.count())):
             item = self.v_layout.itemAt(i)
             if item.widget() is not None:
                 item.widget().deleteLater()
             self.v_layout.removeItem(item)
-
-        if self.mf.last_files.props:
-            for item_index, _file in enumerate(reversed(self.mf.last_files.props)):
-                _file: LastFileProp
-                file_exist = os.path.exists(_file.path)
-                last_file = LastFileItem(_file, self.mf, self, file_exist=file_exist)
-                last_file.setFixedHeight(self.item_height)
-                if file_exist and self.mf.audio_player.player_state is PlayerState.PLAY and \
-                        self.mf.settings.system_settings.open_filename == _file.path:
-                    last_file.is_playing = True
-                self.v_layout.addWidget(last_file)
-            self.v_layout.addStretch()
-            self.file_frame.resize(self.widget_width - self.right_padding, self.item_height * (self.v_layout.count() - 1))
-
-    def delete_elem(self, item: QWidget):
-        self.mf.last_files.delete(item.file_prop)  # noqa
-        self.v_layout.removeWidget(item)
+        self.db.connect()
+        track_list = self.db.get_all_track()
+        self.db.disconnect()
+        for item_index, track in enumerate(track_list):
+            file_exist = os.path.exists(track.path)
+            last_file = LastFileItem(track, self.mf, self, file_exist=file_exist)
+            last_file.setFixedHeight(self.item_height)
+            if track.id == self.playing_track_id:
+                last_file.is_playing = True
+            self.v_layout.addWidget(last_file)
+            self.item_track_map[track.id] = item_index
+        self.v_layout.addStretch()
         self.file_frame.resize(self.widget_width - self.right_padding, self.item_height * (self.v_layout.count() - 1))
+
+    def add(self, title: str, path: str) -> Optional[int]:
+        self.db.connect()
+        track_id: int = self.db.add_track(title, path)
+        self.db.disconnect()
+        return track_id
+
+    def delete_elem(self, item: Union[QWidget, 'LastFileItem']):
+        self.v_layout.removeWidget(item)
+        self.db.connect()
+        self.db.delete_track(track=item.track)
+        self.db.disconnect()
+        self.update_file_list()
+
+    def update_track_last_opened(self, track_id: int) -> None:
+        self.db.connect()
+        self.db.update_track_last_opened(track_id=track_id)
+        self.db.disconnect()
+
+    def get_item_by_track_id(self, track_id: int) -> Optional["LastFileItem"]:
+        item_index: int = self.item_track_map.get(track_id)
+        if item_index is None:
+            return None
+        item = self.v_layout.itemAt(item_index)
+        if item:
+            return item.widget()
+        return None
+
+    def item_click(self, track_id: int) -> None:
+        if track_id != self.playing_track_id:
+            if self.playing_track_id is not None:
+                item = self.get_item_by_track_id(self.playing_track_id)
+                if item:
+                    item.is_playing = False
+            self.playing_track_id = track_id
+            item = self.get_item_by_track_id(self.playing_track_id)
+            if item:
+                item.is_playing = True
+                self.mf.open_file(item.track.path, track_id)
+                self.update_track_last_opened(track_id)
 
 
 class LastFileItem(QWidget):
-    def __init__(self, file_prop: LastFileProp, main_form, container, file_exist: bool = True, *args, **kwargs):
+    def __init__(self, track_obj: Track, main_form, container, file_exist: bool = True, *args, **kwargs):
         super(LastFileItem, self).__init__(*args, **kwargs)
         self.color = 'transparent'
+        self.setMouseTracking(True)
 
-        self.file_prop: LastFileProp = file_prop
-        self.file_path = file_prop.path
-        self.mf = main_form
+        self.track: Track = track_obj
+        self.mf: MainForm = main_form
         self.container: LastFileList = container
         self.file_exist: bool = file_exist
         self.is_playing: bool = False
@@ -134,7 +175,7 @@ class LastFileItem(QWidget):
         }
         """
 
-        self.label_filename = QLabel(os.path.basename(self.file_path), self)
+        self.label_filename = QLabel(self.track.title, self)
         self.label_filename.setGeometry(QRect(90, 13, 300, 40))
         font = QFont("Arima")
         font.setPointSize(13)
@@ -143,7 +184,7 @@ class LastFileItem(QWidget):
         self.label_filename.setStyleSheet(header_style)
         self.label_filename.adjustSize()
 
-        self.label_date = QLabel("Посл. открытие: " + datetime.strftime(self.file_prop.last_date, '%Y-%m-%d %H:%M:%S'), self)
+        self.label_date = QLabel("Посл. открытие: ", self)
         self.label_date.setGeometry(QRect(90, 44, 280, 25))
         font = QFont("Arima")
         font.setPointSize(9)
@@ -154,7 +195,7 @@ class LastFileItem(QWidget):
         if not file_exist:
             file_path = "File not found"
         else:
-            file_path = os.path.abspath(self.file_path).replace('\\', '/')
+            file_path = os.path.abspath(self.track.path).replace('\\', '/')
         self.label_path = QLabel(file_path, self)
         font = QFont("Arima")
         font.setPointSize(9)
@@ -168,13 +209,6 @@ class LastFileItem(QWidget):
         self.button_open = QPushButton(self)
         self.button_open.setGeometry(QRect(10, 10, self.button_open_size.width(), self.button_open_size.height()))
         self.button_open.setObjectName("openFolder")
-        if not file_exist:
-            icon = QPixmap(os.path.join(RESOURCE_ICON_DIR, 'file_error_icon_white.png'))
-            self.button_open.setIconSize(QSize(38, 35))
-        else:
-            icon = QPixmap(os.path.join(RESOURCE_ICON_DIR, 'play_icon_white.png'))
-            self.button_open.setIconSize(QSize(30, 35))
-        self.button_open.setIcon(QIcon(icon))
         self.button_open.clicked.connect(self.click_open_folder)
 
         self.right_pixmap = QPixmap(RESOURCE_ICON_DIR + "audio_wave_plane")
@@ -187,19 +221,16 @@ class LastFileItem(QWidget):
         """)
 
         self.track_meta_image: Optional[QImage] = None
+        img = self.mf.file_meta_controller.get_preview_cover(track_id=self.track.id)
+        if img is None:
+            icon_index: int = fixed_hash(str(self.track.id)) % 6
+            img = QImage()
+            img.load(f"res/icons/track_default_cover_{icon_index + 1}.png")
 
-        file_hash = fixed_hash(self.file_path)
-        path_to_hash: str = f"{PATH_TO_LAST_PREVIEW}/{file_hash}.byte"
-        if os.path.exists(path_to_hash):
-            with open(path_to_hash, 'rb') as bytes_file:
-                self.track_meta_image = QImage()
-                self.track_meta_image.loadFromData(bytes_file.read())
-                self.track_meta_image = self.track_meta_image.scaled(self.button_open_size.width(),
-                                                                     self.button_open_size.height(),
-                                                                     Qt.AspectRatioMode.KeepAspectRatio,
-                                                                     Qt.TransformationMode.SmoothTransformation)
-
-        self.file_type: str = "folder"
+        self.track_meta_image = img.scaled(self.button_open_size.width(),
+                                           self.button_open_size.height(),
+                                           Qt.AspectRatioMode.KeepAspectRatio,
+                                           Qt.TransformationMode.SmoothTransformation)
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -220,16 +251,26 @@ class LastFileItem(QWidget):
         if self.isVisible():
             self.recalc_sizes()
 
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self.file_exist:
+            icon = QPixmap(os.path.join(RESOURCE_ICON_DIR, 'file_error_icon_white.png'))
+            self.button_open.setIconSize(QSize(38, 35))
+        else:
+            icon = QPixmap(os.path.join(RESOURCE_ICON_DIR, 'play_icon_white.png'))
+            self.button_open.setIconSize(QSize(30, 35))
+        self.button_open.setIcon(QIcon(icon))
+
+    def leaveEvent(self, event) -> None:
+        self.button_open.setIcon(QIcon())
+
     def recalc_sizes(self) -> None:
         self.label_path.resize(self.width() - 20, 60)
         self.label_path.adjustSize()
         self.right_plane.move(self.width() - self.right_plane.width(), 5)
 
     def click_open_folder(self):
-        if self.is_playing:
-            self.mf.set_state_mode(StateMode.PLAYER)
-        else:
-            self.mf.open_file(self.file_path)
+        self.container.item_click(self.track.id)
 
     def contextMenuEvent(self, event):
         # self.color = '#2C2A35'
@@ -242,7 +283,7 @@ class LastFileItem(QWidget):
         if action == open_folder:
             self.button_open.click()
         elif action == show_folder:
-            path = self.file_path
+            path = self.track.path
             path = path.replace('/', '\\')
             if sys.platform == "win32":
                 subprocess.call(f'explorer /select,"{path}"')
@@ -275,7 +316,7 @@ class LastFileItem(QWidget):
                 rect_count = 4
                 rect_width = 10
                 rect_shift = 5
-                rect_height = self.button_open_size.height() * 0.4
+                rect_height = self.button_open_size.height() * 0.2
                 calc_rect_width: int = rect_shift + rect_width
                 for i in range(0, rect_count):
                     painter.setBrush(QBrush(QColor(self.color), Qt.BrushStyle.SolidPattern))
@@ -284,6 +325,6 @@ class LastFileItem(QWidget):
                         10 + self.button_open_size.height(),
                         rect_width,
                         -int(abs(cos(self.angle + i / pi * 1.2)) * rect_height),
-                        QBrush(QColor("#ffffff"), Qt.BrushStyle.SolidPattern))
+                        QBrush(QColor("#A1FFA8"), Qt.BrushStyle.SolidPattern))
 
 

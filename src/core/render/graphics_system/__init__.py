@@ -1,4 +1,3 @@
 from .GraphPanelBase_class import GraphPanelBase
 from .GraphPanelAudio_class import GraphPanelAudio
-from .LibrosaGraphsModule_class import LibrosaGraphsModule
 from .NamedGraphPanel_class import NamedGraphPanel

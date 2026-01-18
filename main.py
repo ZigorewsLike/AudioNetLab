@@ -8,8 +8,10 @@ import traceback
 import tracemalloc
 from datetime import datetime
 
+from PyQt6.QtCore import Qt
+
 from src.core.log_system import print_e, print_d, OutputBuffer
-from src.global_constants import APP_NAME, DEBUG, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_PREVIEW
+from src.global_constants import APP_NAME, DEBUG, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_REGISTRY
 
 from PyQt6.QtGui import QIcon
 from PyQt6 import QtWidgets
@@ -50,7 +52,7 @@ if __name__ == '__main__':
     sys.stdout = OutputBuffer()
 
     # region Создание необходимых для программы директорий и файлов
-    for dir_name in ["data/local/", PATH_TO_LAST_PREVIEW]:
+    for dir_name in ["data/local/", PATH_TO_LAST_REGISTRY]:
         os.makedirs(dir_name, exist_ok=True)
     os.makedirs(APP_ROAMING_DIR, exist_ok=True)
     if LOG_IN_FILE:
@@ -68,11 +70,14 @@ if __name__ == '__main__':
     print_d("curr_dpi: ", curr_dpi, w_curr, w_phys)
 
     # region Инициализация приложения, определение глобальных параметров, стиля
-    os.environ["QT_SCALE_FACTOR"] = str(curr_dpi / 96)
-    os.environ["QT_FONT_DPI"] = "96"
+    # os.environ["QT_SCALE_FACTOR"] = str(curr_dpi / 96)
+    # os.environ["QT_FONT_DPI"] = "96"
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setWindowIcon(QIcon('Icon.ico'))
+    app.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough  # Or Round, Floor, etc.
+    )
 
     app.setStyle("fusion")
     screen = app.primaryScreen()

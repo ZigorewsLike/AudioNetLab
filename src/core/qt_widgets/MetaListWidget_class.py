@@ -1,15 +1,11 @@
-import math
 from typing import List
 
-from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, Qt, QSize, QRectF
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QShowEvent, QResizeEvent, \
+from PyQt6.QtCore import QSize, QRectF
+from PyQt6.QtGui import QPaintEvent, QPainter, QColor, QShowEvent, QResizeEvent, \
     QPainterPath
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QScrollArea, QFrame
+from PyQt6.QtWidgets import QWidget, QLabel, QScrollArea, QFrame
 
 from src.core.log_system import print_d, print_e
-from src.function_lib.math_lib import median
-from src.global_styles import DEFAULT_SCROLLBAR_STYLE, AppColorSchemes
 
 
 class MetaListItem(QWidget):
@@ -85,7 +81,7 @@ class MetaListWidget(QWidget):
         for item in self._item_container:
             item.deleteLater()
         self._item_container.clear()
-        self.item_max_width: int = self.width()
+        self.item_max_width: int = self.scroll_area.width()
         self.item_max_width_header: int = 0
 
     def add(self, item: MetaListItem) -> None:
@@ -94,6 +90,7 @@ class MetaListWidget(QWidget):
         item.adjustSize()
         widget_height = (len(self._item_container)) * self.item_height
         item.move(0, widget_height)
+        item.show()
 
         self.item_max_width_header: int = max(item.label_header.width(), self.item_max_width_header)
 

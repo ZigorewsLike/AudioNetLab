@@ -18,7 +18,7 @@ APP_ROAMING_DIR = os.path.join(os.getenv('APPDATA'), APP_NAME)
 CONFIG_FILENAME = "config_app.ini"
 RESOURCE_ICON_DIR = "res/icons/"
 RESOURCE_DIR = "res/"
-PATH_TO_LAST_PREVIEW = "data/preview/"
+PATH_TO_LAST_REGISTRY = "data/registry/"
 
 # region AI MODULES
 GENRE_MODEL_PATH = "models/best_cls_genre_fma_3s_0.0001.onnx"
