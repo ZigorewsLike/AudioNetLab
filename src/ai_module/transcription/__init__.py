@@ -1,0 +1,1 @@
+from .AudioTranscriptionModule_class import AudioTranscriptionModule

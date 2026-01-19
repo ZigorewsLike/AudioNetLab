@@ -10,7 +10,8 @@ from PyQt6.QtGui import (QPainter, QPixmap, QIcon, QMoveEvent,
 from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
                              QWidget, QApplication, QSizeGrip, QTabWidget)
 
-from src.ai_module.genre_classification.qt_widgets import GenreClassifierModule
+from src.ai_module.genre_classification import GenreClassifierModule
+from src.ai_module.transcription import AudioTranscriptionModule
 from src.core.audio import AudioPlayer
 from src.core.file_system import FileMetaController
 from src.core.log_system import print_d
@@ -130,6 +131,10 @@ class MainForm(QMainWindow):
         if AI_ENABLED:
             self.genre_widget.load_model()
         self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
+
+        self.transcription_module = AudioTranscriptionModule(self)
+        self.tab_widget.addTab(self.transcription_module, 'Transcription')
+        self.audio_player.audio_streamer.progress.connect(self.transcription_module.on_position_changed)
         # endregion
 
         # region apply settings
@@ -285,7 +290,7 @@ class MainForm(QMainWindow):
             corner_grip.setVisible(grips_enable)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if self.state is not StateMode.OPENING and not self.preloader.isVisible() and event.mimeData().hasUrls:
+        if not self.preloader.isVisible() and event.mimeData().hasUrls:
             event.setDropAction(Qt.DropAction.CopyAction)
             for path in event.mimeData().urls():
                 if path.isLocalFile():
@@ -424,6 +429,8 @@ class MainForm(QMainWindow):
         else:
             self.audio_player.set_track_cover(cover)
         self.audio_player.player_state_changed = PlayerState.OPENING
+        self.audio_player.playable_track_id = track_id
+        self.audio_player.playable_file_file = file_path
         self.state = StateMode.OPENING
 
         self.worker.file_path = file_path
@@ -454,6 +461,12 @@ class MainForm(QMainWindow):
         self.preloader.setVisible(False)
         self.audio_player.audio_graph.calculate_render_lines(forcedly=True)
         self.genre_widget.reset_result()
+
+        transcription = self.file_meta_controller.get_track_transcription(self.audio_player.playable_track_id)
+        if transcription is not None:
+            self.transcription_module.set_transcription_data(transcription)
+        else:
+            self.transcription_module.clear()
 
     def save_config_app(self) -> None:
         self.settings.player_settings.volume = self.audio_player.volume_slider.value

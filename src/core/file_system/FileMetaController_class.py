@@ -2,6 +2,7 @@ import os
 import pickle
 from typing import Optional
 
+import numpy as np
 import mutagen
 from PyQt6.QtGui import QImage
 from mutagen.flac import FLAC
@@ -70,3 +71,25 @@ class FileMetaController:
             with open(f"{path_to_reg_folder}/{RegistryFileName.TRACK_META}", "rb") as binary_file:
                 return pickle.load(binary_file)
         return None
+
+    def get_track_librosa_data(self, track_id: int) -> Optional[dict]:
+        path_to_reg_folder: str = self.get_registry_path(track_id)
+        if os.path.exists(f"{path_to_reg_folder}/{RegistryFileName.LIBROSA_DATA}"):
+            return np.load(f"{path_to_reg_folder}/{RegistryFileName.LIBROSA_DATA}")
+        return None
+
+    def save_track_librosa_data(self, track_id: int, data: np.ndarray) -> None:
+        path_to_reg_folder: str = self.get_registry_path(track_id)
+        np.save(f"{path_to_reg_folder}/{RegistryFileName.LIBROSA_DATA}", data)
+
+    def get_track_transcription(self, track_id: int) -> Optional[dict]:
+        path_to_reg_folder: str = self.get_registry_path(track_id)
+        if os.path.exists(f"{path_to_reg_folder}/{RegistryFileName.TRANSCRIPTION}"):
+            with open(f"{path_to_reg_folder}/{RegistryFileName.TRANSCRIPTION}", "rb") as binary_file:
+                return pickle.load(binary_file)
+        return None
+
+    def save_track_transcription(self, track_id: int, data: dict) -> None:
+        path_to_reg_folder: str = self.get_registry_path(track_id)
+        with open(f"{path_to_reg_folder}/{RegistryFileName.TRANSCRIPTION}", "wb") as p_file:
+            pickle.dump(data, p_file)

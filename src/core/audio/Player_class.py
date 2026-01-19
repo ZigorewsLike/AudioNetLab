@@ -57,6 +57,8 @@ class AudioPlayer(QWidget):
 
         self.waveform: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
+        self.playable_track_id: Optional[int] = None
+        self.playable_file_file: Optional[str] = None
 
         self.pyaudio_port: Optional[pyaudio.PyAudio] = pyaudio.PyAudio()
         self.pyaudio_stream: Optional[pyaudio.Stream] = None
@@ -375,8 +377,10 @@ class AudioPlayer(QWidget):
 
     def open_file(self, path) -> None:
         waveform_np, sample_rate = librosa.load(path, sr=None, mono=False, dtype=np.int16)
+        if waveform_np.ndim == 1:
+            waveform_np = waveform_np[None, :]
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
-        self.audio_graph.set_data(waveform_np[0, ::sample_rate // 22100 * 10] * 1.0, calc_line=False)
+        self.audio_graph.set_data(waveform_np[0, ::sample_rate // 22050 * 10] * 1.0, calc_line=False)
         self.audio_graph.set_shift(0, 1)
 
         waveform_np = np.swapaxes(waveform_np, 0, 1)
@@ -388,9 +392,9 @@ class AudioPlayer(QWidget):
         print_d(self.pyaudio_port.get_default_output_device_info())
         self.audio_graph.changeCursorPosition.emit(0)
 
-    @pyqtSlot(int)
-    def duration_is_changed(self, duration: int) -> None:
-        self.position_slider.set_range(0, duration)
+    @pyqtSlot(float)
+    def duration_is_changed(self, duration: float) -> None:
+        self.position_slider.set_range(0, int(duration))
         self.label_duration_right.setText(f"{datetime.strftime(datetime.fromtimestamp(duration / 1000), '%M:%S')}")
         self.label_duration_right.adjustSize()
 

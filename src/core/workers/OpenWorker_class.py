@@ -8,7 +8,7 @@ from PyQt6.QtCore import QObject, QUrl
 
 from src.enums import StateMode
 from src.global_constants import DEBUG
-from src.core.log_system import print_d, print_e
+from src.core.log_system import print_d, print_e, print_traceback
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -31,6 +31,7 @@ class OpenFileWorker(QObject):
             self.preloader_signal.emit("Открытие файла. Почти всё")
             self.finished.emit(self.file_path)
         except Exception as e:
+            print_traceback()
             print_e("Worker error:", e)
             self.finished.emit("")
 

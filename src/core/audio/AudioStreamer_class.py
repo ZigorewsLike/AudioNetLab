@@ -19,7 +19,7 @@ class AudioStreamer(QThread):
     progress = QtCore.pyqtSignal(int)
     finished = QtCore.pyqtSignal()
     playbackStateChanged = QtCore.pyqtSignal(PlayerState)
-    durationChanged = QtCore.pyqtSignal(int)
+    durationChanged = QtCore.pyqtSignal(float)
 
     def __init__(self):
         super().__init__()
@@ -29,7 +29,7 @@ class AudioStreamer(QThread):
         self.sample_rate: Optional[int] = None
         self.thread_stop: bool = False
         self._chunk_size: int = 512 * 2
-        self._duration: int = 0
+        self._duration: float = 0
         self._channels: int = 2
         self._volume: float = 1.0
         self.log_volume: bool = True
@@ -45,7 +45,7 @@ class AudioStreamer(QThread):
         time.sleep(self._chunk_size / sample_rate + 0.01)
         self.waveform_ref = waveform
         self.sample_rate = sample_rate
-        self._duration = int(waveform.size / sample_rate * 1000 / self._channels)
+        self._duration = waveform.size / sample_rate * 1000 / self._channels
         self.durationChanged.emit(self._duration)
 
         if self.pyaudio_stream is not None:
@@ -124,7 +124,7 @@ class AudioStreamer(QThread):
     def get_chunk_size(self) -> int:
         return self._chunk_size
 
-    def duration(self) -> int:
+    def duration(self) -> float:
         return self._duration
 
     @pyqtSlot(bool)

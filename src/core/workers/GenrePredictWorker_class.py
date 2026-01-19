@@ -22,21 +22,20 @@ class GenrePredictWorker(QObject):
     preloader_signal = QtCore.pyqtSignal(str)
     waveform: Optional[np.ndarray] = None
     sample_rate: Optional[int] = None
+    track_id: Optional[int] = None
 
     def __init__(self):
         super().__init__()
 
     def run(self) -> List[int]:
-        if not ONNX_INFERENCE:
-            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-            print_d("device:", device)
-            self.mf.genre_widget.model.to(device)
         if self.waveform is not None:
             waveform = self.waveform
             sample_rate = self.sample_rate
+            track_id = self.track_id
         else:
             waveform = self.mf.audio_player.waveform
             sample_rate = self.mf.audio_player.sample_rate
+            track_id = self.mf.audio_player.playable_track_id
 
         start_time = time.time()
         iter_sum_time: float = 0.0
@@ -84,17 +83,27 @@ class GenrePredictWorker(QObject):
                    4.44330652e+01]
 
             last_predict: Optional[int] = None
+            input_array: Optional[np.ndarray] = self.mf.file_meta_controller.get_track_librosa_data(track_id=track_id)
+            use_cache_data: bool = input_array is not None
 
-            for step in range(sample_len):
+            for step_index, step in enumerate(range(sample_len)):
                 self.preloader_signal.emit(f"Классификация жанра {round(step / sample_len * 100)}%")
-                waveform_part = waveform[step * sample_rate * self.pattern_length:
-                                         (step + 1) * sample_rate * self.pattern_length]
+                if not use_cache_data:
+                    waveform_part = waveform[step * sample_rate * self.pattern_length:
+                                             (step + 1) * sample_rate * self.pattern_length]
 
-                input_data = get_genre_input_data(waveform_part, sample_rate)
-                input_data = np.array(input_data)
+                    input_data = get_genre_input_data(waveform_part, sample_rate)
+                    input_data = np.array(input_data)
 
-                input_data = (input_data - mean) / std
-                input_data = input_data.reshape(1, -1)
+                    input_data = (input_data - mean) / std
+                    input_data = input_data.reshape(1, -1)
+
+                    if input_array is None:
+                        input_array = np.array([input_data])
+                    else:
+                        input_array = np.concatenate((input_array, [input_data]), axis=0)
+                else:
+                    input_data = input_array[step_index]
 
                 # region Predict
                 predict_time = time.time()
@@ -114,6 +123,7 @@ class GenrePredictWorker(QObject):
 
                 predict_index_list.append(int(pred))
                 # endregion
+            self.mf.file_meta_controller.save_track_librosa_data(track_id, input_array)
             self.preloader_signal.emit(f"Классификация жанра 100%")
             print_d(f"Predict time: {(time.time() - start_time) * 1000}ms | IterSUmTime: {iter_sum_time}ms")
             self.finished.emit(predict_index_list)
