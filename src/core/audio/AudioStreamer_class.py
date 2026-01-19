@@ -1,6 +1,6 @@
 import time
 import math
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import numpy as np
 import pyaudio
@@ -10,7 +10,7 @@ import sounddevice as sd
 from PyQt6 import QtCore
 from PyQt6.QtCore import QThread, pyqtSlot
 
-from src.core.log_system import print_d
+from src.core.log_system import print_d, print_e
 from src.enums import PlayerState
 from src.function_lib.audio import equalizer_librosa
 
@@ -51,12 +51,30 @@ class AudioStreamer(QThread):
         if self.pyaudio_stream is not None:
             self.pyaudio_stream.close()
 
+        self.open_stream()
+
+    def open_stream(self, device_index: Optional[int] = None) -> None:
+        if device_index is None:
+            device_index = sd.query_devices(kind='output').get("index")
         self.pyaudio_stream = self.pyaudio_port.open(format=self.pyaudio_port.get_format_from_width(2),
                                                      channels=self._channels,
                                                      rate=int(self.sample_rate),
+                                                     output_device_index=device_index,
                                                      frames_per_buffer=self._chunk_size,
                                                      output=True)
-        # self.print_all_devices()
+
+    def switch_device(self, device_index: Optional[int] = None) -> bool:
+        try:
+            if self.pyaudio_stream is not None:
+                if self.pyaudio_stream.is_active():
+                    self.pyaudio_stream.stop_stream()
+                self.pyaudio_stream.close()
+            self.open_stream(device_index)
+            return True
+        except Exception as e:
+            print_e("Unable to switch device", e)
+            self.open_stream()
+            return False
 
     def close_audio_port(self) -> None:
         self.pyaudio_port.terminate()
@@ -85,7 +103,11 @@ class AudioStreamer(QThread):
                 wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
                 # endregion
                 data = wavio._array2wav(wave_crop[left_padding:self._chunk_size+left_padding], 2)
-                self.pyaudio_stream.write(data)
+                try:
+                    self.pyaudio_stream.write(data)
+                except OSError as e:
+                    self.switch_device()
+                    self.pyaudio_stream.write(data)
                 self._position += self._chunk_size
                 self.progress.emit(int(self._position / self.sample_rate * 1000))
             else:
@@ -132,7 +154,32 @@ class AudioStreamer(QThread):
         self.eq_active = eq_active
 
     def print_all_devices(self):
-        print_d(sd.query_devices())
+        print_d(self.get_output_devices())
 
+    @staticmethod
+    def get_output_devices() -> List[Dict[str, any]]:
+        devs = sd.query_devices()
+        hostapis = sd.query_hostapis()
+        out = []
+        for i, d in enumerate(devs):
+            if d.get("max_output_channels", 0) > 1:
+                out.append({
+                    "index": d.get("index"),
+                    "name": d.get("name"),
+                    "hostapi": d.get("hostapi"),
+                    "hostapi_name": hostapis[d.get("hostapi")]["name"],
+                })
+        return out
+
+    @staticmethod
+    def get_default_output() -> Dict[str, any]:
+        device = sd.query_devices(kind="output")
+        hostapis = sd.query_hostapis()
+        return {
+            "index": device.get("index"),
+            "name": device.get("name"),
+            "hostapi": device.get("hostapi"),
+            "hostapi_name": hostapis[device.get("hostapi")]["name"],
+        }
 
 

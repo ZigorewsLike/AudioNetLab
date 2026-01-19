@@ -123,7 +123,8 @@ class GenrePredictWorker(QObject):
 
                 predict_index_list.append(int(pred))
                 # endregion
-            self.mf.file_meta_controller.save_track_librosa_data(track_id, input_array)
+            if not use_cache_data:
+                self.mf.file_meta_controller.save_track_librosa_data(track_id, input_array)
             self.preloader_signal.emit(f"Классификация жанра 100%")
             print_d(f"Predict time: {(time.time() - start_time) * 1000}ms | IterSUmTime: {iter_sum_time}ms")
             self.finished.emit(predict_index_list)

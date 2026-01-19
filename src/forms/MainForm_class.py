@@ -20,7 +20,7 @@ from src.core.point_system import Point
 from src.core.qt_widgets import (PreLoaderWidget, HomePageWidget, DragFileWidget,
                                  MainVerticalTabWidget, TitleBar, SideGrip)
 from src.core.settings import SettingsDataObject
-from src.core.settings.qt_widgets import SettingsTabWidget
+from src.core.settings.qt_widgets import SettingsFrame
 from src.core.workers import OpenFileWorker
 from src.enums import StateMode, PlayerState, MainTabWidgetIcons, DragFileState
 from src.function_lib.math_lib import fixed_hash
@@ -149,7 +149,7 @@ class MainForm(QMainWindow):
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
         # self.settings_widget = QWidget()
-        self.settings_widget = SettingsTabWidget(mf=self)
+        self.settings_widget = SettingsFrame(mf=self)
         self.tab_widget.addTab(self.settings_widget, 'Settings')
 
         self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
@@ -422,7 +422,7 @@ class MainForm(QMainWindow):
             self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
             self.preloader.setVisible(False)
             return
-        cover = self.file_meta_controller.get_preview_cover(track_id)
+        cover = self.file_meta_controller.get_preview_cover(track_id, file_path=file_path)
         if cover is None:
             icon_index: int = fixed_hash(str(track_id)) % 6
             self.audio_player.set_default_track_cover(icon_index=icon_index)

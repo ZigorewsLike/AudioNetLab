@@ -64,6 +64,8 @@ class AudioTranscriptionModule(QWidget):
 
         self.label_frame.setLayout(self.v_layout)
 
+        self.show_timestamp_checkbox.setChecked(True)
+
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self.recalc_position()
@@ -94,7 +96,7 @@ class AudioTranscriptionModule(QWidget):
         # print_d(r.status_code, r.json())
         if r.status_code == 200:
             data = r.json()
-            self.generate_transcription(data)
+            self.set_transcription_data(data)
             track_id = self.mf.audio_player.playable_track_id
             if track_id is not None:
                 self.mf.file_meta_controller.save_track_transcription(track_id, data)

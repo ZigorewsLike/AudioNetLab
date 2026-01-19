@@ -1,1 +1,1 @@
-from .SettingsTabWidget_class import SettingsTabWidget
+from .SettingsFrame_class import SettingsFrame

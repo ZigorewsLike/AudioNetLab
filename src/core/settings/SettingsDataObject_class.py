@@ -18,10 +18,6 @@ class SystemSettings:
     form_width: int
     form_height: int
     form_position: Point
-    last_file: str
-    last_folder: str
-    open_filename: str
-    console_height: int
     version: str
 
 
@@ -35,8 +31,7 @@ class PlayerSettings:
 class SettingsDataObject:
     def __init__(self):
         self.system_settings = SystemSettings(form_width=1600, form_height=900, form_position=Point(-1.0, -1.0),
-                                              last_file="", last_folder=os.getcwd(), open_filename="",
-                                              console_height=206, version=f"{VERSION}")
+                                              version=f"{VERSION}")
         self.player_settings = PlayerSettings(volume=500, auto_play=False, graph_visible=True)
 
     def __repr__(self) -> str:

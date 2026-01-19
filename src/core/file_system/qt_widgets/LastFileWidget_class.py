@@ -221,7 +221,7 @@ class LastFileItem(QWidget):
         """)
 
         self.track_meta_image: Optional[QImage] = None
-        img = self.mf.file_meta_controller.get_preview_cover(track_id=self.track.id)
+        img = self.mf.file_meta_controller.get_preview_cover(track_id=self.track.id, file_path=self.track.path)
         if img is None:
             icon_index: int = fixed_hash(str(self.track.id)) % 6
             img = QImage()

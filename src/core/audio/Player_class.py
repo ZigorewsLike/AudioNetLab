@@ -392,6 +392,21 @@ class AudioPlayer(QWidget):
         print_d(self.pyaudio_port.get_default_output_device_info())
         self.audio_graph.changeCursorPosition.emit(0)
 
+    def get_output_devices(self) -> List[Dict[str, any]]:
+        return self.audio_streamer.get_output_devices()
+
+    def get_default_output(self) -> Dict[str, any]:
+        return self.audio_streamer.get_default_output()
+
+    def switch_device(self, device_index: Optional[int] = None) -> bool:
+        if self.is_playable:
+            self.pause_music()
+            success = self.audio_streamer.switch_device(device_index)
+            self.play_music()
+        else:
+            success = self.audio_streamer.switch_device(device_index)
+        return success
+
     @pyqtSlot(float)
     def duration_is_changed(self, duration: float) -> None:
         self.position_slider.set_range(0, int(duration))

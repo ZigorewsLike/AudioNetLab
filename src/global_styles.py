@@ -18,43 +18,66 @@ class AppColorSchemes(str, Enum):
     # BUTTON_HOVER = "#191919"
 
 
-DEFAULT_SCROLLBAR_STYLE = """
-    QScrollBar:vertical {
+DEFAULT_SCROLLBAR_STYLE = f"""
+    QScrollBar:vertical {{
         width: 12px;
-        background-color: """ + AppColorSchemes.SCROLLBAR_BACKGROUND + """;
-    }
+        background-color: {AppColorSchemes.SCROLLBAR_BACKGROUND};
+    }}
     
-    QScrollBar::handle:vertical {
+    QScrollBar::handle:vertical {{
         min-height: 30px;
         width: 6px;
         margin: 3px;
         margin-top: 2px;
         border-radius: 2px;
-        background-color: """ + AppColorSchemes.SCROLLBAR_BODY + """;
-    }
+        background-color: {AppColorSchemes.SCROLLBAR_BODY};
+    }}
     
-    QScrollBar::handle:vertical:pressed {
+    QScrollBar::handle:vertical:pressed {{
         width: 8px;
         margin: 2px;
-    }
+    }}
     
-    QScrollBar::add-line:vertical {
+    QScrollBar::add-line:vertical {{
         background: none;
         height: 0px;
-    }
+    }}
     
-    QScrollBar::sub-line:vertical {
+    QScrollBar::sub-line:vertical {{
         background: none;
         height: 0px;
-    }
+    }}
     
-    QScrollBar::up-arrow:vertical { 
+    QScrollBar::up-arrow:vertical {{
         height: 0px; 
         width: 0px 
-    }
+    }}
     
-    QScrollBar::down-arrow:vertical {
+    QScrollBar::down-arrow:vertical {{
         height: 0px; 
         width: 0px                              
+    }}
+"""
+
+DEFAULT_CHECKBOX_BLACK_STYLE = """
+    QCheckBox{
+        background-color: transparent;
+    }
+    QCheckBox::indicator {
+        background-color: transparent;
+        border-style: solid;
+        border-width: 1px;
+        border-color: #535353;
+    }
+    QCheckBox::indicator:checked {
+        width: 12px;
+        height: 12px;
+        image: url(resource/2x/baseline_ckeck_black_24dp.png);
+    }
+    QCheckBox::indicator:checked:pressed{
+        background-color: gray;
+    }
+    QCheckBox::indicator:unchecked:pressed{
+        background-color: gray;
     }
 """
