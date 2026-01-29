@@ -1,5 +1,6 @@
 import os
 import pickle
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -123,3 +124,7 @@ class FileMetaController:
                 if k in meta:
                     return ';'.join(meta[k])
         return None
+
+    def delete_track(self, track_id: int) -> None:
+        path_to_reg_folder: str = self.get_registry_path(track_id)
+        shutil.rmtree(path_to_reg_folder)

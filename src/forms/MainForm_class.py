@@ -26,7 +26,7 @@ from src.enums import StateMode, PlayerState, MainTabWidgetIcons, DragFileState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import (APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
                                   RESOURCE_ICON_DIR,
-                                  PATH_TO_LAST_REGISTRY, CUSTOM_TITLE_BAR)
+                                  PATH_TO_LAST_REGISTRY, CUSTOM_TITLE_BAR, DEBUG)
 from src.global_styles import AppColorSchemes
 
 
@@ -105,8 +105,12 @@ class MainForm(QMainWindow):
             border-bottom-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
             font-weight: bold;
         }}
+        
+        QTabBar::tab:disabled {{
+            color: gray;
+        }}
         """)
-        "AFAFAF"
+        self.ai_modules_tab_indexes = []
         # self.tab_widget.tab_switched.connect(self.tab_switched)
         self.audio_player = AudioPlayer(self, self.central_widget)
         # self.audio_player.show()
@@ -127,14 +131,19 @@ class MainForm(QMainWindow):
 
         # region AI MODULES
         self.genre_widget = GenreClassifierModule(model_path=GENRE_MODEL_PATH, main_form=self)
-        self.tab_widget.addTab(self.genre_widget, 'EQ AI')
+        eq_ind = self.tab_widget.addTab(self.genre_widget, 'EQ AI')
         if AI_ENABLED:
             self.genre_widget.load_model()
         self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
+        self.ai_modules_tab_indexes.append(eq_ind)
 
         self.transcription_module = AudioTranscriptionModule(self)
-        self.tab_widget.addTab(self.transcription_module, 'Transcription')
+        tr_ind = self.tab_widget.addTab(self.transcription_module, 'Transcription')
         self.audio_player.audio_streamer.progress.connect(self.transcription_module.on_position_changed)
+        self.ai_modules_tab_indexes.append(tr_ind)
+
+        for index in self.ai_modules_tab_indexes:
+            self.tab_widget.setTabEnabled(index, False or DEBUG)
         # endregion
 
         # region apply settings
@@ -436,7 +445,7 @@ class MainForm(QMainWindow):
         self.worker.file_path = file_path
         self.worker.moveToThread(self.work_thread)
         self.work_thread.started.connect(self.worker.run)
-        print_d("RUN Thread")
+        print_d(f"RUN Thread {track_id}")
         self.work_thread.wait()
         self.work_thread.start()
 
@@ -468,8 +477,10 @@ class MainForm(QMainWindow):
             self.transcription_module.set_transcription_data(transcription)
         else:
             transcription = self.transcription_module.get_lyrics_from_file()
-            if transcription.get('segments', []):
+            if transcription and transcription.get('segments', []):
                 self.transcription_module.set_transcription_data(transcription)
+        for index in self.ai_modules_tab_indexes:
+            self.tab_widget.setTabEnabled(index, True)
 
 
     def get_current_lyrics(self) -> Optional[str]:

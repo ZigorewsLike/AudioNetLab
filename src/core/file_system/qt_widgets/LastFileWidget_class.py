@@ -119,6 +119,7 @@ class LastFileList(QWidget):
         self.db.connect()
         self.db.delete_track(track=item.track)
         self.db.disconnect()
+        self.mf.file_meta_controller.delete_track(item.track.id)
         self.update_file_list()
 
     def update_track_last_opened(self, track_id: int) -> None:
