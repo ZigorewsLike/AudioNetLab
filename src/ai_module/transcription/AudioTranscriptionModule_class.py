@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 import mimetypes
 from bisect import bisect_right
@@ -26,6 +27,8 @@ class AudioTranscriptionModule(QWidget):
         self.segments_start: List[float] = []
         self.last_selected_segment: Optional[int] = None
 
+        self.regex_timestamp_lyrics = re.compile(r"^\[(\d{2}:\d{2})\.\d{2}\]\s(.*)$", re.MULTILINE)
+
         self.run_process_button = QPushButton("Run process", self)
         self.run_process_button.clicked.connect(self.run_process)
 
@@ -49,6 +52,9 @@ class AudioTranscriptionModule(QWidget):
 
         self.show_timestamp_checkbox = QCheckBox("Show timestamp", self)
         self.show_timestamp_checkbox.stateChanged.connect(lambda : self.generate_transcription(self.transcription_data))
+
+        self.get_from_file_button = QPushButton("Get from file", self)
+        self.get_from_file_button.clicked.connect(self.set_lyrics_from_file)
 
         self.label_frame = QFrame()
         self.scroll_area = QScrollArea(self)
@@ -78,6 +84,7 @@ class AudioTranscriptionModule(QWidget):
         self.scroll_area.resize(self.width(), self.height() - 30)
         self.model_name_combo.move(self.run_process_button.width() + 10, 0)
         self.show_timestamp_checkbox.move(self.model_name_combo.width() + self.model_name_combo.x() + 10, 0)
+        self.get_from_file_button.move(self.show_timestamp_checkbox.width() + self.show_timestamp_checkbox.x() + 10, 0)
 
     def run_process(self) -> None:
         url: str = f"{self.host}/{self.end_point}"
@@ -96,6 +103,7 @@ class AudioTranscriptionModule(QWidget):
         # print_d(r.status_code, r.json())
         if r.status_code == 200:
             data = r.json()
+            data['lyric_source'] = 'ai'
             self.set_transcription_data(data)
             track_id = self.mf.audio_player.playable_track_id
             if track_id is not None:
@@ -119,7 +127,7 @@ class AudioTranscriptionModule(QWidget):
         if data is None:
             return
         segments = list(filter(lambda x: x.get('text'), data.get('segments', [])))
-        self.segments_start = [x.get('start') for x in segments]
+        self.segments_start = [x.get('start') for x in segments if x.get('start') is not None]
         for segment_index, segment in enumerate(segments):
             item = TrackLabelItem(segment, parent_list=self, show_timestamp=self.show_timestamp_checkbox.isChecked())
             item.setFixedHeight(self.item_height)
@@ -151,6 +159,33 @@ class AudioTranscriptionModule(QWidget):
     def set_position(self, position: float) -> None:
         self.mf.audio_player.set_track_position(int(position * 1000))
 
+    def get_lyrics_from_file(self) -> dict:
+        lyrics = self.mf.get_current_lyrics()
+        data = {
+            'lyric_source': 'tags',
+            'text': lyrics,
+            'segments': []
+        }
+        lyrics = lyrics.replace('\n\n', '\n')
+        matches = self.regex_timestamp_lyrics.finditer(lyrics)
+        for match_num, match in enumerate(matches, start=1):
+            time_str, text = match.groups()
+            minutes, seconds = time_str.split(':')
+            total_seconds: float = int(minutes) * 60 + float(seconds)
+            data['segments'].append({'start': total_seconds, 'text': text})
+        if not data['segments']:
+            for line in lyrics.split('\n'):
+                data['segments'].append({'start': None, 'text': line})
+        return data
+
+    @pyqtSlot()
+    def set_lyrics_from_file(self) -> None:
+        data = self.get_lyrics_from_file()
+        self.set_transcription_data(data)
+        track_id = self.mf.audio_player.playable_track_id
+        if track_id is not None:
+            self.mf.file_meta_controller.save_track_transcription(track_id, data)
+
 
 class TrackLabelItem(QWidget):
     def __init__(
@@ -179,8 +214,9 @@ class TrackLabelItem(QWidget):
         self.text_label.adjustSize()
 
     def get_text(self) -> str:
-        if self.show_timestamp:
-            timestamp = datetime.strftime(datetime.fromtimestamp(self.segment.get('start')), '%M:%S')
+        time = self.segment.get('start')
+        if self.show_timestamp and time:
+            timestamp = datetime.strftime(datetime.fromtimestamp(time), '%M:%S')
             return f"{timestamp}: {self.segment.get('text')}"
         return self.segment.get('text')
 
@@ -191,7 +227,9 @@ class TrackLabelItem(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         super().mouseReleaseEvent(event)
         if self.mouse_pressed and event.button() == Qt.MouseButton.LeftButton:
-            self.parent_list.set_position(self.segment.get('start'))
+            time = self.segment.get('start')
+            if time:
+                self.parent_list.set_position(time)
         self.mouse_pressed = False
     
     def leaveEvent(self, event: QMouseEvent) -> None:

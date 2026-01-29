@@ -462,11 +462,19 @@ class MainForm(QMainWindow):
         self.audio_player.audio_graph.calculate_render_lines(forcedly=True)
         self.genre_widget.reset_result()
 
+        self.transcription_module.clear()
         transcription = self.file_meta_controller.get_track_transcription(self.audio_player.playable_track_id)
         if transcription is not None:
             self.transcription_module.set_transcription_data(transcription)
         else:
-            self.transcription_module.clear()
+            transcription = self.transcription_module.get_lyrics_from_file()
+            if transcription.get('segments', []):
+                self.transcription_module.set_transcription_data(transcription)
+
+
+    def get_current_lyrics(self) -> Optional[str]:
+        track_id = self.audio_player.playable_track_id
+        return self.file_meta_controller.get_lyrics(track_id)
 
     def save_config_app(self) -> None:
         self.settings.player_settings.volume = self.audio_player.volume_slider.value

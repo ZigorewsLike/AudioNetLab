@@ -53,7 +53,6 @@ class SettingsEQWidget(QWidget):
 
     @pyqtSlot(int)
     def on_switch_preset(self, index: int) -> None:
-        print_d(self.preset_combo_box.currentText(), index)
         gains = self.presets.get(index, [1.0] * EQ_SLIDER_COUNT)
         self.eq.set_sliders([round(gain * self.eq.accuracy) for gain in gains])
 

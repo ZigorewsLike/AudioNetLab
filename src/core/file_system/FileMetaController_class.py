@@ -115,3 +115,11 @@ class FileMetaController:
         path_to_reg_folder: str = self.get_registry_path(track_id)
         with open(f"{path_to_reg_folder}/{RegistryFileName.TRANSCRIPTION}", "wb") as p_file:
             pickle.dump(data, p_file)
+
+    def get_lyrics(self, track_id: int) -> Optional[str]:
+        meta = self.get_track_meta(track_id)
+        if isinstance(meta, FLAC):
+            for k in ["LYRICS", "UNSYNCEDLYRICS", "LYRIC", "LYRICS:DESCRIPTION"]:
+                if k in meta:
+                    return ';'.join(meta[k])
+        return None
