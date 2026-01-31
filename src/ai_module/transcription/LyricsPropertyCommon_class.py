@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import QWidget, QTabWidget, QFrame, QScrollArea, QFormLayou
 from src.global_styles import AppColorSchemes, DEFAULT_SCROLLBAR_STYLE
 from src.core.qt_widgets import CollapsibleSection
 from .TranscriptionModule_class import TranscriptionModule
+from .TranslationModule_class import TranslationModule
+from ...core.log_system import print_d
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -35,11 +37,16 @@ class LyricsPropertyCommon(QWidget):
         self.form_layout = QFormLayout(self)
 
         self.transcription = TranscriptionModule(mf, self.lyric_module, self.common_frame)
+        self.translation = TranslationModule(mf, self.lyric_module, self.common_frame)
+
         self.form_layout.addRow(QLabel("<b>Common settings</b>"))
         self.form_layout.addRow(self.show_timestamp_checkbox)
         self.form_layout.addRow("Extract lyrics from file tags", self.get_from_file_button)
         self.form_layout.addRow(QLabel("<b>Auto audio transcription</b>"))
         self.form_layout.addRow(self.transcription)
+        self.form_layout.addRow(QLabel("<b>Translate lyrics</b>"))
+        self.form_layout.addRow(self.translation)
+
         # self.transcription_section: CollapsibleSection = CollapsibleSection("Auto Audio Transcription", 20, self.common_frame)
         # self.transcription_section.set_content(self.transcription)
 

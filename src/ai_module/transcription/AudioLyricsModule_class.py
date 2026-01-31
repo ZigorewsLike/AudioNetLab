@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayo
 
 from .LyricsPropertyModule_class import TranscriptionPropertyModule
 from src.global_styles import DEFAULT_SCROLLBAR_STYLE
+from ...core.log_system import print_d
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -28,8 +29,9 @@ class AudioLyricsModule(QWidget):
         self.last_selected_segment: Optional[int] = None
 
         self.property = TranscriptionPropertyModule(mf, self)
+        self.property.setMinimumWidth(200)
 
-        self.regex_timestamp_lyrics = re.compile(r"^\[(\d{2}:\d{2})\.\d{2}\]\s(.*)$", re.MULTILINE)
+        self.regex_timestamp_lyrics = re.compile(r"^\[(\d{2}:\d{2}\.\d{2})\]\s?(.*)$", re.MULTILINE)
 
         self.label_frame = QFrame()
         self.scroll_area = QScrollArea(self)
@@ -80,11 +82,14 @@ class AudioLyricsModule(QWidget):
     def update_transcription_list(self) -> None:
         self.generate_transcription(self.transcription_data)
 
+    def get_segments(self) -> Optional[List[dict]]:
+        return list(filter(lambda x: x.get('text'), self.transcription_data.get('segments', [])))
+
     def generate_transcription(self, data: dict) -> None:
         self.clear()
         if data is None:
             return
-        segments = list(filter(lambda x: x.get('text'), data.get('segments', [])))
+        segments = self.get_segments()
         self.segments_start = [x.get('start') for x in segments if x.get('start') is not None]
         for segment_index, segment in enumerate(segments):
             item = TrackLabelItem(segment, parent_list=self, show_timestamp=self.show_timestamp)
@@ -167,6 +172,8 @@ class TrackLabelItem(QWidget):
         font = self.text_label.font()
         font.setPointSize(10)
         self.text_label.setFont(font)
+        self.text_label.adjustSize()
+        self.resize(self.text_label.width(), self.height())
 
     def set_selected(self, selected: bool) -> None:
         font = self.text_label.font()
