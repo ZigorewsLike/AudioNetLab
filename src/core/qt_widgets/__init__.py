@@ -10,3 +10,4 @@ from .SideGrip_class import SideGrip
 from .MetaListWidget_class import MetaListWidget, MetaListItem
 from .EQWidget_class import EQWidget
 from .ScrollButtonWidget_class import ScrollButtonWidget
+from .CollapsibleSection_class import CollapsibleSection

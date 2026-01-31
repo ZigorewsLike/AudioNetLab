@@ -10,59 +10,26 @@ from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
     QSplitter
 
-from src.core.log_system import print_d
-from .SummariserModule_class import SummariserModule
+from .LyricsPropertyModule_class import TranscriptionPropertyModule
 from src.global_styles import DEFAULT_SCROLLBAR_STYLE
 
 if TYPE_CHECKING:
     from src.forms import MainForm
 
 
-class AudioTranscriptionModule(QWidget):
+class AudioLyricsModule(QWidget):
     def __init__(self, mf, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
-        self.host = 'http://127.0.0.1:13000'
-        self.end_point = 'audio/transcription/process'
         self.item_height: int = 18
         self.summariser_width: int = 250
         self.transcription_data: Optional[dict] = None
         self.segments_start: List[float] = []
         self.last_selected_segment: Optional[int] = None
 
-        self.summariser = SummariserModule(mf, self)
+        self.property = TranscriptionPropertyModule(mf, self)
 
         self.regex_timestamp_lyrics = re.compile(r"^\[(\d{2}:\d{2})\.\d{2}\]\s(.*)$", re.MULTILINE)
-
-        self.run_process_button = QPushButton("Run process", self)
-        self.run_process_button.clicked.connect(self.run_process)
-
-        self.model_name_combo = QComboBox(self)
-        self.model_name_combo.addItems([
-            "tiny",
-            "base.en",
-            "base",
-            "small.en",
-            "small",
-            "medium.en",
-            "medium",
-            "large-v1",
-            "large-v2",
-            "large-v3",
-            "large",
-            "large-v3-turbo",
-            "turbo"
-        ])
-        self.model_name_combo.setCurrentText("large-v3-turbo")
-
-        self.show_timestamp_checkbox = QCheckBox("Show timestamp", self)
-        self.show_timestamp_checkbox.stateChanged.connect(lambda : self.generate_transcription(self.transcription_data))
-
-        self.get_from_file_button = QPushButton("Get from file", self)
-        self.get_from_file_button.clicked.connect(self.set_lyrics_from_file)
-
-        self.summarize_button = QPushButton("Summarize", self)
-        self.summarize_button.clicked.connect(self.summarize_lyrics)
 
         self.label_frame = QFrame()
         self.scroll_area = QScrollArea(self)
@@ -74,8 +41,8 @@ class AudioTranscriptionModule(QWidget):
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.splitter.addWidget(self.scroll_area)
-        self.splitter.addWidget(self.summariser)
-        self.splitter.move(0, 30)
+        self.splitter.addWidget(self.property)
+        self.splitter.setSizes([self.width() - 200, 200])
 
         self.v_layout = QVBoxLayout(self)
         self.v_layout.setSpacing(0)
@@ -83,7 +50,7 @@ class AudioTranscriptionModule(QWidget):
 
         self.label_frame.setLayout(self.v_layout)
 
-        self.show_timestamp_checkbox.setChecked(True)
+        self.show_timestamp: bool = True
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -94,43 +61,7 @@ class AudioTranscriptionModule(QWidget):
         self.recalc_position()
 
     def recalc_position(self):
-        # self.scroll_area.resize(self.width() - self.summariser_width, self.height() - 30)
-        # self.summariser.move(self.width() - self.summariser_width, 30)
-        # self.summariser.resize(self.summariser_width, self.height() - 30)
-        self.splitter.resize(self.width(), self.height() - 30)
-
-        self.model_name_combo.move(self.run_process_button.width() + 10, 0)
-        self.show_timestamp_checkbox.move(self.model_name_combo.width() + self.model_name_combo.x() + 10, 0)
-        self.get_from_file_button.move(self.show_timestamp_checkbox.width() + self.show_timestamp_checkbox.x() + 10, 0)
-        self.summarize_button.move(self.get_from_file_button.width() + self.get_from_file_button.x() + 10, 0)
-
-    def run_process(self) -> None:
-        url: str = f"{self.host}/{self.end_point}"
-        opened_file = self.mf.audio_player.playable_file_file
-        if opened_file is None:
-            return
-
-        mime_type, encoding = mimetypes.guess_type(opened_file)
-        with open(opened_file, "rb") as f:
-            r = requests.post(
-                url,
-                params={"model_name": self.model_name_combo.currentText()},
-                files={"file": (opened_file, f, mime_type)},
-                timeout=300,
-            )
-        # print_d(r.status_code, r.json())
-        if r.status_code == 200:
-            data = r.json()
-            data['lyric_source'] = 'ai'
-            self.set_transcription_data(data)
-            track_id = self.mf.audio_player.playable_track_id
-            if track_id is not None:
-                self.mf.file_meta_controller.save_track_transcription(track_id, data)
-
-    @pyqtSlot()
-    def summarize_lyrics(self):
-        texts = [x.get("text") for x in self.transcription_data.get('segments', [])]
-        self.summariser.run_process('\n'.join(texts))
+        self.splitter.resize(self.width(), self.height())
 
     def set_transcription_data(self, data: dict) -> None:
         self.transcription_data = data
@@ -144,7 +75,10 @@ class AudioTranscriptionModule(QWidget):
             self.v_layout.removeItem(item)
         self.last_selected_segment = None
         self.segments_start = []
-        self.summariser.clear()
+        self.property.summariser.clear()
+
+    def update_transcription_list(self) -> None:
+        self.generate_transcription(self.transcription_data)
 
     def generate_transcription(self, data: dict) -> None:
         self.clear()
@@ -153,7 +87,7 @@ class AudioTranscriptionModule(QWidget):
         segments = list(filter(lambda x: x.get('text'), data.get('segments', [])))
         self.segments_start = [x.get('start') for x in segments if x.get('start') is not None]
         for segment_index, segment in enumerate(segments):
-            item = TrackLabelItem(segment, parent_list=self, show_timestamp=self.show_timestamp_checkbox.isChecked())
+            item = TrackLabelItem(segment, parent_list=self, show_timestamp=self.show_timestamp)
             item.setFixedHeight(self.item_height)
             self.v_layout.addWidget(item)
         self.v_layout.addStretch()
@@ -217,14 +151,14 @@ class AudioTranscriptionModule(QWidget):
 class TrackLabelItem(QWidget):
     def __init__(
             self, segment,
-            parent_list: AudioTranscriptionModule,
+            parent_list: AudioLyricsModule,
             show_timestamp: bool = False,
             *args, **kwargs
     ):
         super(TrackLabelItem, self).__init__(*args, **kwargs)
         self.setMouseTracking(True)
         self.segment = segment
-        self.parent_list: AudioTranscriptionModule = parent_list
+        self.parent_list: AudioLyricsModule = parent_list
         self.mouse_pressed = False
         self.show_timestamp: bool = show_timestamp
 

@@ -1,1 +1,1 @@
-from .AudioTranscriptionModule_class import AudioTranscriptionModule
+from .AudioLyricsModule_class import AudioLyricsModule

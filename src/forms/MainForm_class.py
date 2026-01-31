@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
                              QWidget, QApplication, QSizeGrip, QTabWidget)
 
 from src.ai_module.genre_classification import GenreClassifierModule
-from src.ai_module.transcription import AudioTranscriptionModule
+from src.ai_module.transcription import AudioLyricsModule
 from src.core.audio import AudioPlayer
 from src.core.file_system import FileMetaController
 from src.core.log_system import print_d
@@ -137,8 +137,8 @@ class MainForm(QMainWindow):
         self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
         self.ai_modules_tab_indexes.append(eq_ind)
 
-        self.transcription_module = AudioTranscriptionModule(self)
-        tr_ind = self.tab_widget.addTab(self.transcription_module, 'Transcription')
+        self.transcription_module = AudioLyricsModule(self)
+        tr_ind = self.tab_widget.addTab(self.transcription_module, 'Lyrics')
         self.audio_player.audio_streamer.progress.connect(self.transcription_module.on_position_changed)
         self.ai_modules_tab_indexes.append(tr_ind)
 

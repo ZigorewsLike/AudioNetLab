@@ -16,25 +16,32 @@ from src.global_styles import DEFAULT_SCROLLBAR_STYLE
 
 if TYPE_CHECKING:
     from src.forms import MainForm
+    from .AudioLyricsModule_class import AudioLyricsModule
 
 
 class SummariserModule(QWidget):
-    def __init__(self, mf, *args, **kwargs):
+    def __init__(self, mf, lyric_module, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
+        self.lyric_module: AudioLyricsModule = lyric_module
         # TODO: Вынести в настройки
         self.host = 'http://127.0.0.1:13000'
         self.end_point = 'text/summary/process'
 
         self.language_combobox = QComboBox()
-        self.language_combobox.addItem("Russian")
+        self.language_combobox.addItem("Русский")
         self.language_combobox.addItem("English")
 
-        self.form_layout = QFormLayout(self)
-        self.form_layout.addRow("Язык пересказа: ", self.language_combobox)
+        self.summarize_button = QPushButton("Summarize", self)
+        self.summarize_button.clicked.connect(self.summarize_lyrics)
 
         self.label = QLabel("<span style='font-weight: bold;'>Общий смысл песни:</span><br><br>", self)
         self.label.setWordWrap(True)
+
+        self.form_layout = QFormLayout(self)
+        self.form_layout.addRow("Язык пересказа: ", self.language_combobox)
+        self.form_layout.addWidget(self.summarize_button)
+        self.form_layout.addRow(self.label)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -44,6 +51,11 @@ class SummariserModule(QWidget):
     def set_text(self, text: str) -> None:
         self.label.setText(f"<span style='font-weight: bold;'>Общий смысл песни:</span><br><br>{text}")
         self.label.adjustSize()
+
+    @pyqtSlot()
+    def summarize_lyrics(self):
+        texts = [x.get("text") for x in self.lyric_module.transcription_data.get('segments', [])]
+        self.run_process('\n'.join(texts))
 
     def run_process(self, text: str) -> None:
         url: str = f"{self.host}/{self.end_point}"
