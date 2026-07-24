@@ -4,7 +4,7 @@ import sys
 from math import pi, cos
 from typing import Optional, TYPE_CHECKING, Union, Dict
 
-from PyQt6.QtCore import QRect, Qt, QSize, QTimer
+from PyQt6.QtCore import QRect, Qt, QSize, QTimer, QEvent
 from PyQt6.QtGui import (QPainter, QBrush, QColor, QResizeEvent, QFont, QPixmap, QIcon, QShowEvent, QImage,
                          QHideEvent, QMouseEvent)
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFrame, QScrollArea, QVBoxLayout, QMenu
@@ -244,19 +244,14 @@ class LastFileItem(QWidget):
         self.label_filename.setStyleSheet(header_style)
         self.label_filename.adjustSize()
 
-        self.label_date = QLabel("Посл. открытие: ", self)
+        self.label_date = QLabel("", self)
         self.label_date.setGeometry(QRect(90, 44, 280, 25))
         font = QFont("Arima")
         font.setPointSize(9)
         self.label_date.setFont(font)
         self.label_date.setStyleSheet(header_style)
-        self.label_date.adjustSize()
 
-        if not file_exist:
-            file_path = "File not found"
-        else:
-            file_path = os.path.abspath(self.track.path).replace('\\', '/')
-        self.label_path = QLabel(file_path, self)
+        self.label_path = QLabel("", self)
         font = QFont("Arima")
         font.setPointSize(9)
         self.label_path.setFont(font)
@@ -291,6 +286,31 @@ class LastFileItem(QWidget):
                                            self.button_open_size.height(),
                                            Qt.AspectRatioMode.KeepAspectRatio,
                                            Qt.TransformationMode.SmoothTransformation)
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the labels of the row.
+
+        :returns: None.
+        """
+        self.label_date.setText(self.tr("Last opened: "))
+        self.label_date.adjustSize()
+        if not self.file_exist:
+            self.label_path.setText(self.tr("File not found"))
+        else:
+            self.label_path.setText(os.path.abspath(self.track.path).replace('\\', '/'))
+        self.label_path.adjustSize()
 
     def showEvent(self, event: QShowEvent) -> None:
         """Lay out the row and start the playing animation when needed.
@@ -372,9 +392,9 @@ class LastFileItem(QWidget):
         """
         self.update()
         contextMenu = QMenu(self)
-        open_folder = contextMenu.addAction("Открыть")
-        show_folder = contextMenu.addAction("Показать в проводнике")
-        delete_elem = contextMenu.addAction("Удалить из списка")
+        open_folder = contextMenu.addAction(self.tr("Open"))
+        show_folder = contextMenu.addAction(self.tr("Show in file manager"))
+        delete_elem = contextMenu.addAction(self.tr("Remove from the list"))
         action = contextMenu.exec(self.mapToGlobal(event.pos()))
         if action == open_folder:
             self.button_open.click()

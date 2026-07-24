@@ -1,7 +1,7 @@
 from typing import Union, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtCore import pyqtSlot, QEvent
 from PyQt6.QtGui import (QPaintEvent, QPainter, QColor, QMouseEvent, QResizeEvent, QFont, QPixmap)
 from PyQt6.QtWidgets import QWidget, QLabel, QFrame
 
@@ -50,13 +50,12 @@ class HomePageButtonWidget(QWidget):
         self.logo.setPixmap(QPixmap(f"{RESOURCE_ICON_DIR}open_file_icon_white.png"))
         self.logo.resize(40, 40)
 
-        self.header_text = QLabel("Open file", self.frame_info)
+        self.header_text = QLabel("", self.frame_info)
         font = QFont("Arima")
         font.setPointSize(13)
         font.setBold(True)
         self.header_text.setFont(font)
         self.header_text.move(self.logo.width() + 10, 4)
-        self.header_text.adjustSize()
 
         self.footer_text = QLabel(".MP3, .FLAC, .WAVE", self.frame_info)
         font = QFont("Arima")
@@ -64,6 +63,26 @@ class HomePageButtonWidget(QWidget):
         self.footer_text.setFont(font)
         self.footer_text.move(self.logo.width() + 10, 27)
         self.footer_text.adjustSize()
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the button caption.
+
+        :returns: None.
+        """
+        self.header_text.setText(self.tr("Open file"))
+        self.header_text.adjustSize()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self.clicked.emit()

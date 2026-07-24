@@ -6,7 +6,7 @@ from bisect import bisect_right
 from typing import TYPE_CHECKING, List, Union, Optional
 
 import requests
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot, QEvent
 from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
     QFormLayout
@@ -26,28 +26,52 @@ class SummariserModule(QWidget):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
         self.lyric_module: AudioLyricsModule = lyric_module
-        # TODO: Вынести в настройки
+        # TODO: move to the settings
         self.host = 'http://127.0.0.1:13000'
         self.end_point = 'text/summary/process'
 
+        # The item texts are sent to the service as is, they must not be translated
         self.language_combobox = QComboBox()
         self.language_combobox.addItem("Русский")
         self.language_combobox.addItem("English")
 
-        self.summarize_button = QPushButton("Summarize", self)
+        self.summarize_button = QPushButton("", self)
         self.summarize_button.clicked.connect(self.summarize_lyrics)
 
-        self.label = QLabel("<span style='font-weight: bold;'>Общий смысл песни:</span><br><br>", self)
+        self.summary_text: str = ""
+        self.label = QLabel("", self)
         self.label.setWordWrap(True)
         self.label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
             | Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
 
+        self.language_label = QLabel("")
         self.form_layout = QFormLayout(self)
-        self.form_layout.addRow("Язык пересказа: ", self.language_combobox)
+        self.form_layout.addRow(self.language_label, self.language_combobox)
         self.form_layout.addWidget(self.summarize_button)
         self.form_layout.addRow(self.label)
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the texts of this panel.
+
+        :returns: None.
+        """
+        self.summarize_button.setText(self.tr("Summarize"))
+        self.language_label.setText(self.tr("Summary language"))
+        self.set_text(self.summary_text)  # The header of the summary is translated too
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -55,7 +79,14 @@ class SummariserModule(QWidget):
         # self.label.setFixedWidth(self.width() - 20)
 
     def set_text(self, text: str) -> None:
-        self.label.setText(f"<span style='font-weight: bold;'>Общий смысл песни:</span><br><br>{text}")
+        """Show the summary under a translated header.
+
+        :param text: Summary text, may be empty.
+        :returns: None.
+        """
+        self.summary_text = text
+        self.label.setText(f"<span style='font-weight: bold;'>{self.tr('What the song is about:')}</span>"
+                           f"<br><br>{text}")
         self.label.adjustSize()
 
     @pyqtSlot()

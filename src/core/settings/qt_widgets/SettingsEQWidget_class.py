@@ -3,7 +3,7 @@ import pickle
 from typing import Dict, TYPE_CHECKING, List
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtCore import pyqtSlot, QEvent
 from PyQt6.QtGui import QResizeEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QComboBox
 
@@ -40,14 +40,35 @@ class SettingsEQWidget(QWidget):
         self.eq.move(5, 10 + self.preset_combo_box.height())
         self.eq.slidersValueChange.connect(self.on_slider_value_changed)
 
-        self.save_button = QPushButton("Save preset", self)
+        self.save_button = QPushButton("", self)
         self.save_button.clicked.connect(self.save_presets_on_file)
 
-        self.load_button = QPushButton("Load preset", self)
+        self.load_button = QPushButton("", self)
         self.load_button.clicked.connect(self.load_preset_from_file)
 
         self.presets: Dict[int, List[float]] = {}
         self.load_preset_from_file()
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the buttons of this page.
+
+        :returns: None.
+        """
+        self.save_button.setText(self.tr("Save preset"))
+        self.save_button.adjustSize()
+        self.load_button.setText(self.tr("Load preset"))
+        self.load_button.adjustSize()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Fit the equalizer on resize.

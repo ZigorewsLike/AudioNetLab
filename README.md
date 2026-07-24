@@ -18,6 +18,7 @@ device. That is why the equalizer reacts immediately, without restarting playbac
   between presets so a genre change is not audible as a jump.
 * One editable EQ preset per genre, stored on disk.
 * Output device switching, streaming buffer size and volume curve settings.
+* English and Russian interface, switched at runtime without a restart.
 * Built in profiler window with draw and math call timings.
 * Experimental lyrics modules (transcription, translation, summarization). They require a
   separate external HTTP service that is not part of this repository, and the corresponding
@@ -91,6 +92,9 @@ Written automatically on exit next to `main.py`. Editing it by hand is optional.
 | SystemSettings | form_width, form_height | Window size |
 | SystemSettings | form_position | Window position as `x:y` |
 | SystemSettings | version | Version that wrote the file |
+| SystemSettings | language | Interface language code, empty follows the system locale |
+| SystemSettings | last_folder | Folder the open file dialog starts in |
+| SystemSettings | open_filename | Last opened track |
 | PlayerSettings | volume | Volume slider value, 0..1000 |
 | PlayerSettings | auto_play | Reserved |
 | PlayerSettings | graph_visible | Waveform panel visibility |
@@ -125,6 +129,12 @@ The **Settings** tab, section "Настройки аудио":
   against dropouts on a slow machine, smaller values reduce latency.
 * **Логарифмический регулятор громкости**: makes the volume slider feel linear to the ear.
 
+### Interface language
+
+The **Settings** tab, section "Interface". English and Russian are available, the choice is
+applied immediately and stored in `config_app.ini`. On the first start the language follows the
+system locale and falls back to English when the locale has no catalog.
+
 ### Equalizer presets
 
 The **Settings** tab, section "Пресеты эквалайзера": pick a genre, move the sliders, press
@@ -138,6 +148,7 @@ after saving.
 | `storage.db` | SQLite database with the track list (path, title, timestamps) |
 | `data/registry/<track_id>/` | Per track cache: tags, feature vectors, lyrics |
 | `res/presets.pickle` | EQ presets per genre |
+| `res/i18n/` | Translation catalogs, `.ts` sources and compiled `.qm` |
 | `res/icons/` | Interface icons |
 | `models/` | ONNX and h5 genre models |
 | `config_app.ini` | Application settings |
@@ -153,6 +164,7 @@ main.py                     Entry point: logging, DPI, main window
 src/
   forms/                    MainForm, the main window and the module wiring
   core/
+    i18n/                   Translation manager, loads and switches the catalogs
     audio/                  AudioStreamer (streaming thread), AudioPlayer (player panel)
     render/graphics_system/ OpenGL waveform panels
     qt_widgets/             Shared widgets: sliders, equalizer, title bar, overlays
@@ -169,9 +181,47 @@ src/
   enums/                    Enumerations
   global_constants.py       Switches and paths
 installer/                  PyInstaller build script
+tools/                      Development scripts, translation catalog rebuild
 models/                     Genre models
-res/                        Icons and EQ presets
+res/                        Icons, EQ presets, translation catalogs
 ```
+
+## Working with translations
+
+Translations use the Qt Linguist toolchain. The literals in the code are English and are
+wrapped in `self.tr(...)`, or in `QCoreApplication.translate("Context", ...)` in classes that
+are not widgets. Every other language lives in a catalog under `res/i18n/`.
+
+The tooling is a development dependency:
+
+```bat
+pip install -r requirements-dev.txt
+```
+
+After adding or changing a `tr()` string, rebuild the catalogs:
+
+```bat
+venv\Scripts\python.exe tools/update_translations.py
+```
+
+The script scans the sources with `pylupdate6`, refreshes `res/i18n/audionetlab_ru.ts` keeping
+the existing translations, and compiles the `.qm` the application loads. New strings appear as
+unfinished, translate them in the Qt Linguist editor and run the script again:
+
+```bat
+venv\Scripts\pyside6-linguist.exe res/i18n/audionetlab_ru.ts
+```
+
+To add a language, put its code into `LANGUAGES` in `tools/update_translations.py` and into
+`LANGUAGE_NAMES` in `src/global_constants.py`, then run the script. The new language shows up
+in the settings automatically.
+
+Two rules matter when writing new UI code:
+
+* A widget applies its texts in a `retranslate_ui()` method and calls it both from `__init__`
+  and from `changeEvent` on `QEvent.Type.LanguageChange`. Without that its texts will not follow
+  a language switch.
+* Standard dialog buttons come from the Qt catalog bundled with PyQt6 and need no work.
 
 ## Building a standalone executable
 

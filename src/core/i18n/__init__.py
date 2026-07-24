@@ -1,0 +1,1 @@
+from .TranslationManager_class import TranslationManager, translation_manager

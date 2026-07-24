@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QScrollArea, QSizePolicy, QFrame)
 
@@ -97,10 +97,9 @@ class ChatWidget(QWidget):
 
         bottom = QHBoxLayout()
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Напишите сообщение…")
         self.input.returnPressed.connect(self.send_clicked)
 
-        self.send_btn = QPushButton("Send")
+        self.send_btn = QPushButton("")
         self.send_btn.clicked.connect(self.send_clicked)
 
         bottom.addWidget(self.input, 1)
@@ -108,6 +107,26 @@ class ChatWidget(QWidget):
 
         root.addWidget(self.history, 1)
         root.addLayout(bottom, 0)
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the input field and the send button.
+
+        :returns: None.
+        """
+        self.input.setPlaceholderText(self.tr("Type a message"))
+        self.send_btn.setText(self.tr("Send"))
 
     def add_message(self, text: str, outgoing: bool) -> None:
         text = (text or "").strip()
@@ -147,9 +166,9 @@ if __name__ == "__main__":
     w.setWindowTitle("Chat Widget")
     w.resize(720, 520)
 
-    # Демо-история
-    w.add_message("Привет! Это входящее сообщение.", outgoing=False)
-    w.add_message("А это отправленное.", outgoing=True)
+    # Demo history
+    w.add_message("Incoming message example.", outgoing=False)
+    w.add_message("Outgoing message example.", outgoing=True)
 
     w.show()
     raise SystemExit(app.exec())

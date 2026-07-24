@@ -19,6 +19,7 @@ class SystemSettings:
     version: str
     last_folder: str = ""  # Folder the open file dialog starts in
     open_filename: str = ""  # Last opened track
+    language: str = ""  # Interface language code, empty means follow the system locale
 
 
 @dataclass()

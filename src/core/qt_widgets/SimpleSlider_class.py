@@ -35,7 +35,7 @@ class SimpleSlider(QWidget):
         self.rect_always_show: bool = True
         self.is_clicked: bool = False
 
-        # region Настройка стилей
+        # region Style settings
         self.background_color: QColor = QColor("#DADADA")
         self.simple_color: QColor = QColor("#9C9C9C")
         self.hover_color: QColor = QColor("#9C9C9C")
@@ -103,7 +103,7 @@ class SimpleSlider(QWidget):
             self._loading_pos = -stripe_w
         self.update()
 
-    # region Методы QWidget
+    # region QWidget methods
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
         painter = QPainter(self)

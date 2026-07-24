@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot, QEvent
 from PyQt6.QtGui import QResizeEvent
-from PyQt6.QtWidgets import QWidget, QTabWidget, QFrame, QScrollArea, QFormLayout, QLabel, QCheckBox, QPushButton
+from PyQt6.QtWidgets import QWidget, QFrame, QScrollArea, QFormLayout, QLabel, QCheckBox, QPushButton
 
 from src.global_styles import AppColorSchemes, DEFAULT_SCROLLBAR_STYLE
 from src.core.qt_widgets import CollapsibleSection
@@ -23,10 +23,10 @@ class LyricsPropertyCommon(QWidget):
         self.mf: MainForm = mf
         self.lyric_module: AudioLyricsModule = lyric_module
 
-        self.show_timestamp_checkbox = QCheckBox("Show timestamp")
+        self.show_timestamp_checkbox = QCheckBox("")
         self.show_timestamp_checkbox.stateChanged.connect(lambda:  self.set_timestamp_visible())
 
-        self.get_from_file_button = QPushButton("Extract lyrics")
+        self.get_from_file_button = QPushButton("")
         self.get_from_file_button.clicked.connect(self.lyric_module.set_lyrics_from_file)
         self.get_from_file_button.setMaximumWidth(100)
 
@@ -41,16 +41,42 @@ class LyricsPropertyCommon(QWidget):
         self.transcription = TranscriptionModule(mf, self.lyric_module, self.common_frame)
         self.translation = TranslationModule(mf, self.lyric_module, self.common_frame)
 
-        self.form_layout.addRow(QLabel("<b>Common settings</b>"))
+        self.common_header = QLabel("")
+        self.extract_label = QLabel("")
+        self.transcription_header = QLabel("")
+        self.translation_header = QLabel("")
+
+        self.form_layout.addRow(self.common_header)
         self.form_layout.addRow(self.show_timestamp_checkbox)
-        self.form_layout.addRow("Extract lyrics from file tags", self.get_from_file_button)
-        self.form_layout.addRow(QLabel("<b>Auto audio transcription</b>"))
+        self.form_layout.addRow(self.extract_label, self.get_from_file_button)
+        self.form_layout.addRow(self.transcription_header)
         self.form_layout.addRow(self.transcription)
-        self.form_layout.addRow(QLabel("<b>Translate lyrics</b>"))
+        self.form_layout.addRow(self.translation_header)
         self.form_layout.addRow(self.translation)
 
-        # self.transcription_section: CollapsibleSection = CollapsibleSection("Auto Audio Transcription", 20, self.common_frame)
-        # self.transcription_section.set_content(self.transcription)
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the texts of this page.
+
+        :returns: None.
+        """
+        self.show_timestamp_checkbox.setText(self.tr("Show timestamp"))
+        self.get_from_file_button.setText(self.tr("Extract"))
+        self.common_header.setText(f"<b>{self.tr('Common settings')}</b>")
+        self.extract_label.setText(self.tr("Extract lyrics from file tags"))
+        self.transcription_header.setText(f"<b>{self.tr('Auto audio transcription')}</b>")
+        self.translation_header.setText(f"<b>{self.tr('Translate lyrics')}</b>")
 
     def set_timestamp_visible(self):
         self.lyric_module.show_timestamp = self.show_timestamp_checkbox.isChecked()

@@ -29,14 +29,19 @@ class DragFileWidget(QWidget):
         super().showEvent(event)
 
     def set_state(self, state: DragFileState) -> None:
+        """Set the overlay content for the dragged file state.
+
+        :param state: State of the dragged file.
+        :returns: None.
+        """
         if state is DragFileState.CORRECT:
             self.pixmap = QPixmap(RESOURCE_ICON_DIR + "drag_file_icon_white.png")
-            self.paint_text = "Открыть файл в приложении ..."
+            self.paint_text = self.tr("Open the file in the application")
             self.paint_subtext: str = ""
         elif state is DragFileState.INCORRECT:
             self.pixmap = QPixmap(RESOURCE_ICON_DIR + "drag_file_error_icon_white.png")
-            self.paint_text = "Неверный формат"
-            self.paint_subtext: str = "Корректные расширения: .mp3, .flac, .wave"
+            self.paint_text = self.tr("Unsupported format")
+            self.paint_subtext: str = self.tr("Supported extensions: .mp3, .flac, .wave")
         else:
             self.pixmap = QPixmap()
             self.paint_text = ""

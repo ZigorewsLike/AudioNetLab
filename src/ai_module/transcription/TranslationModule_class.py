@@ -6,7 +6,7 @@ from bisect import bisect_right
 from typing import TYPE_CHECKING, List, Union, Optional
 
 import requests
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot, QEvent
 from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
     QFormLayout
@@ -26,20 +26,42 @@ class TranslationModule(QWidget):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
         self.lyric_module: AudioLyricsModule = lyric_module
-        # TODO: Вынести в настройки
+        # TODO: move to the settings
         self.host = 'http://127.0.0.1:13000'
         self.end_point = 'text/translate/process'
 
+        # The item texts are sent to the service as is, they must not be translated
         self.language_combobox = QComboBox()
         self.language_combobox.addItem("Русский")
         self.language_combobox.addItem("English")
 
-        self.translate_button = QPushButton("Translate", self)
+        self.translate_button = QPushButton("", self)
         self.translate_button.clicked.connect(self.translate_lyrics)
 
+        self.language_label = QLabel("")
         self.form_layout = QFormLayout(self)
-        self.form_layout.addRow("Язык перевода: ", self.language_combobox)
+        self.form_layout.addRow(self.language_label, self.language_combobox)
         self.form_layout.addWidget(self.translate_button)
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the texts of this panel.
+
+        :returns: None.
+        """
+        self.translate_button.setText(self.tr("Translate"))
+        self.language_label.setText(self.tr("Target language"))
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)

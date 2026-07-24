@@ -23,7 +23,7 @@ def load_sess_model(path: str, sess_provider: str = "DmlExecutionProvider") -> r
         sess = rt.InferenceSession(model_bytes, sess_options=options, providers=[sess_provider])
     except Exception as e:
         print_e(e)
-        log_i('Переключение загрузки модели на CPU')
+        log_i('Falling back to CPU model loading')
         sess = rt.InferenceSession(model_bytes, providers=['CPUExecutionProvider'])
 
     return sess

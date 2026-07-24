@@ -1,0 +1,4 @@
+# Development only, not needed to run the application.
+# Provides pyside6-lrelease and pyside6-linguist for the translation catalogs.
+-r requirements.txt
+PySide6-Essentials~=6.6.3

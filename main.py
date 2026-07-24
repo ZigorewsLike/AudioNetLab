@@ -8,8 +8,11 @@ from datetime import datetime
 
 from PyQt6.QtCore import Qt
 
+from src.core.i18n import translation_manager
 from src.core.log_system import print_e, print_d, OutputBuffer
-from src.global_constants import APP_NAME, DEBUG, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_REGISTRY
+from src.core.settings import SettingsDataObject
+from src.global_constants import (APP_NAME, DEBUG, APP_ROAMING_DIR, TRACE, LOG_IN_FILE, PATH_TO_LAST_REGISTRY,
+                                  CONFIG_FILENAME)
 
 from PyQt6.QtGui import QIcon
 from PyQt6 import QtWidgets
@@ -85,6 +88,11 @@ if __name__ == '__main__':
     screen = app.primaryScreen()
     size = screen.size()
     # endregion
+
+    # The language must be installed before the first widget is built
+    startup_settings = SettingsDataObject()
+    startup_settings.load_from_ini(CONFIG_FILENAME)
+    translation_manager.set_language(startup_settings.system_settings.language)
 
     # Window parameters (width and height of the screen)
     params_dist: dict = {"size_width": size.width(), "size_height": size.height()}

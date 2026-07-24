@@ -7,13 +7,14 @@ a = Analysis(
     binaries=[('$VENV_PATH/Lib/site-packages/onnxruntime/capi/*.dll', 'onnxruntime/capi'),],
     datas=[
         ('res/*.png', 'res'),
+        ('res/i18n/*.qm', 'res/i18n'),
         ('$GENRE_MODEL_PATH', 'models'),
     ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['torch'],
+    excludes=['torch', 'PySide6', 'shiboken6'],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

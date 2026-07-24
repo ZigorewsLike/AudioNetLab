@@ -1,7 +1,7 @@
 from typing import Dict, TYPE_CHECKING, List
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, Qt
+from PyQt6.QtCore import pyqtSlot, Qt, QEvent
 from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QSlider, QComboBox, QFormLayout,
                              QCheckBox, QHBoxLayout, QMessageBox)
@@ -27,7 +27,7 @@ class SettingsAudioWidget(QWidget):
         self.form_layout = QFormLayout(self)
 
         self.audio_out_device_combo = QComboBox()
-        self.audio_out_device_button = QPushButton("Переключить")
+        self.audio_out_device_button = QPushButton("")
         self.audio_out_device_button.setFixedWidth(100)
         self.audio_out_device_button.clicked.connect(self.switch_device)
 
@@ -42,16 +42,43 @@ class SettingsAudioWidget(QWidget):
         chunk_layout.addWidget(self.chunk_size_slider, 10)
         chunk_layout.addWidget(self.chunk_size_label, 1)
 
-        self.log_volume_checkbox = QCheckBox("Логарифмический регулятор громкости")
+        self.log_volume_checkbox = QCheckBox("")
         self.log_volume_checkbox.stateChanged.connect(self.set_log_volume)
 
         h = QHBoxLayout()
         h.addWidget(self.audio_out_device_combo)
         h.addWidget(self.audio_out_device_button)
-        self.form_layout.addRow("Устройство", h)
-        self.form_layout.addRow("Параметры", QWidget())
-        self.form_layout.addRow("Размер кеша", chunk_layout)
+        # Row labels are kept so retranslate_ui can reach them later
+        self.device_label = QLabel("")
+        self.parameters_label = QLabel("")
+        self.buffer_label = QLabel("")
+        self.form_layout.addRow(self.device_label, h)
+        self.form_layout.addRow(self.parameters_label, QWidget())
+        self.form_layout.addRow(self.buffer_label, chunk_layout)
         self.form_layout.addRow("", self.log_volume_checkbox)
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the texts of this page.
+
+        :returns: None.
+        """
+        self.audio_out_device_button.setText(self.tr("Switch"))
+        self.log_volume_checkbox.setText(self.tr("Logarithmic volume control"))
+        self.device_label.setText(self.tr("Device"))
+        self.parameters_label.setText(self.tr("Parameters"))
+        self.buffer_label.setText(self.tr("Buffer size"))
 
     def showEvent(self, event: QShowEvent) -> None:
         """Refresh the form from the current player state.
@@ -90,11 +117,13 @@ class SettingsAudioWidget(QWidget):
             if self.mf.audio_player.is_playable:
                 if not self.mf.audio_player.switch_device(device_index):
                     error_critical_msg = QMessageBox()
-                    error_critical_msg.setText(f"Ошибка переключения устройства {self.audio_out_device_combo.currentText()}. "
-                                               f"Неподдерживаемый формат. Устройство переключено на 'По умолчанию'."
-                                               f"\nDevice:{self.devices[text_index]}")
+                    error_critical_msg.setText(
+                        self.tr("Unable to switch to the device {0}. The format is not supported, "
+                                "the system default device is used instead.").format(
+                            self.audio_out_device_combo.currentText())
+                        + f"\nDevice:{self.devices[text_index]}")
                     error_critical_msg.setIcon(QMessageBox.Icon.Critical)
-                    error_critical_msg.setWindowTitle(f'Ошибка при переключении устройства.')
+                    error_critical_msg.setWindowTitle(self.tr("Device switch error"))
                     error_critical_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
                     error_critical_msg.exec()
                     self.audio_out_device_combo.setCurrentIndex(0)

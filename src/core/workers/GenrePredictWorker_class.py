@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, List
 import librosa
 import numpy as np
 from PyQt6 import QtCore
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, QCoreApplication
 
 from src.global_constants import ONNX_INFERENCE, PATTERN_SIZE, SAMPLING_RATE_AI
 from src.core.log_system import print_d
@@ -71,7 +71,7 @@ class GenrePredictWorker(QObject):
             sample_len: int = math.ceil(waveform.shape[0] / sample_rate / self.pattern_length)
 
             # StandardScaler coefficients taken from the training pipeline
-            # TODO: Тут надо подумать над распределением (Взял коэффы от StandardScaler)
+            # TODO: revisit the distribution, these are the StandardScaler coefficients
             mean = [3.78439426e-01, 8.29347338e-02, 1.79139561e-01, 3.35948677e-03,
                     1.90030846e+03, 4.02072421e+05, 2.09221961e+03, 1.59393196e+05,
                     3.92067496e+03, 1.83378160e+06, 8.33124954e-02, 1.93341645e-03,
@@ -107,8 +107,11 @@ class GenrePredictWorker(QObject):
             input_array: Optional[np.ndarray] = self.mf.file_meta_controller.get_track_librosa_data(track_id=track_id)
             use_cache_data: bool = input_array is not None  # Features already computed for this track
 
+            # Not a QWidget, so the context has to be named explicitly
+            progress_text = QCoreApplication.translate("GenrePredictWorker", "Genre classification {0}%")
+
             for step_index, step in enumerate(range(sample_len)):
-                self.preloader_signal.emit(f"Классификация жанра {round(step / sample_len * 100)}%")
+                self.preloader_signal.emit(progress_text.format(round(step / sample_len * 100)))
                 if not use_cache_data:
                     waveform_part = waveform[step * sample_rate * self.pattern_length:
                                              (step + 1) * sample_rate * self.pattern_length]
@@ -146,7 +149,7 @@ class GenrePredictWorker(QObject):
                 # endregion
             if not use_cache_data:
                 self.mf.file_meta_controller.save_track_librosa_data(track_id, input_array)
-            self.preloader_signal.emit(f"Классификация жанра 100%")
+            self.preloader_signal.emit(progress_text.format(100))
             print_d(f"Predict time: {(time.time() - start_time) * 1000}ms | IterSUmTime: {iter_sum_time}ms")
             self.finished.emit(predict_index_list)
             return predict_index_list

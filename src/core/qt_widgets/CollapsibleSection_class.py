@@ -65,7 +65,7 @@ class CollapsibleSection(QWidget):
         self.toggle_animation.start()
 
     def set_content(self, content_widget: QWidget):
-        # Внутри QScrollArea должен быть widget, а layout ставим на него
+        # QScrollArea needs a widget inside, the layout goes onto that widget
         self.content_area.setWidget(content_widget)
 
         collapsed_height = self.sizeHint().height() - self.content_area.maximumHeight()
@@ -91,15 +91,15 @@ class CollapsibleSection(QWidget):
 #     w = QWidget()
 #     root = QVBoxLayout(w)
 #
-#     section = CollapsibleSection("Доп. настройки", animation_duration=20)
+#     section = CollapsibleSection("Advanced settings", animation_duration=20)
 #
 #     form = QFormLayout()
 #     form.addRow("Host:", QLineEdit("localhost"))
 #     form.addRow("Port:", QSpinBox())
-#     form.addRow("", QPushButton("Применить"))
+#     form.addRow("", QPushButton("Apply"))
 #     section.set_content_layout(form)
 #
-#     root.addWidget(QLabel("Контент сверху"))
+#     root.addWidget(QLabel("Content above"))
 #     root.addWidget(section)
 #     root.addStretch(1)
 #

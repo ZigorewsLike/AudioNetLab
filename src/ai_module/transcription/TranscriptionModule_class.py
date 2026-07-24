@@ -5,7 +5,7 @@ import mimetypes
 from typing import TYPE_CHECKING, List, Union, Optional
 
 import requests
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot, QEvent
 from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
     QFormLayout
@@ -24,14 +24,14 @@ class TranscriptionModule(QWidget):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
         self.lyric_module: AudioLyricsModule = lyric_module
-        # TODO: Вынести в настройки
+        # TODO: move to the settings
         self.host = 'http://127.0.0.1:13000'
         self.end_point = 'audio/transcription/process'
         self.setMaximumWidth(300)
 
         self.form_layout = QFormLayout(self)
 
-        self.run_process_button = QPushButton("Run process")
+        self.run_process_button = QPushButton("")
         self.run_process_button.clicked.connect(self.run_process)
 
         self.model_name_combo = QComboBox()
@@ -52,8 +52,29 @@ class TranscriptionModule(QWidget):
         ])
         self.model_name_combo.setCurrentText("large-v3-turbo")
 
-        self.form_layout.addRow("Model name", self.model_name_combo)
+        self.model_name_label = QLabel("")
+        self.form_layout.addRow(self.model_name_label, self.model_name_combo)
         self.form_layout.addRow("", self.run_process_button)
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the texts of this panel.
+
+        :returns: None.
+        """
+        self.run_process_button.setText(self.tr("Run process"))
+        self.model_name_label.setText(self.tr("Model name"))
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)

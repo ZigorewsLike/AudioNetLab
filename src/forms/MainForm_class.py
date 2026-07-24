@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QThread, pyqtSlot, QSize, QRect
+from PyQt6.QtCore import Qt, QThread, pyqtSlot, QSize, QRect, QEvent
 from PyQt6.QtGui import (QPainter, QPixmap, QIcon, QMoveEvent,
                          QShowEvent, QAction, QDragEnterEvent, QDragLeaveEvent,
                          QDropEvent, QPaintEvent, QBrush, QColor)
@@ -125,7 +125,7 @@ class MainForm(QMainWindow):
 
         self.home_page = HomePageWidget(self, self.central_widget)
         self.home_page.last_file.update_file_list()
-        self.tab_widget.addTab(self.home_page, 'Home')
+        self.home_tab_index = self.tab_widget.addTab(self.home_page, self.tr("Home"))
 
         # region Overlap widgets
         self.drag_widget = DragFileWidget(self)
@@ -139,22 +139,22 @@ class MainForm(QMainWindow):
 
         # region AI MODULES
         self.genre_widget = GenreClassifierModule(model_path=GENRE_MODEL_PATH, main_form=self)
-        eq_ind = self.tab_widget.addTab(self.genre_widget, 'EQ AI')
+        self.genre_tab_index = self.tab_widget.addTab(self.genre_widget, self.tr("EQ AI"))
         if AI_ENABLED:
             self.genre_widget.load_model()
         self.audio_player.positionChanged.connect(self.genre_widget.set_cursor_position)
-        self.ai_modules_tab_indexes.append(eq_ind)
+        self.ai_modules_tab_indexes.append(self.genre_tab_index)
 
         self.transcription_module = AudioLyricsModule(self)
-        tr_ind = self.tab_widget.addTab(self.transcription_module, 'Lyrics')
+        self.lyrics_tab_index = self.tab_widget.addTab(self.transcription_module, self.tr("Lyrics"))
         self.audio_player.audio_streamer.progress.connect(self.transcription_module.on_position_changed)
-        self.ai_modules_tab_indexes.append(tr_ind)
+        self.ai_modules_tab_indexes.append(self.lyrics_tab_index)
 
         for index in self.ai_modules_tab_indexes:
             self.tab_widget.setTabEnabled(index, False or DEBUG)
 
         self.chat = ChatWidget(mf=self)
-        chat_ind = self.tab_widget.addTab(self.chat, 'Chat')
+        self.chat_tab_index = self.tab_widget.addTab(self.chat, self.tr("Chat"))
         # endregion
 
         # region apply settings
@@ -169,7 +169,7 @@ class MainForm(QMainWindow):
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
         self.settings_widget = SettingsFrame(mf=self)
-        self.tab_widget.addTab(self.settings_widget, 'Settings')
+        self.settings_tab_index = self.tab_widget.addTab(self.settings_widget, self.tr("Settings"))
 
         # EQ sliders feed the streamer gains, saved presets feed the auto EQ of the classifier
         self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
@@ -249,46 +249,83 @@ class MainForm(QMainWindow):
             menu_bar = self.title_bar.menu_bar
         else:
             menu_bar = self.menuBar()
-        file_menu = QMenu("&File", self)
-        edit_menu = QMenu("&Edit", self)
-        tools_menu = QMenu("&Tools", self)
+        self.file_menu = QMenu("", self)
+        self.edit_menu = QMenu("", self)
+        self.tools_menu = QMenu("", self)
 
         # region FileMenu
-        open_file_action = QAction("Open file", self)
-        open_file_action.triggered.connect(lambda: self.add_file_dialog())
+        self.open_file_action = QAction("", self)
+        self.open_file_action.triggered.connect(lambda: self.add_file_dialog())
         icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
-        open_file_action.setIcon(QIcon(icon))
+        self.open_file_action.setIcon(QIcon(icon))
 
-        player_action = QAction("Open player", self)
+        self.player_action = QAction("", self)
 
-        home_page_action = QAction("Home page", self)
+        self.home_page_action = QAction("", self)
         icon = QPixmap(RESOURCE_ICON_DIR + "home_FILL0_wght400_GRAD0_opsz24.png")
-        home_page_action.setIcon(QIcon(icon))
+        self.home_page_action.setIcon(QIcon(icon))
 
-        exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(lambda: self.close())
+        self.exit_action = QAction("", self)
+        self.exit_action.triggered.connect(lambda: self.close())
 
-        file_menu.addAction(open_file_action)
-        file_menu.addAction(player_action)
-        file_menu.addAction(home_page_action)
-        file_menu.addSeparator()
-        file_menu.addAction(exit_action)
+        self.file_menu.addAction(self.open_file_action)
+        self.file_menu.addAction(self.player_action)
+        self.file_menu.addAction(self.home_page_action)
+        self.file_menu.addSeparator()
+        self.file_menu.addAction(self.exit_action)
         # endregion
 
         # region EditMenu
-        edit_menu.addAction(QAction("", self))
+        self.edit_menu.addAction(QAction("", self))
         # endregion
 
         # region ToolsMenu
-        profiling_action = QAction("Profiling", self)
-        profiling_action.triggered.connect(lambda: self.profiling.show())
+        self.profiling_action = QAction("", self)
+        self.profiling_action.triggered.connect(lambda: self.profiling.show())
 
-        tools_menu.addAction(profiling_action)
+        self.tools_menu.addAction(self.profiling_action)
         # endregion
 
-        menu_bar.addMenu(file_menu)
-        menu_bar.addMenu(edit_menu)
-        menu_bar.addMenu(tools_menu)
+        menu_bar.addMenu(self.file_menu)
+        menu_bar.addMenu(self.edit_menu)
+        menu_bar.addMenu(self.tools_menu)
+        self.retranslate_menu_bars()
+
+    def retranslate_menu_bars(self) -> None:
+        """Apply the current translation to the menus and their actions.
+
+        :returns: None.
+        """
+        self.file_menu.setTitle(self.tr("&File"))
+        self.edit_menu.setTitle(self.tr("&Edit"))
+        self.tools_menu.setTitle(self.tr("&Tools"))
+        self.open_file_action.setText(self.tr("Open file"))
+        self.player_action.setText(self.tr("Open player"))
+        self.home_page_action.setText(self.tr("Home page"))
+        self.exit_action.setText(self.tr("Exit"))
+        self.profiling_action.setText(self.tr("Profiling"))
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the menus and the tab captions.
+
+        :returns: None.
+        """
+        self.retranslate_menu_bars()
+        self.tab_widget.setTabText(self.home_tab_index, self.tr("Home"))
+        self.tab_widget.setTabText(self.genre_tab_index, self.tr("EQ AI"))
+        self.tab_widget.setTabText(self.lyrics_tab_index, self.tr("Lyrics"))
+        self.tab_widget.setTabText(self.chat_tab_index, self.tr("Chat"))
+        self.tab_widget.setTabText(self.settings_tab_index, self.tr("Settings"))
 
     def showEvent(self, event: QShowEvent) -> None:
         """Handle the window becoming visible.
@@ -467,10 +504,10 @@ class MainForm(QMainWindow):
 
         :returns: None.
         """
-        dialog_filter = f"Все музыкальные форматы (*.mp3 *.flac *.wave);;" \
-                        f"MP3 (*.mp3);;FLAC (*.flac);;WAVE (*.wave *.wav);;" \
-                        f"Все файлы (*.*)"
-        filename = QFileDialog.getOpenFileName(self, "Открыть файл",
+        dialog_filter = (f"{self.tr('All audio formats')} (*.mp3 *.flac *.wave);;"
+                         f"MP3 (*.mp3);;FLAC (*.flac);;WAVE (*.wave *.wav);;"
+                         f"{self.tr('All files')} (*.*)")
+        filename = QFileDialog.getOpenFileName(self, self.tr("Open file"),
                                                self.settings.system_settings.last_folder,
                                                dialog_filter)[0]
         if filename:
@@ -484,7 +521,7 @@ class MainForm(QMainWindow):
         :returns: None.
         """
         if not os.path.exists(file_path):
-            self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
+            self.show_error_message_log(self.tr("File open error"), self.tr("File not found, it may have been deleted"))
             return
         filename, file_extension = os.path.splitext(os.path.basename(file_path))
         meta = self.file_meta_controller.read_track_file(file_path)
@@ -504,13 +541,13 @@ class MainForm(QMainWindow):
         :returns: None.
         """
         if not os.path.exists(file_path):
-            self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
+            self.show_error_message_log(self.tr("File open error"), self.tr("File not found, it may have been deleted"))
             return
         self.audio_player.start_position_loading()
 
         meta = self.file_meta_controller.get_track_meta(track_id)
         if not self.audio_player.prepare_to_open_file(file_path, meta):
-            self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
+            self.show_error_message_log(self.tr("File open error"), self.tr("Unable to open the file"))
             self.audio_player.stop_position_loading()
             return
         cover = self.file_meta_controller.get_preview_cover(track_id, file_path=file_path)
@@ -540,7 +577,7 @@ class MainForm(QMainWindow):
         self.reset_open_workers()
         self.drag_widget.setVisible(False)
         if not path:
-            self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
+            self.show_error_message_log(self.tr("File open error"), self.tr("Unable to open the file"))
             self.audio_player.stop_position_loading()
             return
         self.home_page.last_file.update_file_list()

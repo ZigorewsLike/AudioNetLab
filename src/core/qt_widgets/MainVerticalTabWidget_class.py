@@ -122,7 +122,7 @@ class MainVerticalTabWidget(BaseTabWidget):
         super(MainVerticalTabWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)
 
-        # region Маска событий мыши. Не реагировать родителю на мышь
+        # region Mouse event mask so the parent ignores the mouse
         reg = QRegion(self.frameGeometry())
         reg -= QRegion(self.geometry())
         reg += self.childrenRegion()

@@ -4,7 +4,7 @@ from typing import Dict, Union, TYPE_CHECKING, Optional, List
 
 import librosa
 import numpy as np
-from PyQt6.QtCore import pyqtSlot, Qt, QPoint, QThread
+from PyQt6.QtCore import pyqtSlot, Qt, QPoint, QThread, QEvent
 from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QLinearGradient, QPen,
                          QFont, QResizeEvent, QShowEvent)
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFileDialog
@@ -58,14 +58,14 @@ class GenreClassifierModule(QWidget):
         self.worker.finished.connect(self.predict_finished)
         self.worker.preloader_signal.connect(self.mf.preloader.set_help_text)
 
-        self.predict_button = QPushButton("Predict", self)
+        self.predict_button = QPushButton("", self)
         self.predict_button.move(10, 5)
         self.predict_button.clicked.connect(lambda: self.predict_current())
 
         self.status_label = QLabel("", self)
         self.status_label.move(self.predict_button.width() + 20, 5)
 
-        self.analysis_button = QPushButton("Анализ", self)
+        self.analysis_button = QPushButton("", self)
         self.analysis_button.move(self.status_label.x() + self.status_label.width() + 10, 5)
         self.analysis_button.clicked.connect(self.do_analysis)
         self.analysis_button.setVisible(False)
@@ -97,6 +97,31 @@ class GenreClassifierModule(QWidget):
             0: "#FAF550",
             6: "#ADBDFA",
         }
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the buttons and the result labels.
+
+        :returns: None.
+        """
+        self.predict_button.setText(self.tr("Predict"))
+        self.predict_button.adjustSize()
+        self.analysis_button.setText(self.tr("Analysis"))
+        self.analysis_button.adjustSize()
+        # The result texts are built from the prediction, rebuild them on a language change
+        if self.global_results:
+            self.show_results(self.global_results)
 
     def showEvent(self, event: QShowEvent) -> None:
         """Lay out the tab when it becomes visible.
@@ -170,11 +195,23 @@ class GenreClassifierModule(QWidget):
         :returns: None.
         """
         if not out:
-            # TODO: Сообщить о том, что выход пустой
+            # TODO: report an empty prediction result to the user
             return
-        self.set_gradient_color(out)
         self.global_results = out
         print_d(out)
+        self.show_results(out)
+
+        self.mf.preloader.setVisible(False)
+        self.worker_reset()
+        self.resize(self.width(), self.eq.y() + self.eq.height())
+
+    def show_results(self, out: List[int]) -> None:
+        """Draw the genre timeline and fill the share and winner labels.
+
+        :param out: Genre index per fragment.
+        :returns: None.
+        """
+        self.set_gradient_color(out)
         counts = np.bincount(np.array(out))
 
         best_of_text: str = ""
@@ -187,14 +224,11 @@ class GenreClassifierModule(QWidget):
                      self.best_of_label.y() + self.best_of_label.height() + 10)
 
         print_d(f"Final genre: {np.argmax(counts)}, name: {self.genre_dict[int(np.argmax(counts))]}")
-        self.status_label.setText(f"<span style=' font-size:8pt; font-weight: bold; color:#4477C9;'>ИТОГ:</span> "
+        self.status_label.setText(f"<span style=' font-size:8pt; font-weight: bold; color:#4477C9;'>"
+                                  f"{self.tr('RESULT:')}</span> "
                                   f"{self.genre_dict[int(np.argmax(counts))]}")
         self.status_label.adjustSize()
         self.update()
-
-        self.mf.preloader.setVisible(False)
-        self.worker_reset()
-        self.resize(self.width(), self.eq.y() + self.eq.height())
 
     def worker_reset(self) -> None:
         """Recreate the worker so the next prediction starts from a clean thread.
@@ -274,21 +308,21 @@ class GenreClassifierModule(QWidget):
 
         :returns: None.
         """
-        file_path = QFileDialog.getExistingDirectory(self, 'Путь к директории, где музыка по жанрам')
+        file_path = QFileDialog.getExistingDirectory(self, self.tr("Directory with music sorted into genre folders"))
         if not file_path:
             return
 
         wb = Workbook()
         sheet: Worksheet = wb.active
-        sheet.title = 'Analysis'
-        sheet["A1"] = "Анализ"
+        sheet.title = "Analysis"
+        sheet["A1"] = self.tr("Analysis")
         header1_style = NamedStyle("Header1", Font(bold=True, size=12))
         header2_style = NamedStyle("Header2", Font(bold=True, size=11))
 
         for index, genre in enumerate(self.genre_dict.values()):
             sheet[f"{chr(65 + index + 1)}2"] = genre
             sheet[f"{chr(65 + index + 1)}2"].style = header1_style
-        sheet[f"{chr(65 + 11)}2"] = "Итог"
+        sheet[f"{chr(65 + 11)}2"] = self.tr("Result")
         sheet[f"{chr(65 + 11)}2"].style = header1_style
         sheet.column_dimensions[chr(65)].width = 50
 

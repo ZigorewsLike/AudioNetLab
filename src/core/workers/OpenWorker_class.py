@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, QCoreApplication
 
 from src.core.log_system import print_e, print_traceback
 
@@ -33,10 +33,11 @@ class OpenFileWorker(QObject):
         :returns: None.
         """
         try:
-            self.preloader_signal.emit("Открытие файла. Загрузка каких-то данных")
+            # Not a QWidget, so the context has to be named explicitly
+            self.preloader_signal.emit(QCoreApplication.translate("OpenFileWorker", "Opening the file, decoding audio"))
             self.mf.audio_player.open_file(self.file_path)
 
-            self.preloader_signal.emit("Открытие файла. Почти всё")
+            self.preloader_signal.emit(QCoreApplication.translate("OpenFileWorker", "Opening the file, almost done"))
             self.finished.emit(self.file_path)
         except Exception as e:
             print_traceback()

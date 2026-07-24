@@ -6,7 +6,7 @@ from bisect import bisect_right
 from typing import TYPE_CHECKING, List, Union, Optional
 
 import requests
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot, QEvent
 from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
     QFormLayout, QTabWidget
@@ -64,8 +64,28 @@ class TranscriptionPropertyModule(QWidget):
                 color: gray;
             }}
         """)
-        self.tab_widget.addTab(self.common_lyrics_property, "Common")
-        self.tab_widget.addTab(self.summariser, "Summarization")
+        self.common_tab_index = self.tab_widget.addTab(self.common_lyrics_property, "")
+        self.summariser_tab_index = self.tab_widget.addTab(self.summariser, "")
+
+        self.retranslate_ui()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Reapply the texts when the application language changes.
+
+        :param event: Qt event.
+        :returns: None.
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Apply the current translation to the tab captions.
+
+        :returns: None.
+        """
+        self.tab_widget.setTabText(self.common_tab_index, self.tr("Common"))
+        self.tab_widget.setTabText(self.summariser_tab_index, self.tr("Summarization"))
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)

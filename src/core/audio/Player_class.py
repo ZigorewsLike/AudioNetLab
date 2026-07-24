@@ -435,7 +435,7 @@ class AudioPlayer(QWidget):
         self.title_tack.setText(track_name[0] if track_name is not None else filename)
         self.title_tack.adjustSize()
 
-        self.author_tack.setText(", ".join(artist_name) if artist_name is not None else "Unknown")
+        self.author_tack.setText(", ".join(artist_name) if artist_name is not None else self.tr("Unknown"))
         self.author_tack.adjustSize()
         return True
 

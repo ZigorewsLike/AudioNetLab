@@ -31,7 +31,7 @@ class ProfileDrawWidget(QOpenGLWidget):
 
         self.profile_data: ProfileDrawData = ProfileDrawData()
 
-        self.checkbox_fps = QCheckBox("FPS mode", self)
+        self.checkbox_fps = QCheckBox(self.tr("FPS mode"), self)
         self.checkbox_fps.move(10, 0)
         self.checkbox_fps.stateChanged.connect(self.fps_mode_changed)
 
@@ -42,7 +42,7 @@ class ProfileDrawWidget(QOpenGLWidget):
         self.spinbox_data_limiter.move(self.checkbox_fps.x() + self.checkbox_fps.width() + 10, 0)
         self.spinbox_data_limiter.valueChanged.connect(self.data_limiter_changed)
 
-        self.checkbox_ignore_zero = QCheckBox("Ignore 0", self)
+        self.checkbox_ignore_zero = QCheckBox(self.tr("Ignore 0"), self)
         self.checkbox_ignore_zero.move(self.spinbox_data_limiter.x() + self.spinbox_data_limiter.width() + 10, 0)
         self.checkbox_ignore_zero.setChecked(True)
 

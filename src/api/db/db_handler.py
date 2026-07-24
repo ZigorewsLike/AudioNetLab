@@ -79,7 +79,7 @@ class DBHandler:
         :param query: SQL text.
         :returns: Fetched rows.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         return self.session.execute(sql_text(query)).fetchall()
 
     def commit(self) -> None:
@@ -87,7 +87,7 @@ class DBHandler:
 
         :returns: None.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         self.session.commit()
 
     def flush(self) -> None:
@@ -95,7 +95,7 @@ class DBHandler:
 
         :returns: None.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         self.session.flush()
 
     def add_track(self, title: str, path: str, commit: bool = True) -> Optional[int]:
@@ -106,7 +106,7 @@ class DBHandler:
         :param commit: Commit the transaction right away.
         :returns: int - Id of the new track, None when the path is already known.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         existing_track = self.session.query(Track).filter(Track.path == path).all()
         if existing_track:
             return None
@@ -123,7 +123,7 @@ class DBHandler:
 
         :returns: List[Track] - Track rows.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         return self.session.query(Track).order_by(Track.dt_last_opened.desc()).all()
 
     def delete_track(self, track: Track, commit: bool = True) -> None:
@@ -133,7 +133,7 @@ class DBHandler:
         :param commit: Commit the transaction right away.
         :returns: None.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         self.session.delete(track)
         self.flush()
         if commit:
@@ -146,7 +146,7 @@ class DBHandler:
         :param commit: Commit the transaction right away.
         :returns: None.
         """
-        assert self.is_connected, "База данных не подключена"
+        assert self.is_connected, "Database is not connected"
         self.session.query(Track).filter(Track.id == track_id).update({"dt_last_opened": datetime.datetime.now()})
         if commit:
             self.commit()
