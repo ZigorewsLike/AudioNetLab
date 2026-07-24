@@ -13,17 +13,17 @@ def load_sess_model(path: str, sess_provider: str = "DmlExecutionProvider") -> r
     :returns: onnxruntime InferenceSession, falls back to CPU when the provider is unavailable.
     """
     print_d(f"Load model {os.path.basename(path)}: [{sess_provider}]")
-    model_fstream = open(path, "rb")
+    with open(path, "rb") as model_fstream:
+        model_bytes = model_fstream.read()  # Read once, the CPU fallback needs the same bytes
 
     try:
         options = rt.SessionOptions()
         options.enable_mem_pattern = False
         options.execution_mode = rt.ExecutionMode.ORT_SEQUENTIAL
-        sess = rt.InferenceSession(model_fstream.read(), sess_options=options, providers=[sess_provider])
+        sess = rt.InferenceSession(model_bytes, sess_options=options, providers=[sess_provider])
     except Exception as e:
         print_e(e)
         log_i('Переключение загрузки модели на CPU')
-        sess = rt.InferenceSession(model_fstream.read(), providers=['CPUExecutionProvider'])
-    model_fstream.close()
+        sess = rt.InferenceSession(model_bytes, providers=['CPUExecutionProvider'])
 
     return sess

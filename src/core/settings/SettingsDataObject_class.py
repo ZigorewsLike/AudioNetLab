@@ -12,11 +12,13 @@ from src.global_constants import VERSION
 
 @dataclass()
 class SystemSettings:
-    """Window geometry and application version stored in the ini file."""
+    """Window geometry, application version and the last used paths stored in the ini file."""
     form_width: int
     form_height: int
     form_position: Point
     version: str
+    last_folder: str = ""  # Folder the open file dialog starts in
+    open_filename: str = ""  # Last opened track
 
 
 @dataclass()
