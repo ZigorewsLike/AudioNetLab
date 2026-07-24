@@ -146,7 +146,7 @@ after saving.
 
 | Path | Content |
 | --- | --- |
-| `storage.db` | SQLite database with the track list (path, title, timestamps) |
+| `storage.db` | SQLite database with the library: tracks, artists, albums, covers, scanned folders |
 | `data/registry/<track_id>/` | Per track cache: tags, feature vectors, lyrics |
 | `res/presets.pickle` | EQ presets per genre |
 | `res/i18n/` | Translation catalogs, `.ts` sources and compiled `.qm` |
@@ -157,6 +157,20 @@ after saving.
 
 Deleting a track from the list also deletes its registry folder. The audio file itself is never
 touched, the application only stores its path.
+
+### Database schema
+
+`storage.db` carries its schema version in `PRAGMA user_version`, and `src/api/db/migrations.py`
+upgrades it on the first connection of a run. There is no Alembic: each version is one function
+in `MIGRATION_STEPS`, run in its own transaction, so a failed upgrade leaves the file on the
+previous version. To change the schema, edit the models, append a step and bump
+`CURRENT_SCHEMA_VERSION`.
+
+Artists and albums are deduplicated on a key column that is casefolded in Python rather than by
+`COLLATE NOCASE`, because SQLite only folds ASCII and would file "Ария" and "ария" as two
+artists. The same keys are what the library search matches against. Tracks are grouped into an
+album by album artist and title, taking the `ALBUMARTIST` tag when the file has one, otherwise a
+compilation would break up into one album per track.
 
 ## Project structure
 
@@ -177,7 +191,7 @@ src/
   ai_module/
     genre_classification/   The EQ AI tab: prediction, timeline, auto EQ
     transcription/          Experimental lyrics modules
-  api/db/                   SQLAlchemy models and the database handler
+  api/db/                   SQLAlchemy models, schema migrations, library queries
   function_lib/             Audio features, the equalizer, ONNX loading, math helpers
   enums/                    Enumerations
   global_constants.py       Switches and paths
