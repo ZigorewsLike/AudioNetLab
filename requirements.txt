@@ -12,4 +12,3 @@ PyAudio~=0.2.14
 wavio~=0.0.9
 sounddevice~=0.5.1
 SQLAlchemy~=2.0.45
-requests~=2.31.0

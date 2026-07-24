@@ -25,7 +25,7 @@ from src.core.workers import OpenFileWorker
 from src.enums import StateMode, PlayerState, DragFileState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import (APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  RESOURCE_ICON_DIR, CUSTOM_TITLE_BAR, DEBUG)
+                                  RESOURCE_ICON_DIR, CUSTOM_TITLE_BAR, DEBUG, EXPERIMENTAL_MODULES)
 from src.global_styles import AppColorSchemes
 
 
@@ -153,8 +153,11 @@ class MainForm(QMainWindow):
         for index in self.ai_modules_tab_indexes:
             self.tab_widget.setTabEnabled(index, False or DEBUG)
 
-        self.chat = ChatWidget(mf=self)
-        self.chat_tab_index = self.tab_widget.addTab(self.chat, self.tr("Chat"))
+        self.chat: Optional[ChatWidget] = None
+        self.chat_tab_index: Optional[int] = None
+        if EXPERIMENTAL_MODULES:
+            self.chat = ChatWidget(mf=self)
+            self.chat_tab_index = self.tab_widget.addTab(self.chat, self.tr("Chat"))
         # endregion
 
         # region apply settings
@@ -324,7 +327,8 @@ class MainForm(QMainWindow):
         self.tab_widget.setTabText(self.home_tab_index, self.tr("Home"))
         self.tab_widget.setTabText(self.genre_tab_index, self.tr("EQ AI"))
         self.tab_widget.setTabText(self.lyrics_tab_index, self.tr("Lyrics"))
-        self.tab_widget.setTabText(self.chat_tab_index, self.tr("Chat"))
+        if self.chat_tab_index is not None:
+            self.tab_widget.setTabText(self.chat_tab_index, self.tr("Chat"))
         self.tab_widget.setTabText(self.settings_tab_index, self.tr("Settings"))
 
     def showEvent(self, event: QShowEvent) -> None:

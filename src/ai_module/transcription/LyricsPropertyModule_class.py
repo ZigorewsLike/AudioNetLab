@@ -1,34 +1,39 @@
-import json
-import re
-from datetime import datetime
-import mimetypes
-from bisect import bisect_right
-from typing import TYPE_CHECKING, List, Union, Optional
+from typing import TYPE_CHECKING, Optional
 
-import requests
-from PyQt6.QtCore import Qt, pyqtSlot, QEvent
-from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
-from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
-    QFormLayout, QTabWidget
+from PyQt6.QtCore import QEvent
+from PyQt6.QtGui import QResizeEvent
+from PyQt6.QtWidgets import QWidget, QTabWidget
 
-from src.core.log_system import print_d
-from .SummariserModule_class import SummariserModule
+from src.global_constants import EXPERIMENTAL_MODULES
 from .LyricsPropertyCommon_class import LyricsPropertyCommon
 from ...global_styles import AppColorSchemes
+
+# Imported only when enabled, so the requests package stays optional
+if EXPERIMENTAL_MODULES:
+    from .SummariserModule_class import SummariserModule
 
 if TYPE_CHECKING:
     from src.forms import MainForm
 
 
 class TranscriptionPropertyModule(QWidget):
-    """Right side panel of the lyrics tab with the Common and Summarization pages."""
+    """Right side panel of the lyrics tab.
+
+    Always shows the Common page. The Summarization page needs the external service
+    and appears only when EXPERIMENTAL_MODULES is on.
+    """
 
     def __init__(self, mf, lyric_module, *args, **kwargs):
+        """Build the panel and its pages.
+
+        :param mf: Main form reference.
+        :param lyric_module: Owning AudioLyricsModule.
+        :returns: None.
+        """
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
 
         self.common_lyrics_property = LyricsPropertyCommon(self.mf, lyric_module)
-        self.summariser: SummariserModule = SummariserModule(self.mf, lyric_module)
 
         self.tab_widget = QTabWidget(self)
         self.tab_widget.setStyleSheet(f"""
@@ -65,7 +70,12 @@ class TranscriptionPropertyModule(QWidget):
             }}
         """)
         self.common_tab_index = self.tab_widget.addTab(self.common_lyrics_property, "")
-        self.summariser_tab_index = self.tab_widget.addTab(self.summariser, "")
+
+        self.summariser: Optional[QWidget] = None
+        self.summariser_tab_index: Optional[int] = None
+        if EXPERIMENTAL_MODULES:
+            self.summariser = SummariserModule(self.mf, lyric_module)
+            self.summariser_tab_index = self.tab_widget.addTab(self.summariser, "")
 
         self.retranslate_ui()
 
@@ -85,10 +95,14 @@ class TranscriptionPropertyModule(QWidget):
         :returns: None.
         """
         self.tab_widget.setTabText(self.common_tab_index, self.tr("Common"))
-        self.tab_widget.setTabText(self.summariser_tab_index, self.tr("Summarization"))
+        if self.summariser_tab_index is not None:
+            self.tab_widget.setTabText(self.summariser_tab_index, self.tr("Summarization"))
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Fit the tab widget to the panel.
+
+        :param event: Qt resize event.
+        :returns: None.
+        """
         super().resizeEvent(event)
         self.tab_widget.resize(self.width(), self.height())
-
-

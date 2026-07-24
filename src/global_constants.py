@@ -10,6 +10,11 @@ LOG_IN_SIGNAL = False  # Duplicate the console output into a Qt signal
 AI_ENABLED = True  # Load the genre model at startup
 ONNX_INFERENCE = True
 CUSTOM_TITLE_BAR = True  # Frameless window with the custom title bar
+# Experimental modules that call an external HTTP service: audio transcription, lyrics
+# translation, lyrics summarization and the chat tab. Off means the application needs no
+# network and no requests package, while lyrics display, tag extraction and the timeline
+# on the Lyrics tab keep working.
+EXPERIMENTAL_MODULES = False
 # endregion
 
 APP_NAME = "AudioNetLab"

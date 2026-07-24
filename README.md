@@ -18,11 +18,11 @@ device. That is why the equalizer reacts immediately, without restarting playbac
   between presets so a genre change is not audible as a jump.
 * One editable EQ preset per genre, stored on disk.
 * Output device switching, streaming buffer size and volume curve settings.
+* Lyrics from the file tags with a timeline that follows playback, clicking a line seeks.
 * English and Russian interface, switched at runtime without a restart.
 * Built in profiler window with draw and math call timings.
-* Experimental lyrics modules (transcription, translation, summarization). They require a
-  separate external HTTP service that is not part of this repository, and the corresponding
-  buttons do nothing without it.
+* Experimental modules behind a flag, off by default: audio transcription, lyrics translation,
+  lyrics summarization and the chat tab. See "Experimental modules" below.
 
 ## Requirements
 
@@ -108,6 +108,7 @@ Developer level switches that are not exposed in the UI:
 | `DEBUG` | Debug logging, and the AI tabs stay enabled without an opened track |
 | `PROFILE` | Collect timings for the profiler window (Tools, Profiling) |
 | `AI_ENABLED` | Load the genre model at startup, turn it off for a faster start |
+| `EXPERIMENTAL_MODULES` | Modules that call an external HTTP service, off by default |
 | `CUSTOM_TITLE_BAR` | Frameless window with the custom title bar |
 | `LOG_IN_FILE` | Duplicate the console output into `logs/` |
 | `GENRE_MODEL_PATH` | Path to the ONNX classifier |
@@ -185,6 +186,38 @@ tools/                      Development scripts, translation catalog rebuild
 models/                     Genre models
 res/                        Icons, EQ presets, translation catalogs
 ```
+
+## Experimental modules
+
+Everything that talks to an external HTTP service sits behind `EXPERIMENTAL_MODULES` in
+`src/global_constants.py` and is **off by default**, so a copy of the application runs fully
+offline and needs nothing beyond `requirements.txt`.
+
+Off (the default):
+
+* No Chat tab.
+* The Lyrics tab keeps working: lyrics are read from the file tags, the timeline follows
+  playback, clicking a line seeks the track, the timestamp toggle and the extraction button
+  stay in place.
+* The right side panel of the Lyrics tab shows only the "Common" page, without the
+  transcription, translation and summarization sections.
+* The `requests` package is never imported, so it does not have to be installed.
+
+On:
+
+```python
+EXPERIMENTAL_MODULES = True
+```
+
+Then install the development requirements, they add `requests`:
+
+```bat
+pip install -r requirements-dev.txt
+```
+
+These modules expect an HTTP service on `http://127.0.0.1:13000` with the endpoints
+`audio/transcription/process`, `text/translate/process` and `text/summary/process`. The service
+is not part of this repository, without it the buttons will fail on a connection error.
 
 ## Working with translations
 

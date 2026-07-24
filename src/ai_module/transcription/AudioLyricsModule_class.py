@@ -4,7 +4,6 @@ import mimetypes
 from bisect import bisect_right
 from typing import TYPE_CHECKING, List, Union, Optional
 
-import requests
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QResizeEvent, QFont, QMouseEvent, QShowEvent
 from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QScrollArea, QVBoxLayout, QLabel, QMenu, QComboBox, QCheckBox, \
@@ -83,7 +82,8 @@ class AudioLyricsModule(QWidget):
             self.v_layout.removeItem(item)
         self.last_selected_segment = None
         self.segments_start = []
-        self.property.summariser.clear()
+        if self.property.summariser is not None:
+            self.property.summariser.clear()
 
     def update_transcription_list(self) -> None:
         self.generate_transcription(self.transcription_data)

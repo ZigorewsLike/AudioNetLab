@@ -1,4 +1,8 @@
 # Development only, not needed to run the application.
-# Provides pyside6-lrelease and pyside6-linguist for the translation catalogs.
 -r requirements.txt
+
+# pyside6-lrelease and pyside6-linguist for the translation catalogs.
 PySide6-Essentials~=6.6.3
+
+# Used by the experimental modules, needed only with EXPERIMENTAL_MODULES on.
+requests~=2.31.0

@@ -116,32 +116,32 @@
   <context>
     <name>LyricsPropertyCommon</name>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="74" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="95" />
       <source>Show timestamp</source>
       <translation>Показывать тайминг</translation>
     </message>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="75" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="96" />
       <source>Extract</source>
       <translation>Извлечь</translation>
     </message>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="76" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="97" />
       <source>Common settings</source>
       <translation>Общие настройки</translation>
     </message>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="77" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="98" />
       <source>Extract lyrics from file tags</source>
       <translation>Извлечь текст из тегов файла</translation>
     </message>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="78" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="100" />
       <source>Auto audio transcription</source>
       <translation>Автоматическая расшифровка аудио</translation>
     </message>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="79" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyCommon_class.py" line="102" />
       <source>Translate lyrics</source>
       <translation>Перевод текста</translation>
     </message>
@@ -149,103 +149,103 @@
   <context>
     <name>MainForm</name>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="324" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="327" />
       <location filename="..\..\src\forms\MainForm_class.py" line="128" />
       <source>Home</source>
       <translation>Главная</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="325" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="328" />
       <location filename="..\..\src\forms\MainForm_class.py" line="142" />
       <source>EQ AI</source>
       <translation>EQ AI</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="326" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="329" />
       <location filename="..\..\src\forms\MainForm_class.py" line="149" />
       <source>Lyrics</source>
       <translation>Текст</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="327" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="157" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="331" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="160" />
       <source>Chat</source>
       <translation>Чат</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="328" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="172" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="332" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="175" />
       <source>Settings</source>
       <translation>Настройки</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="299" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="302" />
       <source>&amp;File</source>
       <translation>&amp;Файл</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="300" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="303" />
       <source>&amp;Edit</source>
       <translation>&amp;Правка</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="301" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="304" />
       <source>&amp;Tools</source>
       <translation>&amp;Инструменты</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="510" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="302" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="514" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="305" />
       <source>Open file</source>
       <translation>Открыть файл</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="303" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="306" />
       <source>Open player</source>
       <translation>Открыть плеер</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="304" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="307" />
       <source>Home page</source>
       <translation>Главная страница</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="305" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="308" />
       <source>Exit</source>
       <translation>Выход</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="306" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="309" />
       <source>Profiling</source>
       <translation>Профилирование</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="507" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="511" />
       <source>All audio formats</source>
       <translation>Все музыкальные форматы</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="509" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="513" />
       <source>All files</source>
       <translation>Все файлы</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="580" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="550" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="544" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="524" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="584" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="554" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="548" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="528" />
       <source>File open error</source>
       <translation>Ошибка открытия файла</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="544" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="524" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="548" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="528" />
       <source>File not found, it may have been deleted</source>
       <translation>Файл не найден, возможно он удалён</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="580" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="550" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="584" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="554" />
       <source>Unable to open the file</source>
       <translation>Не удалось открыть файл</translation>
     </message>
@@ -397,12 +397,12 @@
   <context>
     <name>TranscriptionPropertyModule</name>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyModule_class.py" line="87" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyModule_class.py" line="97" />
       <source>Common</source>
       <translation>Общее</translation>
     </message>
     <message>
-      <location filename="..\..\src\ai_module\transcription\LyricsPropertyModule_class.py" line="88" />
+      <location filename="..\..\src\ai_module\transcription\LyricsPropertyModule_class.py" line="99" />
       <source>Summarization</source>
       <translation>Пересказ</translation>
     </message>
