@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class MainTabWidgetIcons(Enum):
+    """Icon set of the vertical tab bar. Used by MainVerticalTabWidget, currently unused."""
     NONE = 0
     HOME_PAGE = 1
     PLAYER = 2

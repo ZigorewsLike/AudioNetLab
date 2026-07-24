@@ -9,6 +9,8 @@ from src.global_styles import DEFAULT_CHECKBOX_BLACK_STYLE
 
 
 class SectionWidget(QFrame):
+    """Frame that lays its widgets out in rows. Currently unused."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.widget_parent: QWidget = self
@@ -41,6 +43,8 @@ class SectionWidget(QFrame):
 
 
 class SettingsSection(SectionWidget):
+    """Settings section with a title bar. Currently unused."""
+
     def __init__(self, title: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Raised)
@@ -123,6 +127,8 @@ class SettingsSection(SectionWidget):
 
 
 class SettingsSubSection(SectionWidget):
+    """Nested settings section without a frame. Currently unused."""
+
     def __init__(self, title: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setStyleSheet("""

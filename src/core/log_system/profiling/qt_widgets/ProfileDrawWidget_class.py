@@ -16,6 +16,11 @@ from ..ProfileDrawData_class import ProfileDrawData
 
 
 class ProfileDrawWidget(QOpenGLWidget):
+    """Separate profiler window (Tools, Profiling).
+
+    Shows the mean, max and min time of every widget draw call and of the heavy
+    math calls, with a graph of the last data_limiter measurements.
+    """
     valueChanged = QtCore.pyqtSignal(int)
 
     def __init__(self, *args, **kwargs):

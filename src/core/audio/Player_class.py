@@ -24,9 +24,18 @@ if TYPE_CHECKING:
 
 
 class AudioPlayer(QWidget):
+    """Player panel: transport controls, waveform graph, track meta and the AudioStreamer thread.
+
+    :signals: positionChanged (float) - relative playback position in the range 0..1
+    """
     positionChanged = QtCore.pyqtSignal(float)
 
     def __init__(self, mf, *args, **kwargs):
+        """Build the player UI and start the streaming thread.
+
+        :param mf: Main form reference.
+        :returns: None.
+        """
         super(AudioPlayer, self).__init__(*args, **kwargs)
         self.mf: Union[MainForm, QWidget] = mf
         self.setStyleSheet("""
@@ -45,8 +54,6 @@ class AudioPlayer(QWidget):
             color: #606060;
         }
         """)
-        "767676"
-        "EAEAEA"
 
         self.resize(400, 135)
         self.image_size: int = 25
@@ -160,6 +167,7 @@ class AudioPlayer(QWidget):
         self.audio_streamer.playbackStateChanged.connect(self.player_state_changed)
         self.audio_streamer.durationChanged.connect(self.duration_is_changed)
 
+        # The streaming loop must not be starved by the UI thread
         self.audio_streamer.start(QThread.Priority.TimeCriticalPriority)
         self.change_play_icon()
 
@@ -174,12 +182,16 @@ class AudioPlayer(QWidget):
         self.set_default_track_cover()
 
     def paintEvent(self, event: QPaintEvent) -> None:
+        """Draw the panel background and the rounded track cover.
+
+        :param event: Qt paint event.
+        :returns: None.
+        """
         super().paintEvent(event)
         start_time = time.time()
         painter = QPainter(self)
 
         painter.fillRect(0, 0, self.width() - 1, self.height() - 1, QColor("#B3B3B3"))
-        # painter.fillRect(0, 0, self.width() - 1, 1, QColor("#7F7F7F"))
 
         path = QPainterPath()
         path.addRoundedRect(QRectF(20, self.height() - 50 - 10, 50, 50), 15, 15)
@@ -190,18 +202,36 @@ class AudioPlayer(QWidget):
             self.mf.profiling.add_draw_time("AudioPlayer", time.time() - start_time)
 
     def showEvent(self, event: QShowEvent) -> None:
+        """Lay out the child widgets when the panel becomes visible.
+
+        :param event: Qt show event.
+        :returns: None.
+        """
         super().showEvent(event)
         self.recalc_sizes()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Lay out the child widgets on resize.
+
+        :param event: Qt resize event.
+        :returns: None.
+        """
         super().resizeEvent(event)
         if self.isVisible():
             self.recalc_sizes()
 
     def __del__(self) -> None:
+        """Release the audio port together with the widget.
+
+        :returns: None.
+        """
         self.audio_streamer.close_audio_port()
 
     def recalc_sizes(self) -> None:
+        """Reposition every child widget relative to the current panel size.
+
+        :returns: None.
+        """
         self.title_tack.move(80, self.height() - 35 - 21)
         self.author_tack.move(80, self.height() - 35)
         self.play_button.move(round(self.width() / 2 - self.play_button.width() / 2),
@@ -239,6 +269,10 @@ class AudioPlayer(QWidget):
         self.update()
 
     def change_play_icon(self) -> None:
+        """Switch the transport button icon to match the player state.
+
+        :returns: None.
+        """
         if self.player_state is PlayerState.PLAY:
             self.play_button.setIcon(QIcon('res/icons/player_pause_icon_black.png'))
         else:
@@ -247,12 +281,21 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot()
     def play_button_click(self) -> None:
+        """Toggle playback from the transport button.
+
+        :returns: None.
+        """
         if self.player_state is PlayerState.WAIT or self.player_state is PlayerState.PAUSE:
             self.play_music()
         elif self.player_state is PlayerState.PLAY:
             self.pause_music()
 
     def set_graph_visible(self, visible: bool) -> None:
+        """Show or hide the waveform graph and resize the panel accordingly.
+
+        :param visible: True shows the graph.
+        :returns: None.
+        """
         if visible:
             self.audio_graph.setVisible(True)
             self.audio_graph.calculate_render_lines(forcedly=True)
@@ -264,6 +307,10 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot()
     def switch_graph_visible(self) -> None:
+        """Invert the graph visibility and store it in the settings.
+
+        :returns: None.
+        """
         self.graph_visible = not self.graph_visible
         self.set_graph_visible(self.graph_visible)
         self.mf.settings.player_settings.graph_visible = self.graph_visible
@@ -271,6 +318,10 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot()
     def switch_visible_meta(self) -> None:
+        """Slide the track meta list in or out.
+
+        :returns: None.
+        """
         self.meta_visible = not self.meta_visible
         self.meta_show_anim.stop()
         if self.meta_visible:
@@ -285,6 +336,10 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot()
     def switch_mute_audio(self) -> None:
+        """Mute or restore the volume kept by the slider.
+
+        :returns: None.
+        """
         self.mute_audio = not self.mute_audio
         if not self.mute_audio:
             self.mute_volume_button.setIcon(QIcon('res/icons/player_volume_icon_black.png'))
@@ -294,9 +349,15 @@ class AudioPlayer(QWidget):
             self.audio_streamer.set_volume(0)
 
     def set_current_time(self, position: float) -> None:
+        """Update the elapsed and remaining time labels around the progress slider.
+
+        :param position: Playback position in milliseconds.
+        :returns: None.
+        """
         self.label_duration_left.setText(f"{datetime.strftime(datetime.fromtimestamp(position / 1000), '%M:%S')}")
         self.label_duration_left.adjustSize()
         slider_position: float = self.position_slider.width() * position / self.audio_streamer.duration()
+        # Labels ride along the slider and switch colour once they overlap the filled part
         if slider_position - 10 < self.label_duration_left.width():
             self.label_duration_left.move(int(slider_position) + 5 + self.position_slider.x(),
                                           self.label_duration_left.y())
@@ -318,6 +379,11 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot(int)
     def track_position_changed(self, position: int) -> None:
+        """Propagate the streamer progress to the slider, labels and graph.
+
+        :param position: Playback position in milliseconds.
+        :returns: None.
+        """
         self.position_slider.set_value(position)
         self.set_current_time(position)
 
@@ -329,6 +395,11 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot(PlayerState)
     def player_state_changed(self, state: PlayerState):
+        """React to the streamer state changes.
+
+        :param state: New streamer state.
+        :returns: None.
+        """
         print_d(state)
         if state is PlayerState.STOP:
             self.position_slider.set_value(0)
@@ -337,6 +408,12 @@ class AudioPlayer(QWidget):
 
     # region Player methods
     def prepare_to_open_file(self, path: str, track_meta: Optional[dict]) -> bool:
+        """Reset the panel and fill the title, artist and meta list before decoding.
+
+        :param path: Path to the audio file.
+        :param track_meta: Tag dictionary read from the registry, may be None.
+        :returns: True when the panel is ready for the file.
+        """
         self.audio_streamer.stop()
         self.meta_list.clear()
         print_d(f"Open file: {path}")
@@ -363,12 +440,22 @@ class AudioPlayer(QWidget):
         return True
 
     def set_default_track_cover(self, icon_index: int = 0) -> None:
+        """Draw one of the bundled placeholder covers.
+
+        :param icon_index: Placeholder index in the range 0..5.
+        :returns: None.
+        """
         img = QImage()
         img.load(f"res/icons/track_default_cover_{icon_index + 1}.png")
         self.track_meta_image_drawable = img.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
                                                     Qt.TransformationMode.SmoothTransformation)
 
     def set_track_cover(self, image: Optional[QImage]) -> None:
+        """Show the cover extracted from the track, or a placeholder.
+
+        :param image: Cover image, None falls back to the placeholder.
+        :returns: None.
+        """
         if image is not None:
             self.track_meta_image_drawable = image.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
                                                           Qt.TransformationMode.SmoothTransformation)
@@ -376,14 +463,22 @@ class AudioPlayer(QWidget):
             self.set_default_track_cover()
 
     def open_file(self, path) -> None:
+        """Decode the file and hand the waveform over to the streamer and the graph.
+
+        Called from the OpenFileWorker thread because decoding is slow.
+
+        :param path: Path to the audio file.
+        :returns: None.
+        """
         waveform_np, sample_rate = librosa.load(path, sr=None, mono=False, dtype=np.int16)
         if waveform_np.ndim == 1:
             waveform_np = waveform_np[None, :]
         print_d(waveform_np.shape, waveform_np[0], sample_rate)
+        # The graph gets a heavily decimated copy, drawing every sample is pointless
         self.audio_graph.set_data(waveform_np[0, ::sample_rate // 22050 * 10] * 1.0, calc_line=False)
         self.audio_graph.set_shift(0, 1)
 
-        waveform_np = np.swapaxes(waveform_np, 0, 1)
+        waveform_np = np.swapaxes(waveform_np, 0, 1)  # From [channels, samples] to interleaved [samples, channels]
 
         self.waveform = waveform_np
         self.sample_rate = sample_rate
@@ -393,12 +488,25 @@ class AudioPlayer(QWidget):
         self.audio_graph.changeCursorPosition.emit(0)
 
     def get_output_devices(self) -> List[Dict[str, any]]:
+        """List the available output devices.
+
+        :returns: List[Dict] - Device descriptions.
+        """
         return self.audio_streamer.get_output_devices()
 
     def get_default_output(self) -> Dict[str, any]:
+        """Describe the system default output device.
+
+        :returns: Dict - Device description.
+        """
         return self.audio_streamer.get_default_output()
 
     def switch_device(self, device_index: Optional[int] = None) -> bool:
+        """Switch the output device, pausing playback while the stream is reopened.
+
+        :param device_index: Target device index, system default when None.
+        :returns: True on success.
+        """
         if self.is_playable:
             self.pause_music()
             success = self.audio_streamer.switch_device(device_index)
@@ -409,16 +517,29 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot(float)
     def duration_is_changed(self, duration: float) -> None:
+        """Rescale the progress slider for a newly loaded track.
+
+        :param duration: Track duration in milliseconds.
+        :returns: None.
+        """
         self.position_slider.set_range(0, int(duration))
         self.label_duration_right.setText(f"{datetime.strftime(datetime.fromtimestamp(duration / 1000), '%M:%S')}")
         self.label_duration_right.adjustSize()
 
     @property
     def is_playable(self) -> bool:
+        """Whether transport commands may be sent to the streamer.
+
+        :returns: bool - False while no track is loaded or a file is still opening.
+        """
         return self.player_state is not PlayerState.NONE and self.player_state is not PlayerState.OPENING
 
     @pyqtSlot()
     def play_music(self) -> None:
+        """Start playback.
+
+        :returns: None.
+        """
         if self.is_playable:
             self.audio_streamer.play()
             self.player_state = PlayerState.PLAY
@@ -426,6 +547,10 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot()
     def pause_music(self) -> None:
+        """Pause playback.
+
+        :returns: None.
+        """
         if self.is_playable:
             self.audio_streamer.pause()
             self.player_state = PlayerState.PAUSE
@@ -433,6 +558,10 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot()
     def stop_music(self) -> None:
+        """Stop playback and rewind.
+
+        :returns: None.
+        """
         if self.is_playable:
             self.audio_streamer.stop()
             self.player_state = PlayerState.WAIT
@@ -440,27 +569,55 @@ class AudioPlayer(QWidget):
 
     @pyqtSlot(int)
     def set_track_position(self, value: int) -> None:
+        """Seek the track from the progress slider.
+
+        :param value: New position in milliseconds.
+        :returns: None.
+        """
         if self.is_playable:
             self.audio_streamer.set_position(value)
             self.set_current_time(value)
             self.positionChanged.emit(value / self.audio_streamer.duration())
 
     def set_log_volume(self, log_volume: bool) -> None:
+        """Switch between linear and perceptual volume curves.
+
+        :param log_volume: True enables the perceptual curve.
+        :returns: None.
+        """
         self.audio_streamer.log_volume = log_volume
         self.set_track_volume(self.volume_slider.value)
 
     @pyqtSlot(int)
     def set_track_volume(self, value: int) -> None:
+        """Apply the volume slider value to the streamer.
+
+        :param value: Slider value in the range 0..volume_slider.maximum.
+        :returns: None.
+        """
         if not self.mute_audio:
             self.audio_streamer.set_volume(value / self.volume_slider.maximum)
 
     @pyqtSlot(list)
     def set_eq_gains(self, gains: List[float]) -> None:
+        """Push new EQ band gains to the streamer.
+
+        :param gains: Linear multiplier per band.
+        :returns: None.
+        """
         self.audio_streamer.eq_gains = gains
 
     def start_position_loading(self) -> None:
+        """Turn the progress slider into an indeterminate loading bar.
+
+        :returns: None.
+        """
         self.position_slider.set_loading_mode(True)
 
     def stop_position_loading(self) -> None:
+        """Return the progress slider to the normal mode.
+
+        :returns: None.
+        """
         self.position_slider.set_loading_mode(False)
     # endregion

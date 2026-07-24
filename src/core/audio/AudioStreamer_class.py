@@ -16,305 +16,284 @@ from src.function_lib.audio import equalizer_librosa
 
 
 class AudioStreamer(QThread):
-    """Класс для потокового воспроизведения аудио с поддержкой EQ и управления устройствами.
+    """Background thread that streams a waveform to an output device with optional EQ.
 
     :signals: progress (int), finished (), playbackStateChanged (PlayerState), durationChanged (float)
-    :attributes: _position, player_state, waveform_ref, sample_rate, thread_stop, chunk_size, duration, channels, volume, log_volume, eq_active, eq_gains, bands, pyaudio_port, pyaudio_stream
     """
-    
-    progress = QtCore.pyqtSignal(int)  # Сигнал обновления положения (ms)
-    finished = QtCore.pyqtSignal()  # Сигнал завершения воспроизведения
-    playbackStateChanged = QtCore.pyqtSignal(PlayerState)  # Сигнал изменения состояния воспроизведения
-    durationChanged = QtCore.pyqtSignal(float)  # Сигнал изменения длительности трека
+
+    progress = QtCore.pyqtSignal(int)  # Playback position, ms
+    finished = QtCore.pyqtSignal()  # Streaming loop has stopped
+    playbackStateChanged = QtCore.pyqtSignal(PlayerState)
+    durationChanged = QtCore.pyqtSignal(float)  # Track duration, ms
 
     def __init__(self):
-        """Инициализация потока для воспроизведения аудио.
+        """Prepare the streaming thread and open the PyAudio port.
 
-        :returns: None
+        :returns: None.
         """
         super().__init__()
-        # Текущая позиция воспроизведения в сэмплах
-        self._position: int = 0
-        # Состояние плеера (NONE/PLAY/PAUSE/STOP)
+        self._position: int = 0  # Playback position, samples
         self.player_state = PlayerState.NONE
-        # Ссылка на форму волны для воспроизведения
         self.waveform_ref: Optional[np.ndarray] = None
-        # Частота дискретизации в Hz
         self.sample_rate: Optional[int] = None
-        # Флаг остановки потока
         self.thread_stop: bool = False
-        # Размер буфера вывода (чанк) в сэмплах — 512*2 для стерео
-        self._chunk_size: int = 512 * 2
-        # Вычисленная длительность трека в миллисекундах
+        self._chunk_size: int = 512 * 2  # Output buffer size, samples per channel
         self._duration: float = 0
-        # Количество каналов (обычно 2 для стерео)
         self._channels: int = 2
-        # Текущая громкость (линейное значение)
         self._volume: float = 1.0
-        # Флаг логарифмического отображения громкости в логах
-        self.log_volume: bool = True
-        # Активация/деактивация эквалайзера
+        self.log_volume: bool = True  # Apply a curve so the slider feels linear to the ear
         self.eq_active: bool = True
-        # Коэффициенты усиления для каждого бэнда эквалайзера (20 бэндов)
-        self.eq_gains: List[float] = [1.0 for _ in range(20)]
-        # Конфигурация частотных полос EQ (частота, ширина, тип наклона)
-        self.bands: List[tuple] = []
+        self.eq_gains: List[float] = [1.0 for _ in range(20)]  # Linear multiplier per EQ band
+        self.bands: List[tuple] = []  # Frequency ranges (f_low, f_high) matching eq_gains
 
-        # Порт PyAudio для вывода звука
         self.pyaudio_port: pyaudio.PyAudio = pyaudio.PyAudio()
-        # Потоковая передача аудио (будет создана при инициализации файла)
         self.pyaudio_stream: Optional[pyaudio.Stream] = None
 
     def init_file(self, waveform: np.ndarray, sample_rate: int) -> None:
-        """Инициализация потока воспроизведением файла.
+        """Bind a decoded track to the streamer and reopen the output stream.
 
-        :param waveform: Двумерный массив формы волны [channels, samples].
-        :param sample_rate: Частота дискретизации в Hz.
+        :param waveform: Interleaved sample array of shape [samples, channels].
+        :param sample_rate: Sampling rate in Hz.
         :returns: None.
         """
-        self.stop()  # Остановка текущего воспроизведения
-        time.sleep(self._chunk_size / sample_rate + 0.01)  # Задержка для сброса буфера
-        
-        self.waveform_ref = waveform  # Сохранение формы волны для обработки
-        self.sample_rate = sample_rate  # Установление частоты дискретизации
-        self._duration = waveform.size / sample_rate * 1000 / self._channels  # Вычисление длительности в мс
-        
-        self.durationChanged.emit(self._duration)  # Сообщаем о новой длительности
-        
-        if self.pyaudio_stream is not None:  # Закрываем существующий поток
+        self.stop()
+        time.sleep(self._chunk_size / sample_rate + 0.01)  # Let the current chunk drain
+
+        self.waveform_ref = waveform
+        self.sample_rate = sample_rate
+        self._duration = waveform.size / sample_rate * 1000 / self._channels
+
+        self.durationChanged.emit(self._duration)
+
+        if self.pyaudio_stream is not None:
             self.pyaudio_stream.close()
 
-        self.open_stream()  # Открываем новый аудиопоток
+        self.open_stream()
 
     def open_stream(self, device_index: Optional[int] = None) -> None:
-        """Открытие аудиопотока для вывода звука.
+        """Open a 16-bit output stream on the given device.
 
-        :param device_index: Индекс выходного устройства (по умолчанию - default device).
+        :param device_index: Output device index, system default when None.
         :returns: None.
         """
-        if device_index is None:  # Получаем индекс default устройства по умолчанию
+        if device_index is None:
             device_index = sd.query_devices(kind='output').get("index")
-        
+
         self.pyaudio_stream = self.pyaudio_port.open(
-            format=self.pyaudio_port.get_format_from_width(2),  # Format для 16-bit звука
-            channels=self._channels,  # Количество каналов (обычно 2)
-            rate=int(self.sample_rate),  # Частота дискретизации
-            output_device_index=device_index,  # Индекс выходного устройства
-            frames_per_buffer=self._chunk_size,  # Размер буфера вывода
-            output=True  # Выходной поток
+            format=self.pyaudio_port.get_format_from_width(2),
+            channels=self._channels,
+            rate=int(self.sample_rate),
+            output_device_index=device_index,
+            frames_per_buffer=self._chunk_size,
+            output=True
         )
 
     def switch_device(self, device_index: Optional[int] = None) -> bool:
-        """Смена выходного аудиоустройства.
+        """Move playback to another output device.
 
-        :param device_index: Индекс целевого устройства (по умолчанию - default device).
-        :returns: True если переключение успешно, False при ошибке.
+        :param device_index: Target device index, system default when None.
+        :returns: True on success, False when the device was rejected and the default was used.
         """
         try:
-            if self.pyaudio_stream is not None:  # Если поток активен
-                if self.pyaudio_stream.is_active():  # Останавливаем текущую передачу
+            if self.pyaudio_stream is not None:
+                if self.pyaudio_stream.is_active():
                     self.pyaudio_stream.stop_stream()
-                self.pyaudio_stream.close()  # Закрываем старый поток
-            self.open_stream(device_index)  # Открываем новый поток для устройства
-            
-            return True  # Успешное переключение
-        except Exception as e:  # При ошибке
-            print_e("Unable to switch device", e)  # Логирование ошибки
-            self.open_stream()  # Пытаемся использовать default устройство
-            return False  # Возвращаем False на ошибку
+                self.pyaudio_stream.close()
+            self.open_stream(device_index)
+
+            return True
+        except Exception as e:
+            print_e("Unable to switch device", e)
+            self.open_stream()  # Fall back to the default device
+            return False
 
     def close_audio_port(self) -> None:
-        """Закрытие аудиопорта и освобождение ресурсов.
+        """Release the PyAudio port and the output stream.
 
         :returns: None.
         """
-        self.pyaudio_port.terminate()  # Терминирование порта PyAudio
-        if self.pyaudio_stream is not None:  # Если поток существует
-            self.pyaudio_stream.close()  # Закрытие потока
+        self.pyaudio_port.terminate()
+        if self.pyaudio_stream is not None:
+            self.pyaudio_stream.close()
 
     def run(self):
-        """Основной цикл воспроизведения потока.
+        """Stream the waveform chunk by chunk until the thread is stopped.
 
-        :returns: None (выполняется в потоке).
+        :returns: None (runs inside the thread).
         """
-        print_d("AudioStreamer is running")  # Логирование запуска потока
-        
-        while not self.thread_stop:  # Основной цикл обработки чанков
-            if self.player_state is PlayerState.PLAY:  # Если воспроизведение активно
-                
-                left_padding = self._chunk_size  # Левый padding для начала трека
-                right_padding = self._chunk_size  # Правый padding для конца трека
-                
-                # Убираем левый пэдинг для старта трека
+        print_d("AudioStreamer is running")
+
+        while not self.thread_stop:
+            if self.player_state is PlayerState.PLAY:
+
+                # Overlap the cut with neighbour samples so the EQ does not produce edge artifacts
+                left_padding = self._chunk_size
+                right_padding = self._chunk_size
+
                 if self._position == 0:
                     left_padding = 0
-                    right_padding = self._chunk_size  # Добавляем правый пэдинг только в начале
-                
-                # Вырезаем сегмент волны для текущего чанка
+
                 wave_crop = self.waveform_ref[self._position - left_padding:self._position + self._chunk_size + right_padding]
-                
-                if wave_crop is None or wave_crop.size == 0:  # Если трек закончился
-                    self.stop()  # Останавливаем воспроизведение
-                
-                wave_type = wave_crop.dtype  # Определяем тип данных волны
-                
-                wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max  # Нормализация в диапазон [-1, 1]
-                
-                # region EQ — Применяем эквалайзер если активен
+
+                if wave_crop is None or wave_crop.size == 0:  # End of the track
+                    self.stop()
+
+                wave_type = wave_crop.dtype
+
+                wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max  # Normalise to [-1, 1]
+
+                # region EQ
                 if self.eq_active:
                     wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands)
-                    wave_crop = np.clip(wave_crop, -1.0, 1.0)  # Климпируем после EQ
+                    wave_crop = np.clip(wave_crop, -1.0, 1.0)
                 # endregion
-                
-                # Применяем громкость и возвращаем в исходный тип данных
+
                 wave_crop = (wave_crop * self._volume)
                 wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
-                
-                data = wavio._array2wav(wave_crop[left_padding:self._chunk_size+left_padding], 2)  # Конвертация в формат PyAudio
-                
+
+                # Drop the padding and pack the payload chunk into raw PCM bytes
+                data = wavio._array2wav(wave_crop[left_padding:self._chunk_size + left_padding], 2)
+
                 try:
-                    self.pyaudio_stream.write(data)  # Вывод чанка в поток
-                except OSError as e:  # При ошибке с устройством
-                    self.switch_device()  # Переключаемся на другое устройство
-                    self.pyaudio_stream.write(data)  # Повторяем вывод
-                
-                self._position += self._chunk_size  # Сдвигаем позицию вперед
-                
-                self.progress.emit(int(self._position / self.sample_rate * 1000))  # Сообщаем о прогрессе (ms)
-            
-            else:  # Если не PLAY — ждём короткое время
+                    self.pyaudio_stream.write(data)
+                except OSError as e:
+                    self.switch_device()  # Device disappeared, retry on another one
+                    self.pyaudio_stream.write(data)
+
+                self._position += self._chunk_size
+
+                self.progress.emit(int(self._position / self.sample_rate * 1000))
+
+            else:
                 time.sleep(0.01)
                 continue
-        
-        self.finished.emit()  # Сообщаем о завершении воспроизведения
+
+        self.finished.emit()
 
     def set_position(self, position: int) -> None:
-        """Установка позиции воспроизведения в миллисекундах.
+        """Seek to a position inside the track.
 
-        :param position: Позиция в миллисекундах от начала трека.
+        :param position: Offset from the track start in milliseconds.
         :returns: None.
         """
-        self._position = round(position * self.sample_rate / 1000)  # Конвертация мс -> сэмплы
+        self._position = round(position * self.sample_rate / 1000)
 
     def pause(self) -> None:
-        """Возврат воспроизведения в состояние паузы.
+        """Suspend playback and keep the current position.
 
         :returns: None.
         """
         self.player_state = PlayerState.PAUSE
-        self.playbackStateChanged.emit(self.player_state)  # Сообщаем о смене состояния
+        self.playbackStateChanged.emit(self.player_state)
 
     def play(self) -> None:
-        """Запуск воспроизведения трека.
+        """Resume playback from the current position.
 
         :returns: None.
         """
         self.player_state = PlayerState.PLAY
-        self.playbackStateChanged.emit(self.player_state)  # Сообщаем о смене состояния
+        self.playbackStateChanged.emit(self.player_state)
 
     def stop(self) -> None:
-        """Полная остановка воспроизведения.
+        """Stop playback and rewind to the track start.
 
         :returns: None.
         """
         self.player_state = PlayerState.STOP
-        self.playbackStateChanged.emit(self.player_state)  # Сообщаем о смене состояния
-        self._position = 0  # Сброс позиции в начало
+        self.playbackStateChanged.emit(self.player_state)
+        self._position = 0
 
     def set_volume(self, volume: float) -> None:
-        """Установка громкости воспроизведения.
+        """Set the output volume.
 
-        :param volume: Значение громкости от 0 до 1 (линейное). Если log_volume=True, применяется квадратичная трансформация для логарифмического восприятия.
+        :param volume: Linear value in the range 0..1.
         :returns: None.
         """
-        if self.log_volume:  # Логарифмическое отображение громкости в логах
-            self._volume = math.pow(volume, 2.0)  # Компенсация нелинейности восприятия
-        else:  # Линейное отображение
+        if self.log_volume:
+            self._volume = math.pow(volume, 2.0)  # Compensate the non-linear loudness perception
+        else:
             self._volume = volume
 
     def get_volume(self) -> float:
-        """Получение текущего значения громкости.
+        """Return the current volume multiplier.
 
-        :returns: float — Текущее значение громкости (линейное).
+        :returns: float - Linear volume value.
         """
         return self._volume
-        
+
     def set_chunk_size(self, chunk_size: int) -> None:
-        """Изменение размера буфера вывода (чанка).
-        
-        Аргументы:
-            chunk_size (int): Новый размер чанка в сэмплах. Влияет на плавность воспроизведения.
-                             Большие значения — более плавный звук, меньше задержка.
+        """Change the output buffer size.
+
+        :param chunk_size: Buffer size in samples. Larger values are safer against dropouts but add latency.
+        :returns: None.
         """
-        self._chunk_size = chunk_size  # Обновление размера чанка
+        self._chunk_size = chunk_size
 
     def get_chunk_size(self) -> int:
-        """Получение текущего размера буфера вывода.
+        """Return the current output buffer size.
 
-        :returns: int — Текущий размер чанка в сэмплах.
+        :returns: int - Buffer size in samples.
         """
-        return self._chunk_size  # Возврат текущего значения
+        return self._chunk_size
 
     def duration(self) -> float:
-        """Получение общей длительности трека.
+        """Return the duration of the bound track.
 
-        :returns: float — Длительность воспроизведения в миллисекундах.
+        :returns: float - Duration in milliseconds.
         """
-        return self._duration  # Возврат вычисленной длительности
-        
+        return self._duration
+
     @pyqtSlot(bool)
     def set_eq_active(self, eq_active: bool) -> None:
-        """Включение/выключение эквалайзера во время воспроизведения.
+        """Enable or disable the equalizer during playback.
 
-        :param eq_active: True — активировать EQ, False — отключить. Изменение применяется к следующему чанку после выключения.
+        :param eq_active: True enables the EQ, applied starting from the next chunk.
         :returns: None.
         """
-        self.eq_active = eq_active  # Обновление статуса эквалайзера
+        self.eq_active = eq_active
 
     def print_all_devices(self):
-        """Вывод всех доступных выходных аудиоустройств в консоль.
+        """Print every available output device to the console.
 
         :returns: None.
         """
-        print_d(self.get_output_devices())  # Печать списка устройств
+        print_d(self.get_output_devices())
 
     @staticmethod
     def get_output_devices() -> List[Dict[str, any]]:
-        """Получение списка выходных аудиоустройств системы.
+        """Collect the multichannel output devices of the system.
 
-        :returns: List[Dict] — Список словарей с информацией о каждом устройстве (index, name, hostapi, hostapi_name). Фильтрует только устройства с поддержкой >1 канала.
+        :returns: List[Dict] - Device descriptions (index, name, hostapi, hostapi_name).
         """
-        devs = sd.query_devices()  # Получаем все устройства
-        
-        hostapis = sd.query_hostapis()  # Информация о HostAPI системах
-        
-        out = []  # Список для результата
-        
-        for i, d in enumerate(devs):  # Проходим по всем устройствам
-            if d.get("max_output_channels", 0) > 1:  # Только многоканальные устройства
-                out.append({  # Добавляем устройство в список
+        devs = sd.query_devices()
+
+        hostapis = sd.query_hostapis()
+
+        out = []
+
+        for i, d in enumerate(devs):
+            if d.get("max_output_channels", 0) > 1:  # Stereo capable devices only
+                out.append({
                     "index": d.get("index"),
                     "name": d.get("name"),
                     "hostapi": d.get("hostapi"),
                     "hostapi_name": hostapis[d.get("hostapi")]["name"],
                 })
-        return out  # Возврат списка устройств
+        return out
 
     @staticmethod
     def get_default_output() -> Dict[str, any]:
-        """Получение информации о устройстве вывода по умолчанию.
+        """Describe the system default output device.
 
-        :returns: Dict — Словарь с информацией об устройстве (index, name, hostapi, hostapi_name).
+        :returns: Dict - Device description (index, name, hostapi, hostapi_name).
         """
-        device = sd.query_devices(kind="output")  # Получаем выходное устройство
-        
-        hostapis = sd.query_hostapis()  # Информация о HostAPI системах
-        
-        return {  # Возврат словаря с информацией об устройстве
+        device = sd.query_devices(kind="output")
+
+        hostapis = sd.query_hostapis()
+
+        return {
             "index": device.get("index"),
             "name": device.get("name"),
             "hostapi": device.get("hostapi"),
             "hostapi_name": hostapis[device.get("hostapi")]["name"],
         }
-
-

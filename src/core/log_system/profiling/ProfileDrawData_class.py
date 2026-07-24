@@ -6,6 +6,8 @@ from src.enums import ProfileDataType
 
 
 class ProfileDrawData:
+    """Ring buffer of timings per module, split into draw calls and math calls."""
+
     def __init__(self) -> None:
         self._module_draw_call_container: Dict[str, np.ndarray] = {}
         self._module_math_call_container: Dict[str, np.ndarray] = {}

@@ -6,12 +6,11 @@ from src.core.log_system import print_e, log_i, print_d
 
 
 def load_sess_model(path: str, sess_provider: str = "DmlExecutionProvider") -> rt.InferenceSession:
-    """
-    Загрузка модели и создание сессии для предсказания
+    """Load an ONNX model and create an inference session.
 
-    :param path: Путь к onnx зашифрованной модели
-    :param sess_provider: providers для загрузки модели (InferenceSession)
-    :return: onnxruntime InferenceSession
+    :param path: Path to the onnx file.
+    :param sess_provider: Execution provider, for example DmlExecutionProvider or CPUExecutionProvider.
+    :returns: onnxruntime InferenceSession, falls back to CPU when the provider is unavailable.
     """
     print_d(f"Load model {os.path.basename(path)}: [{sess_provider}]")
     model_fstream = open(path, "rb")

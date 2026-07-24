@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 
 class GridContainer(QWidget):
+    """Scrollable grid of track tiles. Currently unused."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -83,6 +85,8 @@ class GridContainer(QWidget):
 
 
 class GridItem(QWidget):
+    """Single tile of GridContainer. Currently unused."""
+
     def __init__(self, prop: QWidget, parent, *args, **kwargs):
         super(GridItem, self).__init__(*args, **kwargs)
         self.prop: QWidget = prop

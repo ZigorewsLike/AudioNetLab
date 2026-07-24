@@ -11,6 +11,10 @@ from .BaseTabWidget_class import BaseTabWidget, TabItem
 
 
 class VerticalTabButton(QWidget):
+    """Text button of the vertical tab bar. Currently unused.
+
+    :signals: tab_clicked (int) - index of the clicked tab
+    """
     tab_clicked = QtCore.pyqtSignal(int)
 
     def __init__(self, text: str, index: int, *args, **kwargs):
@@ -42,6 +46,8 @@ class VerticalTabButton(QWidget):
 
 
 class VerticalTabWidget(BaseTabWidget):
+    """Tab widget with the tab bar on the left. Currently unused."""
+
     def __init__(self, *args, **kwargs):
         super(VerticalTabWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)

@@ -1,20 +1,18 @@
 import configparser
-import os
-import re
-import shutil
 from dataclasses import dataclass, fields
 from enum import Enum
-from typing import Any, List, Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from PyQt6.QtGui import QColor
 
 from src.core.point_system import Point
-from src.core.log_system import print_e, print_d
+from src.core.log_system import print_e
 from src.global_constants import VERSION
 
 
 @dataclass()
 class SystemSettings:
+    """Window geometry and application version stored in the ini file."""
     form_width: int
     form_height: int
     form_position: Point
@@ -23,22 +21,42 @@ class SystemSettings:
 
 @dataclass()
 class PlayerSettings:
+    """Player state restored on the next start."""
     volume: int
     auto_play: bool
     graph_visible: bool
 
 
 class SettingsDataObject:
+    """Application settings backed by an ini file.
+
+    Every dataclass becomes an ini section and every field becomes a key, so a new
+    setting only needs to be added to the corresponding dataclass.
+    """
+
     def __init__(self):
+        """Create the settings with their default values.
+
+        :returns: None.
+        """
         self.system_settings = SystemSettings(form_width=1600, form_height=900, form_position=Point(-1.0, -1.0),
                                               version=f"{VERSION}")
         self.player_settings = PlayerSettings(volume=500, auto_play=False, graph_visible=True)
 
     def __repr__(self) -> str:
+        """Describe the current settings.
+
+        :returns: str - Text representation.
+        """
         return f"SettingsDataObject({self.system_settings}, {self.player_settings})"
 
     @staticmethod
     def data_to_str(data: Any) -> str:
+        """Serialise a setting value for the ini file.
+
+        :param data: Value of any supported type.
+        :returns: str - Text representation.
+        """
         if isinstance(data, QColor):
             return data.name()
         elif isinstance(data, Enum):
@@ -50,9 +68,12 @@ class SettingsDataObject:
 
     @staticmethod
     def data_from_str(data: str, data_type: type) -> Any:
-        # future
-        # if data_type is EnumClass:
-        #     return data_type[data]  # noqa
+        """Parse a setting value read from the ini file.
+
+        :param data: Text representation.
+        :param data_type: Target type taken from the dataclass field.
+        :returns: The value converted to data_type.
+        """
         if data_type is QColor:
             return QColor(data)
         elif data_type is Point:
@@ -63,6 +84,11 @@ class SettingsDataObject:
         return data_type(data)
 
     def save_to_ini(self, save_path: str) -> None:
+        """Write every settings section to an ini file.
+
+        :param save_path: Path to the ini file.
+        :returns: None.
+        """
         conf = configparser.ConfigParser()
         for class_field in [self.system_settings, self.player_settings]:
             conf.add_section(class_field.__class__.__name__)
@@ -73,9 +99,15 @@ class SettingsDataObject:
             conf.write(f)
 
     def load_from_ini(self, file: str) -> bool:
+        """Read the ini file and apply the known keys, keeping defaults for the rest.
+
+        :param file: Path to the ini file.
+        :returns: True when the file was read without errors.
+        """
         try:
             config = configparser.ConfigParser()
             config.read(file, encoding='UTF-8')
+            # Owning dataclass and declared type per field name
             field_dict: Dict[str, Tuple[object, type]] = {}
             for class_field in [self.system_settings, self.player_settings]:
                 for data_field in fields(class_field):
@@ -94,6 +126,4 @@ class SettingsDataObject:
 
 if __name__ == '__main__':
     s = SettingsDataObject()
-    # s.load_from_ini('../../config.ini')
-    # s.load_from_ini('test.ini')
     s.save_to_ini('test_2.ini')

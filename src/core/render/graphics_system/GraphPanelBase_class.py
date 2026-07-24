@@ -1,40 +1,48 @@
 import time
-from typing import TYPE_CHECKING, List, Tuple, Optional
+from typing import TYPE_CHECKING, Tuple, Optional
 
 import numpy as np
-from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QRectF, pyqtSlot, QEasingCurve, QPoint, QPropertyAnimation
-from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QPen, QMouseEvent, QShowEvent, QResizeEvent,
-                         QPolygonF, QPainterPath, QWheelEvent)
+from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QPen, QShowEvent, QResizeEvent,
+                         QPolygonF, QPainterPath)
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtWidgets import QSlider
 
-from src.core.log_system import print_d
-from src.function_lib.math_lib import median
 from src.function_lib.qt_utils import array2d_to_qpolygonf
-from src.global_constants import PROFILE, DEBUG
+from src.global_constants import PROFILE
 
 if TYPE_CHECKING:
     from src.forms.MainForm_class import MainForm
 
 
 class GraphPanelBase(QOpenGLWidget):
+    """OpenGL panel that draws a 1D signal as a polyline.
+
+    The source array is kept as is, only the visible window (shift_left, shift_right)
+    is decimated down to the pixel width and cached as a QPolygonF, so panning and
+    zooming do not rebuild the whole curve.
+    """
+
     def __init__(self, main_form, *args, **kwargs):
+        """Create the panel with its default drawing settings.
+
+        :param main_form: Main form reference, used for profiling and update blocking.
+        :returns: None.
+        """
         super(GraphPanelBase, self).__init__(*args, **kwargs)
         self.mf: MainForm = main_form
         self.colors = [QColor("#5CD392"), QColor("#D0D3C7"), QColor("#D0D3C7")]
-        self.lines: Tuple[np.ndarray, np.ndarray] = (np.array([]), np.array([]))
+        self.lines: Tuple[np.ndarray, np.ndarray] = (np.array([]), np.array([]))  # (x indexes, y values)
         self.max_u_count: float = 0.0
         self.setMouseTracking(True)
         self.data_type: Optional[np.dtype] = None
-        self.shift_left: float = 0
+        self.shift_left: float = 0  # Visible window bounds as a fraction of the data
         self.shift_right: float = 1
         self.scale_factor: float = 1.
         self.new_width: float = self.width()
         self.render_lines: Optional[QPolygonF] = None
         self.graph_visible: bool = True
         self.brush_graph: bool = False
-        self.step_multiplier: int = 2
+        self.step_multiplier: int = 2  # Points drawn per pixel
         self.max_peak_value: float = 1.0
         self.draw_peak_text: bool = False
         self.profile_class_name: str = ""
@@ -43,16 +51,33 @@ class GraphPanelBase(QOpenGLWidget):
         self.background_corner_color: str = ""
 
     def showEvent(self, event: QShowEvent) -> None:
+        """Store the current width used by the shift math.
+
+        :param event: Qt show event.
+        :returns: None.
+        """
         self.new_width = self.width()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Rebuild the polyline for the new size.
+
+        :param event: Qt resize event.
+        :returns: None.
+        """
         super(GraphPanelBase, self).resizeEvent(event)
         self.set_shift(self.shift_left, self.shift_right)
         self.update()
 
     def set_data(self, data_array: np.ndarray, data_type: np.dtype = np.uint8, calc_line: bool = True):
+        """Load the signal to draw, normalising it to the range 0..1.
+
+        :param data_array: Source values.
+        :param data_type: Original data type of the samples.
+        :param calc_line: Build the polyline right away.
+        :returns: None.
+        """
         data_max = data_array.max()
-        if data_max > 1.0:
+        if data_max > 1.0:  # Already normalised data is kept as is
             data_min = data_array.min()
             self.max_peak_value = data_max
             data_array = (data_array - data_min) / (data_max - data_min)
@@ -66,6 +91,11 @@ class GraphPanelBase(QOpenGLWidget):
         self.update()
 
     def calculate_render_lines(self, forcedly: bool = False):
+        """Rebuild the cached polyline out of the visible part of the signal.
+
+        :param forcedly: Build even when the widget is hidden or updates are blocked.
+        :returns: None.
+        """
         if (not self.mf.block_update and self.isVisible()) or forcedly:
             start_time: float = time.time()
             wave_slice = self.lines[0]
@@ -73,9 +103,10 @@ class GraphPanelBase(QOpenGLWidget):
             wave_slice: np.ndarray = wave_slice[wave_slice <= int(self.shift_right * self.lines[1].size)]
             if wave_slice.size == 0:
                 return
-            # print_d("Clac render line. Slice: ", time.time() - start_time)
+            # Off screen anchors close the polygon below the visible area
             x_np_line: np.ndarray = np.array([-10])
             y_np_line: np.ndarray = np.array([self.height() + 50])
+            # Take at most step_multiplier points per pixel
             x_slice = wave_slice[::max(1, int(wave_slice.size / self.width() / self.step_multiplier / self.scale_factor))]
             y_slice = self.lines[1][x_slice]
 
@@ -91,9 +122,16 @@ class GraphPanelBase(QOpenGLWidget):
                 self.mf.profiling.add_math_time(module_name + "_lines", time.time() - start_time)
 
     def set_shift(self, shift_left: float, shift_right: float):
+        """Set the visible window of the signal and rebuild the polyline.
+
+        :param shift_left: Left bound as a fraction of the data, 0..1.
+        :param shift_right: Right bound as a fraction of the data, 0..1.
+        :returns: None.
+        """
         self.shift_left = shift_left
         self.shift_right = shift_right
         shift: float = (1 - self.shift_right) + self.shift_left
+        # Virtual width of the full signal at the current zoom
         self.new_width = self.width()
         if shift != 1:
             self.new_width *= abs(1 / (1 - shift))
@@ -101,6 +139,11 @@ class GraphPanelBase(QOpenGLWidget):
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
+        """Draw the background and the cached polyline.
+
+        :param event: Qt paint event.
+        :returns: None.
+        """
         start_time: float = time.time()
         if not self.mf.block_update and self.graph_visible and self.isVisible():
             painter = QPainter(self)
@@ -131,110 +174,3 @@ class GraphPanelBase(QOpenGLWidget):
         if PROFILE:
             self.mf.profiling.add_draw_time(self.__class__.__name__ if not self.profile_class_name else self.profile_class_name,
                                             time.time() - start_time)
-
-
-class GraphPanelAudio(GraphPanelBase):
-    changeCursorPosition = QtCore.pyqtSignal(float)
-
-    def __init__(self, main_form, *args, **kwargs):
-        super().__init__(main_form, *args, **kwargs)
-        self.cursor_position: float = 0.0
-        self.changeCursorPosition.connect(self.cursor_position_changed)
-        self.setMouseTracking(True)
-        self.debug: bool = False
-        self.slider_visible: bool = False
-        self.reset_graph_scale: bool = True
-        self.mouse_clicked: bool = False
-        self.mouse_position: QPoint = QPoint()
-        self.old_shift: List[float] = [self.shift_left, self.shift_right]
-        self.step_multiplier: int = 20
-
-        self.step_slider = QSlider(self)
-        self.step_slider.setRange(1, 20)
-        self.step_slider.setValue(self.step_multiplier)
-        self.step_slider.valueChanged.connect(self.step_multiplier_changed)
-
-        self.slider_show_anim = QPropertyAnimation(self.step_slider, b"pos")
-        self.slider_show_anim.setDuration(200)
-
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        super().resizeEvent(event)
-        self.step_slider.resize(15, self.height() - 20)
-        if self.slider_visible:
-            self.step_slider.move(self.width() - 20, 10)
-        else:
-            self.step_slider.move(self.width() + 5, 10)
-
-    def paintEvent(self, event: QPaintEvent) -> None:
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setPen(QPen(Qt.GlobalColor.green, 2.0, Qt.PenStyle.SolidLine))
-        cursor_x = int((self.cursor_position - self.shift_left) * self.scale_factor * self.width())
-        painter.drawLine(cursor_x, 0, cursor_x, self.height())
-        if DEBUG and self.debug:
-            painter.setPen(QPen(QColor("#FA887F"), 2.0, Qt.PenStyle.SolidLine))
-            painter.drawText(5, 40, f'scale:{self.scale_factor}')
-            painter.drawText(5, 55, f'shift:{self.shift_left} : {self.shift_right}')
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        super().mouseMoveEvent(event)
-        if not self.slider_visible:
-            self.slider_visible = True
-            self.slider_show_anim.setEndValue(QPoint(self.width() - 20, 10))
-            self.slider_show_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-            self.slider_show_anim.start()
-        if self.mouse_clicked:
-            delta_pos = self.mouse_position - event.pos()
-            shift_delta = delta_pos.x() / self.scale_factor / self.width()
-            if 0 <= self.old_shift[0] + shift_delta <= 1.0 and 0 <= self.old_shift[1] + shift_delta <= 1.0:
-                self.set_shift(median(0, self.old_shift[0] + shift_delta, 1),
-                               median(0, self.old_shift[1] + shift_delta, 1))
-
-    def leaveEvent(self, event) -> None:
-        super().leaveEvent(event)
-        if self.slider_visible:
-            self.slider_visible = False
-            self.slider_show_anim.setEndValue(QPoint(self.width() + 5, 10))
-            self.slider_show_anim.setEasingCurve(QEasingCurve.Type.InCubic)
-            self.slider_show_anim.start()
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        self.mouse_position = event.pos()
-        self.mouse_clicked = True
-        self.old_shift = [self.shift_left, self.shift_right]
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self.mouse_clicked = False
-
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        self.change_scale_graph()
-
-    def wheelEvent(self, event: QWheelEvent) -> None:
-        self.scale_factor = max(1, self.scale_factor + event.angleDelta().y() / 5)
-        self.reset_graph_scale = self.scale_factor == 1.0
-        self.change_scale_graph()
-
-    @pyqtSlot(int)
-    def step_multiplier_changed(self, val: int) -> None:
-        self.step_multiplier = val
-        self.calculate_render_lines()
-        self.update()
-        print_d(val)
-
-    def change_scale_graph(self) -> None:
-        if self.scale_factor != 1.0 or self.reset_graph_scale:
-            region_size: float = 1 / self.scale_factor
-            n_l = self.cursor_position - region_size / 2
-            n_r = self.cursor_position + region_size / 2
-            new_shift_l = n_l - min(.0, n_l) - max(.0, n_r - 1.0)
-            new_shift_r = n_r - min(.0, n_l) - max(.0, n_r - 1.0)
-            if (new_shift_l, new_shift_r) != (self.shift_left, self.shift_right):
-                self.set_shift(new_shift_l, new_shift_r)
-            self.reset_graph_scale = False
-            self.update()
-
-    @pyqtSlot(float)
-    def cursor_position_changed(self, position: float) -> None:
-        self.cursor_position = position
-        self.update()
-

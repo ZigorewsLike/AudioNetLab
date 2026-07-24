@@ -1,0 +1,196 @@
+# AudioNetLab
+
+Desktop audio player for Windows built with PyQt6. Besides normal playback it classifies the
+genre of a track with a neural network and can adjust a 20 band equalizer to the genre
+automatically, fragment by fragment.
+
+Audio is decoded into memory, streamed to the output device chunk by chunk in a background
+thread, and every chunk passes through an STFT based equalizer before it is written to the
+device. That is why the equalizer reacts immediately, without restarting playback.
+
+## Features
+
+* Playback of MP3, FLAC and WAV with a waveform view, a track list and tag display.
+* 20 band equalizer applied live during playback.
+* Genre classification with an ONNX model: the track is split into 3 second fragments and each
+  fragment gets its own genre.
+* Auto EQ mode: the equalizer follows the genre under the playback cursor and interpolates
+  between presets so a genre change is not audible as a jump.
+* One editable EQ preset per genre, stored on disk.
+* Output device switching, streaming buffer size and volume curve settings.
+* Built in profiler window with draw and math call timings.
+* Experimental lyrics modules (transcription, translation, summarization). They require a
+  separate external HTTP service that is not part of this repository, and the corresponding
+  buttons do nothing without it.
+
+## Requirements
+
+* Windows 10 or newer. The application uses Windows only APIs (DPI detection, Explorer
+  integration), it will not run on Linux or macOS as is.
+* Python 3.10 (the project is developed and tested on 3.10.7).
+* A working audio output device.
+
+## Installation
+
+```bat
+git clone <repository-url>
+cd AudioNetLab
+
+python -m venv venv
+venv\Scripts\activate
+
+pip install -r requirements.txt
+```
+
+The genre model is included in the repository under `models/`, nothing needs to be downloaded
+separately.
+
+## Running
+
+With the virtual environment activated:
+
+```bat
+python main.py
+```
+
+Or directly, without activating it:
+
+```bat
+venv\Scripts\python.exe main.py
+```
+
+On the first start the application creates `data/local/`, `data/registry/` and a `storage.db`
+database in the project folder, so run it from the project root.
+
+## First steps
+
+1. Open the **Home** tab and press **Open file**, or drag an audio file onto the window. The
+   track is added to the list.
+2. Click a track in the list to start playback. The player panel is pinned to the bottom of
+   the window: transport button, position slider, volume, waveform toggle and tag panel toggle.
+3. Open the **EQ AI** tab and press **Predict**. The track is analysed and a coloured genre
+   timeline appears, together with the genre shares and the final genre.
+4. On the same tab the buttons on the left of the equalizer control it:
+   * reset the sliders to a flat response,
+   * enable or disable the equalizer effect,
+   * enable auto EQ, where the sliders follow the detected genre,
+   * set the interpolation smoothness (mouse wheel over the button).
+
+The first prediction of a track is slow because the librosa features have to be extracted.
+They are cached in the track registry, so a repeated prediction of the same track only runs
+the model.
+
+## Configuration
+
+### config_app.ini
+
+Written automatically on exit next to `main.py`. Editing it by hand is optional.
+
+| Section | Key | Meaning |
+| --- | --- | --- |
+| SystemSettings | form_width, form_height | Window size |
+| SystemSettings | form_position | Window position as `x:y` |
+| SystemSettings | version | Version that wrote the file |
+| PlayerSettings | volume | Volume slider value, 0..1000 |
+| PlayerSettings | auto_play | Reserved |
+| PlayerSettings | graph_visible | Waveform panel visibility |
+
+### src/global_constants.py
+
+Developer level switches that are not exposed in the UI:
+
+| Constant | Meaning |
+| --- | --- |
+| `DEBUG` | Debug logging, and the AI tabs stay enabled without an opened track |
+| `PROFILE` | Collect timings for the profiler window (Tools, Profiling) |
+| `AI_ENABLED` | Load the genre model at startup, turn it off for a faster start |
+| `CUSTOM_TITLE_BAR` | Frameless window with the custom title bar |
+| `LOG_IN_FILE` | Duplicate the console output into `logs/` |
+| `GENRE_MODEL_PATH` | Path to the ONNX classifier |
+| `ONNX_SESS_PROVIDER` | `CPUExecutionProvider` or `DmlExecutionProvider` for a GPU |
+| `PATTERN_SIZE` | Length of one classified fragment in seconds, must match the model |
+| `SAMPLING_RATE_AI` | Sampling rate the model was trained on |
+| `EQ_SLIDER_COUNT` | Number of equalizer bands |
+| `GENRE_DICT` | Model output index to genre name |
+
+`PATTERN_SIZE`, `SAMPLING_RATE_AI` and `GENRE_DICT` describe the bundled model. Changing them
+without changing the model will produce wrong results.
+
+### Audio settings
+
+The **Settings** tab, section "Настройки аудио":
+
+* **Устройство**: output device, press "Переключить" to apply. Playback keeps running.
+* **Размер кеша**: streaming buffer size in samples, 256 to 4096. Larger values are safer
+  against dropouts on a slow machine, smaller values reduce latency.
+* **Логарифмический регулятор громкости**: makes the volume slider feel linear to the ear.
+
+### Equalizer presets
+
+The **Settings** tab, section "Пресеты эквалайзера": pick a genre, move the sliders, press
+**Save preset**. Presets are stored in `res/presets.pickle` and are picked up by auto EQ right
+after saving.
+
+## Data on disk
+
+| Path | Content |
+| --- | --- |
+| `storage.db` | SQLite database with the track list (path, title, timestamps) |
+| `data/registry/<track_id>/` | Per track cache: tags, feature vectors, lyrics |
+| `res/presets.pickle` | EQ presets per genre |
+| `res/icons/` | Interface icons |
+| `models/` | ONNX and h5 genre models |
+| `config_app.ini` | Application settings |
+| `error_log.txt` | Uncaught exceptions |
+
+Deleting a track from the list also deletes its registry folder. The audio file itself is never
+touched, the application only stores its path.
+
+## Project structure
+
+```
+main.py                     Entry point: logging, DPI, main window
+src/
+  forms/                    MainForm, the main window and the module wiring
+  core/
+    audio/                  AudioStreamer (streaming thread), AudioPlayer (player panel)
+    render/graphics_system/ OpenGL waveform panels
+    qt_widgets/             Shared widgets: sliders, equalizer, title bar, overlays
+    file_system/            Track registry and the recent track list
+    settings/               Settings object and the settings pages
+    workers/                Background workers: file opening, genre prediction
+    log_system/             Logging and the profiler
+    point_system/           Point helper type
+  ai_module/
+    genre_classification/   The EQ AI tab: prediction, timeline, auto EQ
+    transcription/          Experimental lyrics modules
+  api/db/                   SQLAlchemy models and the database handler
+  function_lib/             Audio features, the equalizer, ONNX loading, math helpers
+  enums/                    Enumerations
+  global_constants.py       Switches and paths
+installer/                  PyInstaller build script
+models/                     Genre models
+res/                        Icons and EQ presets
+```
+
+## Building a standalone executable
+
+```bat
+venv\Scripts\activate
+python installer/PyInstaller_running.py
+```
+
+The script fills `main_template.spec` with the current name, version and model path, writes
+`main_generate.spec` and runs PyInstaller. The result appears in `dist/AudioNetLab v<version>/`.
+It reads the active virtual environment from `VIRTUAL_ENV`, so the environment must be
+activated.
+
+## Troubleshooting
+
+* **Playback stutters**: raise "Размер кеша" in the audio settings.
+* **The device cannot be switched**: the device rejected the format of the current track,
+  the application falls back to the system default and shows a message.
+* **Prediction is slow on a long track**: expected on the first run, the features are cached
+  afterwards. A GPU can be used by setting `ONNX_SESS_PROVIDER` to `DmlExecutionProvider`.
+* **The window opens off screen**: delete `config_app.ini`, the geometry will be reset.
+* **Crash dialog with a traceback**: the same text is appended to `error_log.txt`.

@@ -20,6 +20,8 @@ class ChatMessage:
 
 
 class MessageBubble(QWidget):
+    """Single chat bubble, aligned left or right depending on the message direction."""
+
     def __init__(self, msg: ChatMessage, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
@@ -64,9 +66,9 @@ class MessageBubble(QWidget):
 
 
 class ChatWidget(QWidget):
-    """
-    - history: QScrollArea + вертикальный layout с пузырями
-    - input: QLineEdit + QPushButton
+    """Chat tab: a scrollable message history plus an input line.
+
+    Experimental UI stub, the send button currently echoes the message back.
     """
     def __init__(self, mf, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

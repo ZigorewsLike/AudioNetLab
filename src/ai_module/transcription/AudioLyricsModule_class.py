@@ -19,6 +19,12 @@ if TYPE_CHECKING:
 
 
 class AudioLyricsModule(QWidget):
+    """"Lyrics" tab: line by line lyrics that follow the playback position.
+
+    Lyrics come either from the file tags or from the external transcription service.
+    Clicking a line seeks the track to its timestamp.
+    """
+
     def __init__(self, mf, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
@@ -154,12 +160,21 @@ class AudioLyricsModule(QWidget):
 
 
 class TrackLabelItem(QWidget):
+    """One lyrics line, goes bold while it is the current one and seeks on a click."""
+
     def __init__(
             self, segment,
             parent_list: AudioLyricsModule,
             show_timestamp: bool = False,
             *args, **kwargs
     ):
+        """Build the label of one lyrics segment.
+
+        :param segment: Segment with the start time and the text.
+        :param parent_list: Owning AudioLyricsModule.
+        :param show_timestamp: Prefix the line with its timestamp.
+        :returns: None.
+        """
         super(TrackLabelItem, self).__init__(*args, **kwargs)
         self.setMouseTracking(True)
         self.segment = segment

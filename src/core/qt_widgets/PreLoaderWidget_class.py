@@ -9,6 +9,11 @@ from PyQt6.QtWidgets import QPushButton, QSlider, QLabel, QVBoxLayout, QWidget, 
 
 
 class PreLoaderWidget(QWidget):
+    """Fullscreen overlay with an animated bar indicator and a progress caption.
+
+    Shown while a file is decoded or a track is classified.
+    """
+
     def __init__(self, *args, **kwargs):
         super(PreLoaderWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)

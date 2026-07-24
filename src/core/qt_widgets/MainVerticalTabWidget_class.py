@@ -12,8 +12,9 @@ from .BaseTabWidget_class import BaseTabWidget
 
 
 class MainVerticalTabButton(QWidget):
-    """
-    Класс кнопки переключения вкладки
+    """Icon button of the vertical tab bar. Currently unused.
+
+    :signals: tab_clicked (int) - index of the clicked tab
     """
     tab_clicked = QtCore.pyqtSignal(int)
 
@@ -92,9 +93,7 @@ class MainVerticalTabButton(QWidget):
 
 
 class MainVerticalTabSubButton(MainVerticalTabButton):
-    """
-    Класс подраздела вкладки
-    """
+    """Nested button of a tab section. Currently unused."""
     tab_clicked = QtCore.pyqtSignal(int)
 
     def __init__(self, tab_type: MainTabWidgetIcons, index: int, icon_size: Optional[QSize], *args, **kwargs):
@@ -118,9 +117,7 @@ class MainVerticalTabSubButton(MainVerticalTabButton):
 
 
 class MainVerticalTabWidget(BaseTabWidget):
-    """
-    Класс многоуровневого TabWidget'a для главного окна
-    """
+    """Multi level vertical tab widget of the main window. Currently unused."""
     def __init__(self, *args, **kwargs):
         super(MainVerticalTabWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)

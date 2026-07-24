@@ -1,3 +1,4 @@
+"""Qt controls that report a hint through a show_help callback on hover. Currently unused."""
 from typing import Callable
 
 from PyQt6.QtCore import Qt

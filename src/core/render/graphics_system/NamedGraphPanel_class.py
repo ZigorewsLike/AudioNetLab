@@ -11,6 +11,8 @@ from .GraphPanelBase_class import GraphPanelBase
 
 
 class NamedGraphPanel(QWidget):
+    """GraphPanelBase with a caption above it. Currently unused."""
+
     def __init__(self, mf, *args, **kwargs):
         super(NamedGraphPanel, self).__init__(*args, **kwargs)
         self.header_padding: int = 30

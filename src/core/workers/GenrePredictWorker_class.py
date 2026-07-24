@@ -16,6 +16,15 @@ if TYPE_CHECKING:
 
 
 class GenrePredictWorker(QObject):
+    """Worker that classifies a track fragment by fragment outside the UI thread.
+
+    Every PATTERN_SIZE second fragment is turned into a librosa feature vector,
+    normalised with the training scaler and pushed through the ONNX model.
+    Feature vectors are cached in the track registry, so a repeated prediction
+    only runs inference.
+
+    :signals: finished (list) - genre index per fragment, preloader_signal (str) - progress text
+    """
     finished = QtCore.pyqtSignal(list)
     mf = None  # MainForm
     pattern_length: int = PATTERN_SIZE  # sec
@@ -25,9 +34,20 @@ class GenrePredictWorker(QObject):
     track_id: Optional[int] = None
 
     def __init__(self):
+        """Create the worker, inputs are assigned as attributes before run().
+
+        :returns: None.
+        """
         super().__init__()
 
     def run(self) -> List[int]:
+        """Classify the waveform and emit the per fragment genre indexes.
+
+        Uses the explicitly assigned waveform when present, otherwise the track
+        currently opened in the player.
+
+        :returns: List[int] - Genre index per fragment, empty when there is nothing to classify.
+        """
         if self.waveform is not None:
             waveform = self.waveform
             sample_rate = self.sample_rate
@@ -42,14 +62,15 @@ class GenrePredictWorker(QObject):
 
         if waveform is not None:
             predict_index_list: List[int] = []
-            waveform = waveform[:, 0].astype(np.float32) / np.iinfo(waveform.dtype).max
+            waveform = waveform[:, 0].astype(np.float32) / np.iinfo(waveform.dtype).max  # Left channel, [-1, 1]
             target_sr: int = SAMPLING_RATE_AI
-            if sample_rate != target_sr:
+            if sample_rate != target_sr:  # The model was trained on SAMPLING_RATE_AI
                 waveform = librosa.resample(waveform, orig_sr=sample_rate, target_sr=target_sr)
                 sample_rate = target_sr
 
             sample_len: int = math.ceil(waveform.shape[0] / sample_rate / self.pattern_length)
 
+            # StandardScaler coefficients taken from the training pipeline
             # TODO: Тут надо подумать над распределением (Взял коэффы от StandardScaler)
             mean = [3.78439426e-01, 8.29347338e-02, 1.79139561e-01, 3.35948677e-03,
                     1.90030846e+03, 4.02072421e+05, 2.09221961e+03, 1.59393196e+05,
@@ -84,7 +105,7 @@ class GenrePredictWorker(QObject):
 
             last_predict: Optional[int] = None
             input_array: Optional[np.ndarray] = self.mf.file_meta_controller.get_track_librosa_data(track_id=track_id)
-            use_cache_data: bool = input_array is not None
+            use_cache_data: bool = input_array is not None  # Features already computed for this track
 
             for step_index, step in enumerate(range(sample_len)):
                 self.preloader_signal.emit(f"Классификация жанра {round(step / sample_len * 100)}%")
@@ -113,8 +134,8 @@ class GenrePredictWorker(QObject):
                 preds = np.array(self.mf.genre_widget.model.run([output_name],
                                                                 {input_name: input_data.astype(np.float32)}))
                 preds = preds.squeeze()
-                # print_d(step, (preds * 100).round(1))
                 pred = np.argmax(preds)
+                # Keep the previous genre on a low confidence fragment to avoid flicker
                 if last_predict is not None and preds[pred] < 0.85:
                     pred = last_predict
                 else:
@@ -131,4 +152,3 @@ class GenrePredictWorker(QObject):
             return predict_index_list
         self.finished.emit([])
         return []
-

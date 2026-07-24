@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 
 class TranscriptionModule(QWidget):
+    """Experimental speech to text panel, requires an external HTTP service."""
+
     def __init__(self, mf, lyric_module, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf

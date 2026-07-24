@@ -8,6 +8,10 @@ from src.core.log_system import ConsoleColors
 
 
 class OutputBuffer(QObject):
+    """stdout replacement that mirrors the console output into a file and a Qt signal.
+
+    :signals: widget_print (str) - printed text when LOG_IN_SIGNAL is on
+    """
     widget_print = pyqtSignal(str)
 
     def __init__(self):

@@ -13,6 +13,10 @@ from src.global_styles import AppColorSchemes
 
 
 class DragFileWidget(QWidget):
+    """Drop overlay shown while a file is dragged over the window.
+
+    Tells apart a supported and an unsupported extension through DragFileState.
+    """
 
     def __init__(self, *args, **kwargs):
         super(DragFileWidget, self).__init__(*args, **kwargs)

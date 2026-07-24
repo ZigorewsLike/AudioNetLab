@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import QWidget, QToolButton, QFrame, QSizePolicy, QScrollAr
 
 
 class CollapsibleSection(QWidget):
+    """Section with a header that expands and collapses its content with an animation."""
+
     def __init__(self, title: str = "", animation_duration: int = 30, parent=None):
         super().__init__(parent)
 

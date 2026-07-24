@@ -1,22 +1,25 @@
-import os
-import pickle
-from typing import Dict, Union, TYPE_CHECKING, Optional, List
+from typing import Dict, TYPE_CHECKING, List
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread, QSize, QRect
-from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont,
-                         QResizeEvent, QShowEvent)
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog, QSlider, QComboBox, QFormLayout, \
-    QCheckBox, QHBoxLayout, QMessageBox
+from PyQt6.QtCore import pyqtSlot, Qt
+from PyQt6.QtGui import QShowEvent
+from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QSlider, QComboBox, QFormLayout,
+                             QCheckBox, QHBoxLayout, QMessageBox)
 
 if TYPE_CHECKING:
     from src.forms import MainForm
 
 
 class SettingsAudioWidget(QWidget):
+    """Settings tab for the output device, the streaming buffer and the volume curve."""
     onPresetChanged = QtCore.pyqtSignal(dict)
 
     def __init__(self, mf, *args, **kwargs):
+        """Build the audio settings form.
+
+        :param mf: Main form reference.
+        :returns: None.
+        """
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
         self.devices: List[Dict[str, any]] = []
@@ -24,7 +27,6 @@ class SettingsAudioWidget(QWidget):
         self.form_layout = QFormLayout(self)
 
         self.audio_out_device_combo = QComboBox()
-        # self.audio_out_device_combo.currentIndexChanged.connect(lambda: self.switch_device())
         self.audio_out_device_button = QPushButton("Переключить")
         self.audio_out_device_button.setFixedWidth(100)
         self.audio_out_device_button.clicked.connect(self.switch_device)
@@ -52,10 +54,19 @@ class SettingsAudioWidget(QWidget):
         self.form_layout.addRow("", self.log_volume_checkbox)
 
     def showEvent(self, event: QShowEvent) -> None:
+        """Refresh the form from the current player state.
+
+        :param event: Qt show event.
+        :returns: None.
+        """
         super().showEvent(event)
         self.load_data()
 
     def load_data(self) -> None:
+        """Fill the device list and the controls with the active values.
+
+        :returns: None.
+        """
         self.audio_out_device_combo.clear()
         self.devices = self.mf.audio_player.get_output_devices()
         for device in self.devices:
@@ -69,6 +80,10 @@ class SettingsAudioWidget(QWidget):
         self.log_volume_checkbox.setChecked(self.mf.audio_player.audio_streamer.log_volume)
 
     def switch_device(self) -> None:
+        """Move playback to the selected device and report an unsupported format.
+
+        :returns: None.
+        """
         if self.isVisible():
             text_index = self.audio_out_device_combo.currentIndex()
             device_index = self.devices[text_index].get('index')
@@ -86,20 +101,22 @@ class SettingsAudioWidget(QWidget):
 
     @pyqtSlot(int)
     def set_log_volume(self, _: int) -> None:
+        """Switch the volume slider between the linear and the perceptual curve.
+
+        :param _: Checkbox state, unused.
+        :returns: None.
+        """
         self.mf.audio_player.set_log_volume(self.log_volume_checkbox.isChecked())
 
     @pyqtSlot(int)
     def chunk_size_changed(self, value: int) -> None:
+        """Apply a new streaming buffer size.
+
+        :param value: Buffer size in samples, larger values trade latency for stability.
+        :returns: None.
+        """
         chunk_size = value
         self.chunk_size_label.setText(f"{chunk_size}")
         self.chunk_size_label.adjustSize()
 
         self.mf.audio_player.audio_streamer.set_chunk_size(chunk_size)
-
-
-
-
-
-
-
-

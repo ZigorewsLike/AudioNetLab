@@ -19,6 +19,7 @@ from .SettingsSection_class import SettingsSection, SettingsSubSection
 
 
 class SettingsFrame(QFrame):
+    """Settings tab: a section tree on the left and the matching page on the right."""
 
     def __init__(self, mf, lang_string: String = String()):
         super().__init__()

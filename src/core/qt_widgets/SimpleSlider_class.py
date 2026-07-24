@@ -10,6 +10,13 @@ from src.function_lib.math_lib import median
 
 
 class SimpleSlider(QWidget):
+    """Flat slider used for the playback position and the volume.
+
+    Besides the normal mode it has a loading mode where a stripe runs along the track
+    while the file is being decoded.
+
+    :signals: valueChanged (int), sliderMoved (int), onMouseRelease (), onMousePress ()
+    """
     valueChanged = QtCore.pyqtSignal(int)
     sliderMoved = QtCore.pyqtSignal(int)
     onMouseRelease = QtCore.pyqtSignal()

@@ -8,6 +8,10 @@ from src.global_styles import AppColorSchemes
 
 
 class TitleBar(QWidget):
+    """Custom title bar of the frameless window: logo, menu bar and window buttons.
+
+    Used when CUSTOM_TITLE_BAR is on, it also handles dragging and maximizing the window.
+    """
 
     def __init__(self, *args, **kwargs):
         super(TitleBar, self).__init__(*args, **kwargs)

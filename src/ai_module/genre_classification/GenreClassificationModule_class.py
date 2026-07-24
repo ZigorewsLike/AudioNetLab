@@ -26,7 +26,20 @@ if TYPE_CHECKING:
 
 
 class GenreClassifierModule(QWidget):
+    """"EQ AI" tab: runs genre classification over the track and drives the equalizer.
+
+    The track is split into PATTERN_SIZE second fragments, each fragment is classified
+    separately and drawn as a coloured band on the timeline. When auto EQ is on, the
+    slider values follow the genre under the playback cursor.
+    """
+
     def __init__(self, model_path: str, main_form, *args, **kwargs):
+        """Build the tab and the prediction worker.
+
+        :param model_path: Path to the ONNX classifier.
+        :param main_form: Main form reference.
+        :returns: None.
+        """
         super(GenreClassifierModule, self).__init__(*args, **kwargs)
         self.model_path: str = model_path
         self.setMouseTracking(True)
@@ -63,11 +76,11 @@ class GenreClassifierModule(QWidget):
         self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
         self.genre_gradient.setColorAt(0.0, QColor("#2A2A2A"))
         self.genre_gradient.setColorAt(1.0, QColor("#2A2A2A"))
-        self.global_results: Optional[list] = None
+        self.global_results: Optional[list] = None  # Genre index per fragment
         self.drawing_text_pos: Optional[QPoint] = None
 
         self.eq = EQWidget(EQType.ACTIVE, self)
-        self.genre_eq: Dict[int, List[float]] = {}
+        self.genre_eq: Dict[int, List[float]] = {}  # EQ preset per genre index
         self.current_genre: str = ""
 
         self.genre_dict: Dict[int, str] = GENRE_DICT
@@ -86,27 +99,51 @@ class GenreClassifierModule(QWidget):
         }
 
     def showEvent(self, event: QShowEvent) -> None:
+        """Lay out the tab when it becomes visible.
+
+        :param event: Qt show event.
+        :returns: None.
+        """
         super().showEvent(event)
         self.recalc_sizes()
 
     def load_model(self) -> None:
+        """Create the ONNX inference session for the classifier.
+
+        :returns: None.
+        """
         print_i(f"AI inference mode: {'ONNX' if ONNX_INFERENCE else 'PyTorch'}")
         self.model = load_sess_model(self.model_path, ONNX_SESS_PROVIDER)
 
     def predict_current(self) -> None:
+        """Classify the currently opened track in the worker thread.
+
+        :returns: None.
+        """
         self.worker.moveToThread(self.work_thread)
         self.work_thread.started.connect(self.worker.run)
         self.work_thread.start()
         self.mf.show_preloader()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Lay out the tab on resize.
+
+        :param event: Qt resize event.
+        :returns: None.
+        """
         super().resizeEvent(event)
         self.recalc_sizes()
 
     def set_gradient_color(self, genre_result: List[int]) -> None:
+        """Build the timeline gradient where every fragment gets its genre colour.
+
+        :param genre_result: Genre index per fragment.
+        :returns: None.
+        """
         self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
         sample_width = self.mf.audio_player.sample_rate * PATTERN_SIZE
         for step, result in enumerate(genre_result):
+            # Two stops per fragment keep the colour flat instead of blending into the neighbour
             self.genre_gradient.setColorAt(
                 (step * sample_width + sample_width / 2) / self.mf.audio_player.waveform.shape[0],
                 QColor(self.genre_color[result]))
@@ -115,6 +152,10 @@ class GenreClassifierModule(QWidget):
                 QColor(self.genre_color[result]))
 
     def recalc_sizes(self) -> None:
+        """Rebuild the gradient and recentre the equalizer.
+
+        :returns: None.
+        """
         if self.global_results:
             self.set_gradient_color(self.global_results)
         self.eq.move(int(self.width() / 2 - self.eq.width() / 2),
@@ -123,6 +164,11 @@ class GenreClassifierModule(QWidget):
 
     @pyqtSlot(list)
     def predict_finished(self, out: List[int]) -> None:
+        """Show the classification result: genre shares, the winner and the timeline.
+
+        :param out: Genre index per fragment.
+        :returns: None.
+        """
         if not out:
             # TODO: Сообщить о том, что выход пустой
             return
@@ -151,6 +197,10 @@ class GenreClassifierModule(QWidget):
         self.resize(self.width(), self.eq.y() + self.eq.height())
 
     def worker_reset(self) -> None:
+        """Recreate the worker so the next prediction starts from a clean thread.
+
+        :returns: None.
+        """
         self.work_thread.exit(0)
         self.worker = GenrePredictWorker()
         self.worker.mf = self.mf
@@ -158,6 +208,11 @@ class GenreClassifierModule(QWidget):
         self.worker.preloader_signal.connect(self.mf.preloader.set_help_text)
 
     def paintEvent(self, event: QPaintEvent) -> None:
+        """Draw the genre timeline, the playback cursor and the hovered genre name.
+
+        :param event: Qt paint event.
+        :returns: None.
+        """
         super().paintEvent(event)
         if self.isVisible():
             start_time: float = time.time()
@@ -174,6 +229,7 @@ class GenreClassifierModule(QWidget):
                 painter.drawLine(self.drawing_text_pos.x(), self.graph_y, self.drawing_text_pos.x(),
                                  self.graph_y + self.graph_height)
 
+                # Map the mouse x to the fragment under it
                 index_factor: float = (self.drawing_text_pos.x()) / (self.width())
                 index: int = median(0, round((len(self.global_results) - 1) * index_factor), len(self.global_results) - 1)
                 genre_text: str = self.genre_dict[self.global_results[index]]
@@ -189,6 +245,11 @@ class GenreClassifierModule(QWidget):
                 self.mf.profiling.add_draw_time(self.__class__.__name__, time.time() - start_time)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Track the cursor over the timeline to show the genre under it.
+
+        :param event: Qt mouse event.
+        :returns: None.
+        """
         super().mouseMoveEvent(event)
         if self.graph_y <= event.pos().y() <= self.graph_y + self.graph_height:
             self.drawing_text_pos = event.pos()
@@ -197,10 +258,22 @@ class GenreClassifierModule(QWidget):
         self.update()
 
     def leaveEvent(self, a0) -> None:
+        """Drop the hover marker when the cursor leaves the tab.
+
+        :param a0: Qt event.
+        :returns: None.
+        """
         self.drawing_text_pos = None
         self.update()
 
     def do_analysis(self) -> None:
+        """Classify every file of a genre sorted directory tree and export an xlsx report.
+
+        Folders are treated as reference genres, one row per file with the per genre
+        percentages. The result is written to data/local/analysis.xlsx.
+
+        :returns: None.
+        """
         file_path = QFileDialog.getExistingDirectory(self, 'Путь к директории, где музыка по жанрам')
         if not file_path:
             return
@@ -208,7 +281,6 @@ class GenreClassifierModule(QWidget):
         wb = Workbook()
         sheet: Worksheet = wb.active
         sheet.title = 'Analysis'
-        # analysis_sheet = wb.create_sheet("Analysis")
         sheet["A1"] = "Анализ"
         header1_style = NamedStyle("Header1", Font(bold=True, size=12))
         header2_style = NamedStyle("Header2", Font(bold=True, size=11))
@@ -242,7 +314,7 @@ class GenreClassifierModule(QWidget):
                 self.worker.waveform = waveform
                 self.worker.sample_rate = sample_rate
 
-                results = self.worker.run()
+                results = self.worker.run()  # Runs inline, the report is built synchronously
 
                 for col in range(len(self.genre_dict.values())):
                     sheet[f"{chr(65 + 1 + col)}{data_begin_index + row_count + file_index}"] = 0.0
@@ -258,6 +330,10 @@ class GenreClassifierModule(QWidget):
         wb.save('data/local/analysis.xlsx')
 
     def reset_result(self) -> None:
+        """Clear the previous classification, called when a new track is opened.
+
+        :returns: None.
+        """
         self.global_results = None
         self.genre_gradient = QLinearGradient(0, 0, self.width(), 0)
         self.genre_gradient.setColorAt(0.0, QColor("#2A2A2A"))
@@ -268,19 +344,27 @@ class GenreClassifierModule(QWidget):
 
     @pyqtSlot(float)
     def set_cursor_position(self, position: float) -> None:
+        """Move the timeline cursor and apply the EQ preset of the current genre.
+
+        :param position: Relative playback position in the range 0..1.
+        :returns: None.
+        """
         self.cursor_position = position
         if self.global_results is not None:
             position *= self.mf.audio_player.waveform[:, 0].size
             genre: int = self.global_results[int(position / self.mf.audio_player.sample_rate / PATTERN_SIZE)]
             self.current_genre = self.genre_dict[genre]
             if self.eq.auto_eq:
+                # Sliders creep towards the preset so a genre change is not audible as a jump
                 gains: np.ndarray = np.array(self.genre_eq[genre])
                 self.eq.set_sliders((gains * self.eq.accuracy).astype(np.uint16), interpolation=True)
         self.update()
 
     @pyqtSlot(dict)
     def on_preset_changed(self, presets: dict) -> None:
+        """Pick up the presets edited on the settings tab.
+
+        :param presets: Band gains per genre index.
+        :returns: None.
+        """
         self.genre_eq = presets
-
-
-

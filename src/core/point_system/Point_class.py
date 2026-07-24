@@ -8,6 +8,11 @@ from PyQt6.QtCore import QPoint
 
 
 class Point:
+    """2D point with arithmetic operators and conversion to and from QPoint.
+
+    Used for the window position stored in the ini file.
+    """
+
     def __init__(self, x: Union[int, float] = 0, y: Union[int, float] = 0):
         self.x = float(x)
         self.y = float(y)
@@ -140,6 +145,8 @@ class Point:
 
 
 class Point3d:
+    """3D point with arithmetic operators."""
+
     def __init__(self, x=0., y=0., z=0.):
         self.x: float = x
         self.y: float = y

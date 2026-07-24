@@ -1,6 +1,4 @@
-"""
-Главный файл для запуска приложения
-"""
+"""Application entry point: sets up logging, DPI and the main window."""
 import ctypes
 import os
 import sys
@@ -28,8 +26,14 @@ os.system('cls')
 os.environ['QT_MULTIMEDIA_PREFERRED_PLUGINS'] = 'windowsmediafoundation'
 
 
-# Функция перехвата критических ошибок
 def except_hook(exc_type, exc_value, exc_tb):
+    """Log an uncaught exception into error_log.txt and show it in a dialog.
+
+    :param exc_type: Exception class.
+    :param exc_value: Exception instance.
+    :param exc_tb: Traceback object.
+    :returns: None.
+    """
     tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
     print_e("Some error:\n", tb, '\033[0m')
 
@@ -42,16 +46,16 @@ def except_hook(exc_type, exc_value, exc_tb):
     error_critical_msg.setWindowTitle(f'Critical Error: {exc_value}.')
     error_critical_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
     error_critical_msg.exec()
-    if not DEBUG:
+    if not DEBUG:  # In debug the app keeps running so the state can be inspected
         QtWidgets.QApplication.quit()
 
 
 if __name__ == '__main__':
-    # Перехват критических ошибок и stdout
+    # Intercept uncaught errors and stdout
     sys.excepthook = except_hook
     sys.stdout = OutputBuffer()
 
-    # region Создание необходимых для программы директорий и файлов
+    # region Create the directories and files the application needs
     for dir_name in ["data/local/", PATH_TO_LAST_REGISTRY]:
         os.makedirs(dir_name, exist_ok=True)
     os.makedirs(APP_ROAMING_DIR, exist_ok=True)
@@ -59,24 +63,22 @@ if __name__ == '__main__':
         os.makedirs('logs', exist_ok=True)
     # endregion
 
-    # region Вычисление dpi для больших мониторов или ноутбуков, где масштаб больше 100%
+    # region Detect the DPI of monitors scaled above 100%
     user32 = ctypes.windll.user32
-    w_curr = user32.GetSystemMetrics(0)
+    w_curr = user32.GetSystemMetrics(0)  # Scaled width
     user32.SetProcessDPIAware()
-    w_phys = user32.GetSystemMetrics(0)
+    w_phys = user32.GetSystemMetrics(0)  # Physical width
     curr_dpi = round(w_phys * 96 / w_curr, 0)
     # endregion
 
     print_d("curr_dpi: ", curr_dpi, w_curr, w_phys)
 
-    # region Инициализация приложения, определение глобальных параметров, стиля
-    # os.environ["QT_SCALE_FACTOR"] = str(curr_dpi / 96)
-    # os.environ["QT_FONT_DPI"] = "96"
+    # region Application setup: name, icon, scaling policy and style
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setWindowIcon(QIcon('Icon.ico'))
     app.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough  # Or Round, Floor, etc.
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
 
     app.setStyle("fusion")
@@ -84,17 +86,14 @@ if __name__ == '__main__':
     size = screen.size()
     # endregion
 
-    # Параметры окна (ширина и высота)
+    # Window parameters (width and height of the screen)
     params_dist: dict = {"size_width": size.width(), "size_height": size.height()}
-    # Создание окна авторизации
     mainWin = MainForm(params_dist)
     app.processEvents()
     mainWin.load_ann_models()
-    # splash_screen.close()
 
     mainWin.show()
-    # Ожидание завершения приложения
     app.exec()
-    # Сброс stdout (метод OutputBuffer класса)
+    # Restore the original stdout (OutputBuffer method)
     sys.stdout.reset()
     tracemalloc.stop()

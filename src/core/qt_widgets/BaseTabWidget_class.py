@@ -7,17 +7,18 @@ from PyQt6.QtWidgets import QWidget
 
 
 class TabItem:
-    """
-    Класс вкладки
-    """
+    """One tab: its content widget and its caption."""
     def __init__(self, widget: QWidget, tab_name: str):
         self.widget: QWidget = widget
         self.tab_name: str = tab_name
 
 
 class BaseTabWidget(QWidget):
-    """
-    Класс базового виджета переключения вкладок
+    """Minimal tab container without a tab bar, the pages are switched from the outside.
+
+    Used by the settings tab where the section tree acts as the tab bar.
+
+    :signals: tab_switched (int, bool) - index of the new tab and its active state
     """
     tab_switched = QtCore.pyqtSignal(int, bool)
 

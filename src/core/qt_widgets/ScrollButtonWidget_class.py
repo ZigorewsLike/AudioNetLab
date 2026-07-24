@@ -11,6 +11,10 @@ from src.function_lib.math_lib import median
 
 
 class ScrollButtonWidget(QPushButton):
+    """Button holding a number that is changed with the mouse wheel.
+
+    :signals: valueChanged (int)
+    """
     valueChanged = QtCore.pyqtSignal(int)
 
     def __init__(self, *args, **kwargs):

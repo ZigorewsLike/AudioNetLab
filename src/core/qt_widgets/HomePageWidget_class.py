@@ -14,6 +14,10 @@ if TYPE_CHECKING:
 
 
 class HomePageButtonWidget(QWidget):
+    """Wide "Open file" button at the top of the home page.
+
+    :signals: clicked ()
+    """
     clicked = QtCore.pyqtSignal()
 
     def __init__(self, *args, **kwargs):
@@ -71,6 +75,8 @@ class HomePageButtonWidget(QWidget):
 
 
 class HomePageWidget(QWidget):
+    """Home tab: the open file button and the list of recently opened tracks."""
+
     def __init__(self, mf, *args, **kwargs):
         super(HomePageWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 
 class LyricsPropertyCommon(QWidget):
+    """"Common" page of the lyrics panel: display options, tag extraction, transcription and translation."""
+
     def __init__(self, mf, lyric_module, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf

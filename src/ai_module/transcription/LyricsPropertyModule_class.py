@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 
 class TranscriptionPropertyModule(QWidget):
+    """Right side panel of the lyrics tab with the Common and Summarization pages."""
+
     def __init__(self, mf, lyric_module, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf

@@ -5,6 +5,10 @@ from PyQt6.QtCore import Qt, QPoint, pyqtSlot
 
 
 class SideGrip(QtWidgets.QWidget):
+    """Invisible strip along a window edge that resizes the frameless window by dragging.
+
+    :signals: resizeSignal (QPoint) - mouse delta since the grab
+    """
     resizeSignal = QtCore.pyqtSignal(QPoint)
 
     def __init__(self, parent, edge):

@@ -9,6 +9,8 @@ from src.core.log_system import print_d, print_e
 
 
 class MetaListItem(QWidget):
+    """Single tag row: the highlighted tag name and its value."""
+
     def __init__(self, key: str, values: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         tag_str_value: str = ""
@@ -41,6 +43,8 @@ class MetaListItem(QWidget):
 
 
 class MetaListWidget(QWidget):
+    """Sliding panel with the full tag dump of the opened track."""
+
     def __init__(self, *args, **kwargs):
         super(MetaListWidget, self).__init__(*args, **kwargs)
         self.resize(300, 300)

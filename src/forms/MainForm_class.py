@@ -18,19 +18,27 @@ from src.core.log_system import print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
 from src.core.qt_widgets import (PreLoaderWidget, HomePageWidget, DragFileWidget,
-                                 MainVerticalTabWidget, TitleBar, SideGrip, ChatWidget)
+                                 TitleBar, SideGrip, ChatWidget)
 from src.core.settings import SettingsDataObject
 from src.core.settings.qt_widgets import SettingsFrame
 from src.core.workers import OpenFileWorker
-from src.enums import StateMode, PlayerState, MainTabWidgetIcons, DragFileState
+from src.enums import StateMode, PlayerState, DragFileState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import (APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  RESOURCE_ICON_DIR,
-                                  PATH_TO_LAST_REGISTRY, CUSTOM_TITLE_BAR, DEBUG)
+                                  RESOURCE_ICON_DIR, CUSTOM_TITLE_BAR, DEBUG)
 from src.global_styles import AppColorSchemes
 
 
 class MainForm(QMainWindow):
+    """Application main window.
+
+    Owns the tab bar (Home, EQ AI, Lyrics, Chat, Settings), the player panel pinned
+    to the bottom, the settings object and the file opening worker. It also wires the
+    modules together: the classifier drives the equalizer and the equalizer drives
+    the audio streamer.
+
+    :signals: resized (), windowStateChanged ()
+    """
     resized = QtCore.pyqtSignal()
     windowStateChanged = QtCore.pyqtSignal()
     resource_dir = "resource"
@@ -39,6 +47,11 @@ class MainForm(QMainWindow):
     local_dir = f"{data_dir}local/"
 
     def __init__(self, params):
+        """Build the window, the tabs and the connections between the modules.
+
+        :param params: Startup parameters, expects size_width and size_height of the screen.
+        :returns: None.
+        """
         super().__init__()
         self.params: dict = params
         self.params['main_form_ref'] = self
@@ -46,7 +59,7 @@ class MainForm(QMainWindow):
             self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.title_bar = TitleBar(self)
         self.title_bar.setVisible(CUSTOM_TITLE_BAR)
-        self.block_update: bool = False
+        self.block_update: bool = False  # Suspends the heavy repaints while the window is dragged
         self.windowStateChanged.connect(self.window_state_changed)
         self.file_meta_controller = FileMetaController()
 
@@ -72,9 +85,6 @@ class MainForm(QMainWindow):
         self.init_ui()
         self.resized.connect(self.recalculate_size)
 
-        # self.meta_list.setContentsMargins(5, 5, 5, 5)
-        # self.meta_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-
         self.tab_widget = QTabWidget(self.central_widget)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         self.tab_widget.setStyleSheet(f"""
@@ -98,22 +108,20 @@ class MainForm(QMainWindow):
             padding: 0px 10px;
             margin-left: 2px;
         }}
-        
+
         QTabBar::tab:selected {{
             color: black;
             background-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
             border-bottom-color: {AppColorSchemes.FILE_LIST_BACKGROUND};
             font-weight: bold;
         }}
-        
+
         QTabBar::tab:disabled {{
             color: gray;
         }}
         """)
-        self.ai_modules_tab_indexes = []
-        # self.tab_widget.tab_switched.connect(self.tab_switched)
+        self.ai_modules_tab_indexes = []  # Tabs that stay disabled until a track is open
         self.audio_player = AudioPlayer(self, self.central_widget)
-        # self.audio_player.show()
 
         self.home_page = HomePageWidget(self, self.central_widget)
         self.home_page.last_file.update_file_list()
@@ -160,17 +168,15 @@ class MainForm(QMainWindow):
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
-        # self.settings_widget = QWidget()
         self.settings_widget = SettingsFrame(mf=self)
         self.tab_widget.addTab(self.settings_widget, 'Settings')
 
+        # EQ sliders feed the streamer gains, saved presets feed the auto EQ of the classifier
         self.genre_widget.eq.slidersValueChange.connect(self.audio_player.set_eq_gains)
         self.genre_widget.eq.activeSwitched.connect(self.audio_player.audio_streamer.set_eq_active)
         self.audio_player.audio_streamer.bands = self.genre_widget.eq.bands
         self.genre_widget.genre_eq = self.settings_widget.eq_settings.load_preset_from_file()
         self.settings_widget.eq_settings.onPresetChanged.connect(self.genre_widget.on_preset_changed)
-
-        # self.main_tab_widget = MainVerticalTabWidget(self.central_widget)
 
         self.audio_player.meta_list.raise_()
 
@@ -188,9 +194,14 @@ class MainForm(QMainWindow):
         self.recalculate_size()
 
     def init_ui(self):
+        """Restore the window geometry from the settings, keeping it on a real screen.
+
+        :returns: None.
+        """
         if self.settings.system_settings.form_position == Point(-1, -1):
             self.settings.system_settings.form_position.x = self.screen_width / 2 - self.settings.system_settings.form_width / 2
             self.settings.system_settings.form_position.y = self.screen_height / 2 - self.settings.system_settings.form_height / 2
+        # Pull the window back when the monitor it was left on is gone
         common_width: int = 0
         common_height: int = 0
         for screen in QApplication.screens():
@@ -208,6 +219,10 @@ class MainForm(QMainWindow):
         self.setWindowIcon(QIcon('Icon.ico'))
 
     def update_grips(self):
+        """Place the resize grips along the window edges and corners.
+
+        :returns: None.
+        """
         self.setContentsMargins(*[self.grip_size] * 4)
 
         out_rect = self.rect()
@@ -226,6 +241,10 @@ class MainForm(QMainWindow):
                                        in_rect.width(), self.grip_size)
 
     def create_menu_bars(self) -> None:
+        """Build the File, Edit and Tools menus.
+
+        :returns: None.
+        """
         if CUSTOM_TITLE_BAR:
             menu_bar = self.title_bar.menu_bar
         else:
@@ -241,8 +260,6 @@ class MainForm(QMainWindow):
         open_file_action.setIcon(QIcon(icon))
 
         player_action = QAction("Open player", self)
-        # icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
-        # player_action.setIcon(QIcon(icon))
 
         home_page_action = QAction("Home page", self)
         icon = QPixmap(RESOURCE_ICON_DIR + "home_FILL0_wght400_GRAD0_opsz24.png")
@@ -274,20 +291,39 @@ class MainForm(QMainWindow):
         menu_bar.addMenu(tools_menu)
 
     def showEvent(self, event: QShowEvent) -> None:
+        """Handle the window becoming visible.
+
+        :param event: Qt show event.
+        :returns: None.
+        """
         pass
 
     def moveEvent(self, event: QMoveEvent) -> None:
+        """Remember the window position for the next start.
+
+        :param event: Qt move event.
+        :returns: None.
+        """
         if self.windowState() is not Qt.WindowState.WindowMaximized:
             self.settings.system_settings.form_position.x = event.pos().x()
             self.settings.system_settings.form_position.y = event.pos().y()
 
     def resizeEvent(self, event):
+        """Relayout the widgets and the resize grips.
+
+        :param event: Qt resize event.
+        :returns: None.
+        """
         self.resized.emit()
         super(MainForm, self).resizeEvent(event)
         self.update_grips()
 
     @pyqtSlot()
     def window_state_changed(self) -> None:
+        """Hide the resize grips while the window is maximized.
+
+        :returns: None.
+        """
         grips_enable: bool = True
         if self.windowState() is Qt.WindowState.WindowMaximized:
             grips_enable = False
@@ -302,11 +338,16 @@ class MainForm(QMainWindow):
             corner_grip.setVisible(grips_enable)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
+        """Show the drop overlay and validate the dragged file extension.
+
+        :param event: Qt drag enter event.
+        :returns: None.
+        """
         if not self.audio_player.position_slider.loading_mode and event.mimeData().hasUrls:
             event.setDropAction(Qt.DropAction.CopyAction)
             for path in event.mimeData().urls():
                 if path.isLocalFile():
-                    file_path = path.path()[1:]
+                    file_path = path.path()[1:]  # Strip the leading slash of the file:// url
                 else:
                     file_path = str(path)
                 _, file_extension = os.path.splitext(file_path)
@@ -323,6 +364,11 @@ class MainForm(QMainWindow):
             self.drag_widget.setVisible(False)
 
     def dropEvent(self, event: QDropEvent) -> None:
+        """Add the dropped file to the track list.
+
+        :param event: Qt drop event.
+        :returns: None.
+        """
         if event.mimeData().hasUrls and self.drag_widget.state is DragFileState.CORRECT:
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
@@ -338,18 +384,20 @@ class MainForm(QMainWindow):
             self.drag_widget.setVisible(False)
 
     def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:
+        """Hide the drop overlay.
+
+        :param event: Qt drag leave event.
+        :returns: None.
+        """
         self.drag_widget.setVisible(False)
 
     @pyqtSlot()
     def recalculate_size(self) -> None:
-        """
-        Перерасчёт размеров, позиции виджетов, объектов
+        """Recompute the size and position of the title bar, tabs, player and overlays.
 
-        :return: None
+        :returns: None.
         """
         preloader_size: QSize = self.size()
-        # if self.audio_player.isVisible():
-        #     preloader_size = preloader_size - QSize(0, self.audio_player.height())
 
         if CUSTOM_TITLE_BAR:
             title_bar_size = QSize(0, self.title_bar.height())
@@ -363,20 +411,29 @@ class MainForm(QMainWindow):
             self.settings.system_settings.form_width = self.width()
             self.settings.system_settings.form_height = self.height()
 
-        # self.main_tab_widget.resize(self.central_widget.size())
+        # The player is pinned to the bottom, the tabs take the rest
         self.audio_player.resize(self.central_widget.width(), self.audio_player.height())
         self.audio_player.move(0, self.central_widget.height() - self.audio_player.height())
         self.tab_widget.resize(self.central_widget.width(),
                                self.central_widget.height() - self.audio_player.height())
-        # self.settings_widget.resize(self.central_widget.size())
 
         self.drag_widget.resize(self.size())
 
     def show_preloader(self) -> None:
+        """Show the fullscreen preloader overlay.
+
+        :returns: None.
+        """
         self.preloader.setVisible(True)
         self.recalculate_size()
 
     def show_error_message_log(self, title: str, text: str) -> None:
+        """Show a modal error dialog centred on the window.
+
+        :param title: Dialog title.
+        :param text: Message text.
+        :returns: None.
+        """
         error_msg = QMessageBox()
         error_msg.setText(text)
         error_msg.setIcon(QMessageBox.Icon.Critical)
@@ -386,9 +443,17 @@ class MainForm(QMainWindow):
         error_msg.exec()
 
     def load_ann_models(self) -> None:
+        """Hook for loading the neural network models after the window is created.
+
+        :returns: None.
+        """
         pass
 
     def reset_open_workers(self) -> None:
+        """Recreate the file opening worker and stop its thread.
+
+        :returns: None.
+        """
         self.worker = OpenFileWorker()
         self.worker.mf = self
         self.worker.finished.connect(self.open_finished)
@@ -398,6 +463,10 @@ class MainForm(QMainWindow):
         self.work_thread.wait()
 
     def add_file_dialog(self) -> None:
+        """Ask for an audio file and add it to the track list.
+
+        :returns: None.
+        """
         dialog_filter = f"Все музыкальные форматы (*.mp3 *.flac *.wave);;" \
                         f"MP3 (*.mp3);;FLAC (*.flac);;WAVE (*.wave *.wav);;" \
                         f"Все файлы (*.*)"
@@ -409,20 +478,31 @@ class MainForm(QMainWindow):
             self.add_file(filename)
 
     def add_file(self, file_path: str) -> None:
+        """Register a file in the database and store its tags in the registry.
+
+        :param file_path: Path to the audio file.
+        :returns: None.
+        """
         if not os.path.exists(file_path):
             self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
             return
         filename, file_extension = os.path.splitext(os.path.basename(file_path))
         meta = self.file_meta_controller.read_track_file(file_path)
         track_name = meta.get('title')
-        title = track_name[0] if track_name is not None else filename
+        title = track_name[0] if track_name is not None else filename  # Fall back to the file name
         track_id: int = self.home_page.last_file.add(title, file_path)
-        if track_id is None:
+        if track_id is None:  # The file is already in the list
             return
         self.file_meta_controller.save_meta_in_registry(track_id)
         self.home_page.last_file.update_file_list()
 
     def open_file(self, file_path, track_id: int = 6) -> None:
+        """Start opening a track: show the meta and cover, then decode in the worker thread.
+
+        :param file_path: Path to the audio file.
+        :param track_id: Track id in the database.
+        :returns: None.
+        """
         if not os.path.exists(file_path):
             self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
             return
@@ -452,27 +532,28 @@ class MainForm(QMainWindow):
         self.work_thread.start()
 
     def open_finished(self, path: Optional[str]) -> None:
+        """Finish opening a track: start playback, refresh the graph and the AI tabs.
+
+        :param path: Path of the opened file, empty when decoding failed.
+        :returns: None.
+        """
         self.reset_open_workers()
         self.drag_widget.setVisible(False)
         if not path:
             self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
             self.audio_player.stop_position_loading()
             return
-        # filename, file_extension = os.path.splitext(path)
-        # track_name = self.file_meta_controller.track_meta.get('title')
-        # title = track_name[0] if track_name is not None else filename
-        # track_id: int = self.home_page.last_file.add(title, path)
         self.home_page.last_file.update_file_list()
-        # self.file_meta_controller.save_meta_in_registry(track_id)
 
         self.audio_player.stop_position_loading()
         self.audio_player.play_music()
         self.settings.system_settings.open_filename = path
         self.save_config_app()
-        gc.collect()
+        gc.collect()  # The previous waveform can be hundreds of megabytes
         self.audio_player.audio_graph.calculate_render_lines(forcedly=True)
         self.genre_widget.reset_result()
 
+        # Lyrics come from the registry first, then from the file tags
         self.transcription_module.clear()
         transcription = self.file_meta_controller.get_track_transcription(self.audio_player.playable_track_id)
         if transcription is not None:
@@ -484,24 +565,46 @@ class MainForm(QMainWindow):
         for index in self.ai_modules_tab_indexes:
             self.tab_widget.setTabEnabled(index, True)
 
-
     def get_current_lyrics(self) -> Optional[str]:
+        """Read the lyrics of the currently opened track from its tags.
+
+        :returns: str - Lyrics text, None when there are none.
+        """
         track_id = self.audio_player.playable_track_id
         return self.file_meta_controller.get_lyrics(track_id)
 
     def save_config_app(self) -> None:
+        """Write the current settings to the ini file.
+
+        :returns: None.
+        """
         self.settings.player_settings.volume = self.audio_player.volume_slider.value
         self.settings.save_to_ini(CONFIG_FILENAME)
 
     def closeEvent(self, event):
+        """Close the profiler window and persist the settings.
+
+        :param event: Qt close event.
+        :returns: None.
+        """
         if self.profiling.isVisible():
             self.profiling.close()
         self.save_config_app()
 
     def on_tab_changed(self, index: int):
+        """React to a tab switch.
+
+        :param index: New tab index.
+        :returns: None.
+        """
         pass
 
     def paintEvent(self, event: QPaintEvent) -> None:
+        """Fill the window background.
+
+        :param event: Qt paint event.
+        :returns: None.
+        """
         super(MainForm, self).paintEvent(event)
         if self.isVisible():
             painter = QPainter(self)

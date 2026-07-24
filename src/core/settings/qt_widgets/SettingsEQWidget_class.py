@@ -1,17 +1,14 @@
 import os
 import pickle
-from typing import Dict, Union, TYPE_CHECKING, Optional, List
-
+from typing import Dict, TYPE_CHECKING, List
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent, QPointF, Qt, QPoint, QThread, QSize, QRect
-from PyQt6.QtGui import (QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient, QPen, QFont,
-                         QResizeEvent, QShowEvent)
-from PyQt6.QtWidgets import QWidget, QToolTip, QLabel, QPushButton, QFileDialog, QSlider, QComboBox
+from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtGui import QResizeEvent, QShowEvent
+from PyQt6.QtWidgets import QWidget, QPushButton, QComboBox
 
 from src.global_constants import GENRE_DICT, EQ_SLIDER_COUNT, RESOURCE_DIR
-from src.core.log_system import print_d, print_e, print_i
-from src.core.qt_widgets import BaseTabWidget, EQWidget
+from src.core.qt_widgets import EQWidget
 from src.enums import EQType
 
 if TYPE_CHECKING:
@@ -19,9 +16,20 @@ if TYPE_CHECKING:
 
 
 class SettingsEQWidget(QWidget):
+    """Settings tab where an EQ preset is edited for every genre.
+
+    Presets are stored in res/presets.pickle as {genre index: [band gains]} and are
+    used by the auto EQ mode of the genre classifier.
+
+    :signals: onPresetChanged (dict) - full preset map after a save
+    """
     onPresetChanged = QtCore.pyqtSignal(dict)
 
     def __init__(self, *args, **kwargs):
+        """Build the genre selector, the equalizer and the save/load buttons.
+
+        :returns: None.
+        """
         super().__init__(*args, **kwargs)
         self.preset_combo_box = QComboBox(self)
         self.preset_combo_box.addItems(list(GENRE_DICT.values()))
@@ -42,10 +50,20 @@ class SettingsEQWidget(QWidget):
         self.load_preset_from_file()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Fit the equalizer on resize.
+
+        :param event: Qt resize event.
+        :returns: None.
+        """
         super().resizeEvent(event)
         self.eq.adjustSize()
-        
+
     def showEvent(self, event: QShowEvent) -> None:
+        """Place the buttons under the equalizer once its size is known.
+
+        :param event: Qt show event.
+        :returns: None.
+        """
         super().showEvent(event)
         self.eq.adjustSize()
         self.save_button.move(5, self.eq.height() + self.eq.y() + 5)
@@ -53,15 +71,29 @@ class SettingsEQWidget(QWidget):
 
     @pyqtSlot(int)
     def on_switch_preset(self, index: int) -> None:
+        """Load the preset of the selected genre into the sliders.
+
+        :param index: Genre index from the combo box.
+        :returns: None.
+        """
         gains = self.presets.get(index, [1.0] * EQ_SLIDER_COUNT)
         self.eq.set_sliders([round(gain * self.eq.accuracy) for gain in gains])
 
     @pyqtSlot(list)
     def on_slider_value_changed(self, gains: list) -> None:
+        """Store the edited gains in the preset of the selected genre.
+
+        :param gains: Linear gain per band.
+        :returns: None.
+        """
         self.presets[self.preset_combo_box.currentIndex()] = gains
 
     @pyqtSlot()
     def save_presets_on_file(self) -> None:
+        """Write every preset to disk and notify the listeners.
+
+        :returns: None.
+        """
         save_path = os.path.join(RESOURCE_DIR, 'presets.pickle')
         with open(save_path, 'wb') as f:
             pickle.dump(self.presets, f)
@@ -69,18 +101,16 @@ class SettingsEQWidget(QWidget):
 
     @pyqtSlot()
     def load_preset_from_file(self) -> Dict[int, List[float]]:
+        """Read the presets from disk, falling back to flat ones.
+
+        :returns: Dict[int, List[float]] - Band gains per genre index.
+        """
         preset_path = os.path.join(RESOURCE_DIR, 'presets.pickle')
         try:
             if not os.path.exists(preset_path):
                 raise FileExistsError
             with open(preset_path, 'rb') as f:
                 presets: Dict[int, List[float]] = pickle.load(f)
-                # _l = {}
-                # for key, values in presets.items():
-                #     _l[key] = [value / 100 for value in values]
-                # self.presets = _l
-                # self.save_presets_on_file()
-                # return self.presets
         except (FileExistsError, Exception) as e:
             presets: Dict[int, List[float]] = {}
             for key in GENRE_DICT.keys():
@@ -88,9 +118,3 @@ class SettingsEQWidget(QWidget):
         self.presets = presets
         self.on_switch_preset(self.preset_combo_box.currentIndex())
         return presets
-
-
-
-
-
-
