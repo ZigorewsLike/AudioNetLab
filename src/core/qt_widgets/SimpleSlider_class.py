@@ -1,8 +1,8 @@
 import math
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSlot, QEvent
-from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics
+from PyQt6.QtCore import pyqtSlot, QEvent, QTimer
+from PyQt6.QtGui import QPaintEvent, QPainter, QBrush, QColor, QMouseEvent, QFontMetrics, QLinearGradient
 from PyQt6.QtWidgets import QWidget, QToolTip, QLabel
 
 from src.core.log_system import print_d
@@ -42,6 +42,12 @@ class SimpleSlider(QWidget):
         self.tooltip_font_metrics: QFontMetrics = local_text_container.fontMetrics()
         # endregion
 
+        self.loading_mode: bool = False
+        self._loading_pos: float = 0.0
+        self._loading_timer: QTimer = QTimer(self)
+        self._loading_timer.setInterval(16)
+        self._loading_timer.timeout.connect(self._loading_tick)
+
         self.resize(self.parent().width(), self._slider_height + self.top_bottom_margin * 2)
         self.setMouseTracking(True)
         self.valueChanged.connect(self._slider_val_change)
@@ -73,18 +79,52 @@ class SimpleSlider(QWidget):
         self.minimum = min_value
         self.maximum = max_value
 
+    def set_loading_mode(self, loading: bool) -> None:
+        self.loading_mode = loading
+        if loading:
+            self._loading_pos = 0.0
+            self._loading_timer.start()
+        else:
+            self._loading_timer.stop()
+        self.update()
+
+    def _loading_tick(self) -> None:
+        track_w = self.width() - self.left_right_margin * 2
+        stripe_w = max(track_w // 3, 1)
+        self._loading_pos += (track_w + stripe_w) / 60.0
+        if self._loading_pos > track_w:
+            self._loading_pos = -stripe_w
+        self.update()
+
     # region Методы QWidget
     def paintEvent(self, event: QPaintEvent) -> None:
         super().paintEvent(event)
         painter = QPainter(self)
-        painter.fillRect(self.left_right_margin, self.top_bottom_margin, self.width() - self.left_right_margin * 2,
-                         self.height() - self.top_bottom_margin * 2, QBrush(self.background_color))
-        if self.maximum - self.minimum != 0:
-            calc_width: float = (self.width() - self.left_right_margin * 2) * (self.value / (self.maximum - self.minimum))
-            painter.fillRect(self.left_right_margin, self.top_bottom_margin,
-                             int(calc_width), int(self.height() - self.top_bottom_margin * 2), QBrush(self.front_color))
+        track_x = self.left_right_margin
+        track_y = self.top_bottom_margin
+        track_w = self.width() - self.left_right_margin * 2
+        track_h = self.height() - self.top_bottom_margin * 2
+        painter.fillRect(track_x, track_y, track_w, track_h, QBrush(self.background_color))
+
+        if self.loading_mode:
+            stripe_w = track_w // 3
+            x = int(self._loading_pos) + track_x
+            gradient = QLinearGradient(x, 0, x + stripe_w, 0)
+            transparent = QColor(self.front_color)
+            transparent.setAlpha(0)
+            gradient.setColorAt(0.0, transparent)
+            gradient.setColorAt(0.3, self.front_color)
+            gradient.setColorAt(0.7, self.front_color)
+            gradient.setColorAt(1.0, transparent)
+            painter.setClipRect(track_x, track_y, track_w, track_h)
+            painter.fillRect(x, track_y, stripe_w, track_h, QBrush(gradient))
+            painter.setClipping(False)
+        elif self.maximum - self.minimum != 0:
+            calc_width: float = track_w * (self.value / (self.maximum - self.minimum))
+            painter.fillRect(track_x, track_y,
+                             int(calc_width), track_h, QBrush(self.front_color))
             if self.rect_always_show or self.is_hover:
-                painter.fillRect(int(calc_width - 2 + self.left_right_margin), int(self.top_bottom_margin // 2),
+                painter.fillRect(int(calc_width - 2 + track_x), int(self.top_bottom_margin // 2),
                                  5, int(self.height() - self.top_bottom_margin), QBrush(self.flag_color))
 
     def mousePressEvent(self, event: QMouseEvent) -> None:

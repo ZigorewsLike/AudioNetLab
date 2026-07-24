@@ -18,7 +18,7 @@ from src.core.log_system import print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
 from src.core.qt_widgets import (PreLoaderWidget, HomePageWidget, DragFileWidget,
-                                 MainVerticalTabWidget, TitleBar, SideGrip)
+                                 MainVerticalTabWidget, TitleBar, SideGrip, ChatWidget)
 from src.core.settings import SettingsDataObject
 from src.core.settings.qt_widgets import SettingsFrame
 from src.core.workers import OpenFileWorker
@@ -144,6 +144,9 @@ class MainForm(QMainWindow):
 
         for index in self.ai_modules_tab_indexes:
             self.tab_widget.setTabEnabled(index, False or DEBUG)
+
+        self.chat = ChatWidget(mf=self)
+        chat_ind = self.tab_widget.addTab(self.chat, 'Chat')
         # endregion
 
         # region apply settings
@@ -299,7 +302,7 @@ class MainForm(QMainWindow):
             corner_grip.setVisible(grips_enable)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if not self.preloader.isVisible() and event.mimeData().hasUrls:
+        if not self.audio_player.position_slider.loading_mode and event.mimeData().hasUrls:
             event.setDropAction(Qt.DropAction.CopyAction)
             for path in event.mimeData().urls():
                 if path.isLocalFile():
@@ -423,13 +426,12 @@ class MainForm(QMainWindow):
         if not os.path.exists(file_path):
             self.show_error_message_log("Ошибка открытия файла", "Файл не найден. Возможно он удалён")
             return
-        self.show_preloader()
-        self.preloader.set_help_text("Открытие файла")
+        self.audio_player.start_position_loading()
 
         meta = self.file_meta_controller.get_track_meta(track_id)
         if not self.audio_player.prepare_to_open_file(file_path, meta):
             self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
-            self.preloader.setVisible(False)
+            self.audio_player.stop_position_loading()
             return
         cover = self.file_meta_controller.get_preview_cover(track_id, file_path=file_path)
         if cover is None:
@@ -454,7 +456,7 @@ class MainForm(QMainWindow):
         self.drag_widget.setVisible(False)
         if not path:
             self.show_error_message_log("Ошибка открытия файла", "Не возможно открыть файл!")
-            self.preloader.setVisible(False)
+            self.audio_player.stop_position_loading()
             return
         # filename, file_extension = os.path.splitext(path)
         # track_name = self.file_meta_controller.track_meta.get('title')
@@ -463,11 +465,11 @@ class MainForm(QMainWindow):
         self.home_page.last_file.update_file_list()
         # self.file_meta_controller.save_meta_in_registry(track_id)
 
+        self.audio_player.stop_position_loading()
         self.audio_player.play_music()
         self.settings.system_settings.open_filename = path
         self.save_config_app()
         gc.collect()
-        self.preloader.setVisible(False)
         self.audio_player.audio_graph.calculate_render_lines(forcedly=True)
         self.genre_widget.reset_result()
 

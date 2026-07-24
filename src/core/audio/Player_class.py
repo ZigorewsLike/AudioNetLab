@@ -457,4 +457,10 @@ class AudioPlayer(QWidget):
     @pyqtSlot(list)
     def set_eq_gains(self, gains: List[float]) -> None:
         self.audio_streamer.eq_gains = gains
+
+    def start_position_loading(self) -> None:
+        self.position_slider.set_loading_mode(True)
+
+    def stop_position_loading(self) -> None:
+        self.position_slider.set_loading_mode(False)
     # endregion
