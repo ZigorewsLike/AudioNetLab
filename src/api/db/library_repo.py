@@ -257,17 +257,25 @@ def get_album_track_ids(session: Session, album_id: int) -> List[int]:
     return list(session.scalars(query).all())
 
 
-def get_path_mtime_map(session: Session) -> Dict[str, float]:
-    """Read every known path with its recorded modification time.
+class PathEntry(NamedTuple):
+    """What the scanner needs to know about a path already in the library."""
+    track_id: int
+    mtime: float
+    is_missing: bool
 
-    The scanner loads this once and diffs the file system against it, which is what
+
+def get_path_index(session: Session) -> Dict[str, PathEntry]:
+    """Read every known path with the state the scanner diffs against.
+
+    The scanner loads this once and compares the file system to it, which is what
     keeps a rescan of an unchanged library down to a directory walk.
 
     :param session: Open session.
-    :returns: Dict[str, float] - Modification time per path, 0.0 when never recorded.
+    :returns: Dict[str, PathEntry] - Track id, modification time and missing flag per path.
     """
-    rows = session.execute(select(Track.path, Track.file_mtime)).all()
-    return {path: (mtime or 0.0) for path, mtime in rows}
+    rows = session.execute(select(Track.path, Track.id, Track.file_mtime, Track.is_missing)).all()
+    return {path: PathEntry(track_id, mtime or 0.0, bool(is_missing))
+            for path, track_id, mtime, is_missing in rows}
 
 
 def get_counts(session: Session) -> LibraryCounts:

@@ -1,0 +1,1 @@
+from .ScanProgressWidget_class import ScanProgressWidget

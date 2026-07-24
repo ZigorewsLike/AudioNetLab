@@ -1,9 +1,9 @@
 import gc
 import os
-from typing import Optional
+from typing import List, Optional, Sequence
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QThread, pyqtSlot, QSize, QRect, QEvent
+from PyQt6.QtCore import Qt, QThread, pyqtSlot, QSize, QRect, QEvent, QUrl
 from PyQt6.QtGui import (QPainter, QPixmap, QIcon, QMoveEvent,
                          QShowEvent, QAction, QDragEnterEvent, QDragLeaveEvent,
                          QDropEvent, QPaintEvent, QBrush, QColor)
@@ -14,6 +14,9 @@ from src.ai_module.genre_classification import GenreClassifierModule
 from src.ai_module.transcription import AudioLyricsModule
 from src.core.audio import AudioPlayer
 from src.core.file_system import FileMetaController
+from src.core.library.qt_widgets import ScanProgressWidget
+from src.core.library.scanner import ScanStats
+from src.core.file_system.tag_reader import read_tags, title_from_path
 from src.core.log_system import print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
@@ -21,11 +24,12 @@ from src.core.qt_widgets import (PreLoaderWidget, HomePageWidget, DragFileWidget
                                  TitleBar, SideGrip, ChatWidget)
 from src.core.settings import SettingsDataObject
 from src.core.settings.qt_widgets import SettingsFrame
-from src.core.workers import OpenFileWorker
+from src.core.workers import OpenFileWorker, LibraryScanWorker
 from src.enums import StateMode, PlayerState, DragFileState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import (APP_TITLE, VERSION, CONFIG_FILENAME, GENRE_MODEL_PATH, AI_ENABLED,
-                                  RESOURCE_ICON_DIR, CUSTOM_TITLE_BAR, DEBUG, EXPERIMENTAL_MODULES)
+                                  RESOURCE_ICON_DIR, CUSTOM_TITLE_BAR, DEBUG, EXPERIMENTAL_MODULES,
+                                  SUPPORTED_AUDIO_EXTENSIONS)
 from src.global_styles import AppColorSchemes
 
 
@@ -171,6 +175,22 @@ class MainForm(QMainWindow):
         self.worker.finished.connect(self.open_finished)
         self.worker.preloader_signal.connect(self.preloader.set_help_text)
 
+        # region library scan
+        # The strip and the worker are wired once. Unlike the open worker the thread is
+        # only started and stopped, so started() must not be reconnected on every run.
+        self.scan_progress = ScanProgressWidget(self.central_widget)
+        self.scan_progress.visibilityChanged.connect(self.recalculate_size)
+
+        self.scan_thread = QThread(self)
+        self.scan_worker = LibraryScanWorker()
+        self.scan_worker.moveToThread(self.scan_thread)
+        self.scan_thread.started.connect(self.scan_worker.run)
+        self.scan_worker.progress.connect(self.scan_progress.set_progress)
+        self.scan_worker.finished.connect(self.on_scan_finished)
+        self.scan_worker.failed.connect(self.on_scan_failed)
+        self.scan_progress.cancelRequested.connect(self.scan_worker.cancel)
+        # endregion
+
         self.settings_widget = SettingsFrame(mf=self)
         self.settings_tab_index = self.tab_widget.addTab(self.settings_widget, self.tr("Settings"))
 
@@ -262,6 +282,9 @@ class MainForm(QMainWindow):
         icon = QPixmap(RESOURCE_ICON_DIR + "audio_file_FILL0_wght400_GRAD0_opsz24.png")
         self.open_file_action.setIcon(QIcon(icon))
 
+        self.add_folder_action = QAction("", self)
+        self.add_folder_action.triggered.connect(lambda: self.add_folder_dialog())
+
         self.player_action = QAction("", self)
 
         self.home_page_action = QAction("", self)
@@ -272,6 +295,7 @@ class MainForm(QMainWindow):
         self.exit_action.triggered.connect(lambda: self.close())
 
         self.file_menu.addAction(self.open_file_action)
+        self.file_menu.addAction(self.add_folder_action)
         self.file_menu.addAction(self.player_action)
         self.file_menu.addAction(self.home_page_action)
         self.file_menu.addSeparator()
@@ -303,6 +327,7 @@ class MainForm(QMainWindow):
         self.edit_menu.setTitle(self.tr("&Edit"))
         self.tools_menu.setTitle(self.tr("&Tools"))
         self.open_file_action.setText(self.tr("Open file"))
+        self.add_folder_action.setText(self.tr("Add folder to the library"))
         self.player_action.setText(self.tr("Open player"))
         self.home_page_action.setText(self.tr("Home page"))
         self.exit_action.setText(self.tr("Exit"))
@@ -378,51 +403,69 @@ class MainForm(QMainWindow):
             corner_grip.setEnabled(grips_enable)
             corner_grip.setVisible(grips_enable)
 
+    @staticmethod
+    def urls_to_paths(urls: Sequence[QUrl]) -> List[str]:
+        """Turn dropped urls into local paths.
+
+        toLocalFile is used rather than trimming the leading slash off path(), because
+        that trick mangles a network share and leaves percent escapes in a name with
+        spaces or Cyrillic characters.
+
+        :param urls: Urls carried by the drop.
+        :returns: List[str] - Local paths, in the order they were dropped.
+        """
+        paths: List[str] = []
+        for url in urls:
+            if not url.isLocalFile():
+                continue
+            local = url.toLocalFile()
+            if local:
+                paths.append(local)
+        return paths
+
+    @staticmethod
+    def is_supported_audio(path: str) -> bool:
+        """Whether a file is one the player can open.
+
+        :param path: Path to check.
+        :returns: bool - True for a supported audio file.
+        """
+        return os.path.splitext(path)[1].lower() in SUPPORTED_AUDIO_EXTENSIONS
+
     def dragEnterEvent(self, event: QDragEnterEvent):
-        """Show the drop overlay and validate the dragged file extension.
+        """Show the drop overlay and validate what is being dragged.
+
+        A drop is accepted when it carries at least one folder or one supported audio
+        file, so a whole music collection can be dropped on the window at once.
 
         :param event: Qt drag enter event.
         :returns: None.
         """
-        if not self.audio_player.position_slider.loading_mode and event.mimeData().hasUrls:
-            event.setDropAction(Qt.DropAction.CopyAction)
-            for path in event.mimeData().urls():
-                if path.isLocalFile():
-                    file_path = path.path()[1:]  # Strip the leading slash of the file:// url
-                else:
-                    file_path = str(path)
-                _, file_extension = os.path.splitext(file_path)
-                if file_extension.lower() in ['.mp3', '.wave', '.wav', '.flac']:
-                    self.drag_widget.set_state(DragFileState.CORRECT)
-                    event.accept()
-                else:
-                    self.drag_widget.set_state(DragFileState.INCORRECT)
-                    event.accept()
-                self.drag_widget.setVisible(True)
-                break
-        else:
+        if self.audio_player.position_slider.loading_mode or not event.mimeData().hasUrls():
             event.ignore()
             self.drag_widget.setVisible(False)
+            return
+
+        paths = self.urls_to_paths(event.mimeData().urls())
+        acceptable = any(os.path.isdir(path) or self.is_supported_audio(path) for path in paths)
+        self.drag_widget.set_state(DragFileState.CORRECT if acceptable else DragFileState.INCORRECT)
+        self.drag_widget.setVisible(True)
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
 
     def dropEvent(self, event: QDropEvent) -> None:
-        """Add the dropped file to the track list.
+        """Add everything that was dropped to the library.
 
         :param event: Qt drop event.
         :returns: None.
         """
-        if event.mimeData().hasUrls and self.drag_widget.state is DragFileState.CORRECT:
-            event.setDropAction(Qt.DropAction.CopyAction)
-            event.accept()
-            for path in event.mimeData().urls():
-                self.drag_widget.setVisible(False)
-                if path.isLocalFile():
-                    self.add_file(path.path()[1:])
-                else:
-                    self.add_file(str(path))
-                break
-        else:
+        self.drag_widget.setVisible(False)
+        if not event.mimeData().hasUrls() or self.drag_widget.state is not DragFileState.CORRECT:
             event.ignore()
-            self.drag_widget.setVisible(False)
+            return
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+        self.add_paths(self.urls_to_paths(event.mimeData().urls()))
 
     def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:
         """Hide the drop overlay.
@@ -452,11 +495,18 @@ class MainForm(QMainWindow):
             self.settings.system_settings.form_width = self.width()
             self.settings.system_settings.form_height = self.height()
 
-        # The player is pinned to the bottom, the tabs take the rest
+        # The player is pinned to the bottom, the scan strip sits above it while a scan
+        # runs, and the tabs take whatever is left
         self.audio_player.resize(self.central_widget.width(), self.audio_player.height())
         self.audio_player.move(0, self.central_widget.height() - self.audio_player.height())
+
+        scan_height: int = self.scan_progress.height() if self.scan_progress.isVisible() else 0
+        self.scan_progress.resize(self.central_widget.width(), self.scan_progress.height())
+        self.scan_progress.move(0, self.central_widget.height()
+                                - self.audio_player.height() - scan_height)
+
         self.tab_widget.resize(self.central_widget.width(),
-                               self.central_widget.height() - self.audio_player.height())
+                               self.central_widget.height() - self.audio_player.height() - scan_height)
 
         self.drag_widget.resize(self.size())
 
@@ -504,19 +554,93 @@ class MainForm(QMainWindow):
         self.work_thread.wait()
 
     def add_file_dialog(self) -> None:
-        """Ask for an audio file and add it to the track list.
+        """Ask for audio files and add them to the library.
 
         :returns: None.
         """
-        dialog_filter = (f"{self.tr('All audio formats')} (*.mp3 *.flac *.wave);;"
+        all_formats = " ".join(f"*{extension}" for extension in SUPPORTED_AUDIO_EXTENSIONS)
+        dialog_filter = (f"{self.tr('All audio formats')} ({all_formats});;"
                          f"MP3 (*.mp3);;FLAC (*.flac);;WAVE (*.wave *.wav);;"
                          f"{self.tr('All files')} (*.*)")
-        filename = QFileDialog.getOpenFileName(self, self.tr("Open file"),
-                                               self.settings.system_settings.last_folder,
-                                               dialog_filter)[0]
-        if filename:
-            self.settings.system_settings.last_folder = os.path.dirname(filename)
-            self.add_file(filename)
+        filenames = QFileDialog.getOpenFileNames(self, self.tr("Open file"),
+                                                 self.settings.system_settings.last_folder,
+                                                 dialog_filter)[0]
+        if filenames:
+            self.settings.system_settings.last_folder = os.path.dirname(filenames[0])
+            self.add_paths(filenames)
+
+    def add_folder_dialog(self) -> None:
+        """Ask for a folder and import everything under it.
+
+        :returns: None.
+        """
+        folder = QFileDialog.getExistingDirectory(self, self.tr("Add folder to the library"),
+                                                  self.settings.system_settings.last_folder)
+        if folder:
+            self.settings.system_settings.last_folder = folder
+            self.add_paths([folder])
+
+    def add_paths(self, paths: Sequence[str]) -> None:
+        """Add any mix of files and folders to the library.
+
+        A single dropped file is registered right away, since starting a thread for it
+        would only make it slower. Anything larger goes through the scanner, which
+        reads and writes in batches and keeps the window responsive meanwhile.
+
+        :param paths: Files and folders to add.
+        :returns: None.
+        """
+        folders = [path for path in paths if os.path.isdir(path)]
+        files = [path for path in paths if os.path.isfile(path) and self.is_supported_audio(path)]
+        if not folders and not files:
+            return
+        if not folders and len(files) == 1:
+            self.add_file(files[0])
+            return
+        self.start_library_scan(folders + files)
+
+    def start_library_scan(self, paths: Sequence[str]) -> None:
+        """Import paths in the background.
+
+        :param paths: Files and folders to import.
+        :returns: None.
+        """
+        if self.scan_thread.isRunning():
+            self.show_error_message_log(self.tr("Library"),
+                                        self.tr("A scan is already running, wait for it to finish"))
+            return
+        self.scan_thread.wait()  # The previous run may still be shutting down
+        self.scan_worker.set_paths(paths)
+        self.scan_progress.start()
+        self.scan_thread.start()
+
+    @pyqtSlot(object)
+    def on_scan_finished(self, stats: ScanStats) -> None:
+        """Show what the scan did and refresh the views that read the library.
+
+        :param stats: Result reported by the scanner.
+        :returns: None.
+        """
+        self.scan_thread.quit()
+        if stats.cancelled:
+            summary = self.tr("Scan cancelled, {0} tracks added").format(stats.tracks_added)
+        else:
+            summary = self.tr("{0} tracks added, {1} updated, {2} albums").format(
+                stats.tracks_added, stats.tracks_updated, stats.albums_added)
+        self.scan_progress.finish(summary)
+        if stats.changed:
+            self.home_page.last_file.update_file_list()
+
+    @pyqtSlot(str)
+    def on_scan_failed(self, message: str) -> None:
+        """Report a scan that could not run.
+
+        :param message: Error text.
+        :returns: None.
+        """
+        self.scan_thread.quit()
+        self.scan_progress.finish(self.tr("Scan failed"))
+        self.show_error_message_log(self.tr("Library"), message)
 
     def add_file(self, file_path: str) -> None:
         """Register a file in the database and store its tags in the registry.
@@ -527,10 +651,13 @@ class MainForm(QMainWindow):
         if not os.path.exists(file_path):
             self.show_error_message_log(self.tr("File open error"), self.tr("File not found, it may have been deleted"))
             return
-        filename, file_extension = os.path.splitext(os.path.basename(file_path))
-        meta = self.file_meta_controller.read_track_file(file_path)
-        track_name = meta.get('title')
-        title = track_name[0] if track_name is not None else filename  # Fall back to the file name
+        # read_track_file fills the registry with the raw mutagen object, but its keys
+        # are format specific: an ID3 tag answers to TIT2, not to title, so reading the
+        # name off it left every MP3 named after its file. The title comes from the
+        # normalized reader instead.
+        self.file_meta_controller.read_track_file(file_path)
+        tags = read_tags(file_path)
+        title = tags.title if tags is not None and tags.title else title_from_path(file_path)
         track_id: int = self.home_page.last_file.add(title, file_path)
         if track_id is None:  # The file is already in the list
             return
@@ -549,7 +676,15 @@ class MainForm(QMainWindow):
             return
         self.audio_player.start_position_loading()
 
+        # Tracks imported by the scanner have no registry folder, their tags live in the
+        # database. Fill the registry for the track actually being opened, which is what
+        # the player panel, the cover and the lyrics read from.
         meta = self.file_meta_controller.get_track_meta(track_id)
+        if meta is None:
+            meta = self.file_meta_controller.read_track_file(file_path)
+            if meta is not None:
+                self.file_meta_controller.save_meta_in_registry(track_id)
+
         if not self.audio_player.prepare_to_open_file(file_path, meta):
             self.show_error_message_log(self.tr("File open error"), self.tr("Unable to open the file"))
             self.audio_player.stop_position_loading()
@@ -630,6 +765,11 @@ class MainForm(QMainWindow):
         """
         if self.profiling.isVisible():
             self.profiling.close()
+        if self.scan_thread.isRunning():
+            # The scan stops after the current chunk, everything it wrote is committed
+            self.scan_worker.cancel()
+            self.scan_thread.quit()
+            self.scan_thread.wait(5000)
         self.save_config_app()
 
     def on_tab_changed(self, index: int):

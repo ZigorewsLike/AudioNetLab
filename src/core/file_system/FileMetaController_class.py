@@ -1,7 +1,6 @@
 import os
 import pickle
 import shutil
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -11,6 +10,7 @@ from PyQt6.QtGui import QImage
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
+from .tag_reader import cover_bytes_from_audio, find_folder_cover
 from src.core.log_system import print_e
 from src.enums import RegistryFileName
 from src.global_constants import PATH_TO_LAST_REGISTRY
@@ -79,45 +79,33 @@ class FileMetaController:
     def get_preview_cover(self, track_id: int, file_path: str = None) -> Optional[QImage]:
         """Get the track cover from the tags, or from an image next to the file.
 
+        Both lookups are delegated: the picture frames to cover_bytes_from_audio and
+        the image on disk to find_folder_cover, so this agrees with what the library
+        scanner stored for the same track instead of applying its own rules.
+
         :param track_id: Track id.
         :param file_path: Path to the audio file, enables the search on disk.
         :returns: QImage - Cover image, None when nothing was found.
         """
-        path_to_reg_folder: str = self.get_registry_path(track_id)
-        if os.path.exists(f"{path_to_reg_folder}/{RegistryFileName.TRACK_META}"):
-            with open(f"{path_to_reg_folder}/{RegistryFileName.TRACK_META}", "rb") as binary_file:
-                meta = pickle.load(binary_file)
-                image_bytes = None
-                try:
-                    if isinstance(meta, FLAC):
-                        image_bytes = meta.pictures[0].data
-                    elif isinstance(meta, MP3):
-                        apic = meta.tags.get("APIC:", None)
-                        if apic:
-                            image_bytes = apic.data
-                except Exception as e:
-                    print_e(f"[{track_id}]: Meta preview read error", e)
-                    image_bytes = None
-                if image_bytes is not None:
-                    img = QImage()
-                    img.loadFromData(image_bytes)
-                    return img
-                elif file_path and self.find_image_on_disk:
-                    try:
-                        folder = Path(os.path.dirname(file_path))
-                        ext_images = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".webp"}
-                        files = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in ext_images)
-                        if files:
-                            # Crop the first image found to a centred square
-                            image = QImage(str(files[0]))
-                            w, h = image.width(), image.height()
-                            s = min(w, h)
-                            x = (w - s) // 2
-                            y = (h - s) // 2
-                            return image.copy(QRect(x, y, s, s))
-                    except Exception as e:
-                        print_e(f"[{track_id}]: Preview from disk read error", e)
+        image_bytes = cover_bytes_from_audio(self.get_track_meta(track_id))
+        if image_bytes is not None:
+            image = QImage()
+            if image.loadFromData(image_bytes):
+                return image
+
+        if file_path and self.find_image_on_disk:
+            try:
+                image_path = find_folder_cover(os.path.dirname(file_path))
+                if image_path:
+                    # Crop to a centred square, the player draws the cover in a square
+                    image = QImage(image_path)
+                    if image.isNull():
                         return None
+                    side = min(image.width(), image.height())
+                    return image.copy(QRect((image.width() - side) // 2,
+                                            (image.height() - side) // 2, side, side))
+            except Exception as e:
+                print_e(f"[{track_id}]: Preview from disk read error", e)
         return None
 
     def get_track_meta(self, track_id: int) -> Optional[dict]:
@@ -190,10 +178,14 @@ class FileMetaController:
         return None
 
     def delete_track(self, track_id: int) -> None:
-        """Drop the whole registry folder of a track.
+        """Drop the registry folder of a track, if it has one.
+
+        A track imported by the library scanner keeps its tags in the database and has
+        no registry folder until it is opened, so deleting one that was never opened
+        must not fail on the missing folder.
 
         :param track_id: Track id.
         :returns: None.
         """
         path_to_reg_folder: str = self.get_registry_path(track_id)
-        shutil.rmtree(path_to_reg_folder)
+        shutil.rmtree(path_to_reg_folder, ignore_errors=True)

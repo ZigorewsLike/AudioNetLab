@@ -3,13 +3,13 @@ import threading
 from contextlib import contextmanager
 from typing import Optional, Any, List, Iterator
 
-from sqlalchemy import create_engine, Engine, event
+from sqlalchemy import create_engine, Engine, event, func
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import sessionmaker, Session
 
 from src.core.log_system import print_d
 from .migrations import migrate
-from .models import Track, normalize_path
+from .models import Track, normalize_key, normalize_path
 
 DATABASE_URL = "sqlite:///./storage.db"
 
@@ -192,7 +192,10 @@ class DBHandler:
         existing_track = self.session.query(Track.id).filter(Track.path == path).first()
         if existing_track:
             return None
-        track_object = Track(title=title, path=path, dt_create=datetime.datetime.now(),
+        # title_key mirrors what the scanner writes, so a track added one at a time is
+        # found by the library search the same as a scanned one
+        track_object = Track(title=title, title_key=normalize_key(title), path=path,
+                             dt_create=datetime.datetime.now(),
                              dt_last_opened=datetime.datetime.now())
         self.session.add(track_object)
         self.flush()  # Needed to read back the generated id
@@ -201,12 +204,18 @@ class DBHandler:
         return track_object.id
 
     def get_all_track(self) -> List[Track]:
-        """Read the whole track list, most recently opened first.
+        """Read the whole track list, most recently added or opened first.
+
+        A track imported by the scanner has never been opened, so its dt_last_opened
+        is NULL and it would sink below every opened track, out of sight at the bottom
+        of the list. Ordering on the add time as a fallback keeps a freshly imported
+        track where the user expects it, at the top.
 
         :returns: List[Track] - Track rows.
         """
         assert self.is_connected, "Database is not connected"
-        return self.session.query(Track).order_by(Track.dt_last_opened.desc()).all()
+        recency = func.coalesce(Track.dt_last_opened, Track.dt_create)
+        return self.session.query(Track).order_by(recency.desc()).all()
 
     def get_track_by_path(self, path: str) -> Optional[Track]:
         """Find a track by its file path.

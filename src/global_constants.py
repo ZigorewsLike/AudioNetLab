@@ -27,6 +27,21 @@ RESOURCE_ICON_DIR = "res/icons/"
 RESOURCE_DIR = "res/"
 PATH_TO_LAST_REGISTRY = "data/registry/"  # Per track cache: tags, cover, features, lyrics
 
+# region LIBRARY
+# Extensions the player can decode. The file dialog, the drop target and the folder
+# scanner all read this, so a new format is enabled in one place.
+SUPPORTED_AUDIO_EXTENSIONS = (".mp3", ".flac", ".wav", ".wave")
+# Images looked for next to an audio file when the tags carry no cover, in this order
+COVER_FILE_NAMES = ("cover", "folder", "front", "album", "albumart")
+COVER_FILE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+PATH_TO_COVER_CACHE = "data/covers/"  # Pre-scaled covers, named after the hash of the source image
+COVER_CACHE_SIZES = (160, 480)  # Edge length of the cached copies, the grid picks the nearest
+COVER_CACHE_QUALITY = 85  # JPEG quality of the cached copies
+COVER_MEMORY_CACHE_KB = 96 * 1024  # QPixmapCache budget for the decoded covers
+SCAN_CHUNK_SIZE = 256  # Files read and written per pass, keeps memory flat on a huge library
+SCAN_PROGRESS_INTERVAL_MS = 100  # Lower bound between two progress signals of the scanner
+# endregion
+
 # region I18N
 I18N_DIR = "res/i18n/"  # Compiled .qm catalogs
 SOURCE_LANGUAGE = "en"  # Language the literals in the code are written in, needs no catalog

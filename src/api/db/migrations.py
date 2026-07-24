@@ -7,7 +7,7 @@ from src.core.log_system import print_d, print_e
 from .models import Base, Track
 
 # Schema the code expects. Bump it and append a step to MIGRATION_STEPS when the models change.
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 # Name of the table the old track rows are copied out of while it is rebuilt.
 _REBUILD_TABLE_NAME = "track_migrate_old"
@@ -106,9 +106,24 @@ def _migrate_to_1(conn: Connection) -> None:
     conn.execute(sql_text(f"DROP TABLE {_REBUILD_TABLE_NAME}"))
 
 
+def _migrate_to_2(conn: Connection) -> None:
+    """Backfill title_key on any row that got in without one.
+
+    A version 1 release added tracks one at a time without filling title_key, so a
+    database upgraded from that release can hold rows the library search would miss.
+    An ASCII fold here matches what the version 1 rebuild used; the next scan replaces
+    it with the proper Unicode fold.
+
+    :param conn: Open connection inside a transaction.
+    :returns: None.
+    """
+    conn.execute(sql_text("UPDATE track SET title_key = lower(title) WHERE title_key IS NULL"))
+
+
 # One callable per version, index 0 upgrades a version 0 database to version 1.
 MIGRATION_STEPS: List[Callable[[Connection], None]] = [
     _migrate_to_1,
+    _migrate_to_2,
 ]
 
 

@@ -148,6 +148,7 @@ after saving.
 | --- | --- |
 | `storage.db` | SQLite database with the library: tracks, artists, albums, covers, scanned folders |
 | `data/registry/<track_id>/` | Per track cache: tags, feature vectors, lyrics |
+| `data/covers/` | Pre-scaled covers, named after the hash of the source image |
 | `res/presets.pickle` | EQ presets per genre |
 | `res/i18n/` | Translation catalogs, `.ts` sources and compiled `.qm` |
 | `res/icons/` | Interface icons |
@@ -155,8 +156,31 @@ after saving.
 | `config_app.ini` | Application settings |
 | `error_log.txt` | Uncaught exceptions |
 
-Deleting a track from the list also deletes its registry folder. The audio file itself is never
-touched, the application only stores its path.
+Deleting a track from the list also deletes its registry folder, if it has one: a track
+imported by the scanner keeps its tags in the database and only gets a registry folder once it
+is opened. The audio file itself is never touched, the application only stores its path.
+
+### Importing into the library
+
+Drop any number of files and whole folders on the window, use **File, Open file** for a
+multiple selection, or **File, Add folder to the library** for a folder. A single dropped
+file is registered immediately; anything larger goes to the scanner, which runs on its own
+thread and reports on a strip above the player with a cancel button. The window stays usable
+while it works, and a cancelled scan keeps everything it had already imported.
+
+Two things keep a large import affordable:
+
+* A file whose modification time did not change is never opened again, so a rescan of an
+  unchanged collection costs a directory walk. On a collection of 3663 tracks that is 0.1 s.
+* FLAC tags are read by a small parser that seeks past the artwork instead of loading it,
+  because mutagen reads every metadata block and a FLAC with a cover carries a few hundred
+  kilobytes of it. That is 0.6 KB read per track instead of 306 KB. The cover itself is
+  decoded once per album, not once per track, and cached under `data/covers/` named after
+  the hash of the image, so albums sharing artwork share one file.
+
+Files that disappear are flagged, never deleted: an unplugged drive would otherwise wipe the
+library along with its play counts. They are listed as missing and unflag themselves when the
+drive comes back.
 
 ### Database schema
 
@@ -179,13 +203,14 @@ main.py                     Entry point: logging, DPI, main window
 src/
   forms/                    MainForm, the main window and the module wiring
   core/
+    library/                Folder scanner, cover cache, the scan progress strip
     i18n/                   Translation manager, loads and switches the catalogs
     audio/                  AudioStreamer (streaming thread), AudioPlayer (player panel)
     render/graphics_system/ OpenGL waveform panels
     qt_widgets/             Shared widgets: sliders, equalizer, title bar, overlays
-    file_system/            Track registry and the recent track list
+    file_system/            Tag reader, track registry and the recent track list
     settings/               Settings object and the settings pages
-    workers/                Background workers: file opening, genre prediction
+    workers/                Background workers: file opening, genre prediction, library scan
     log_system/             Logging and the profiler
     point_system/           Point helper type
   ai_module/
