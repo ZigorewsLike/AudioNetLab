@@ -310,6 +310,35 @@ def delete_orphans(session: Session) -> tuple:
     return albums, artists
 
 
+class QueueTrack(NamedTuple):
+    """Display fields of one queued track."""
+    id: int
+    title: str
+    artist: Optional[str]
+    duration: Optional[float]
+
+
+def get_queue_tracks(session: Session, track_ids: List[int]) -> dict:
+    """Read the display fields of a set of tracks, for the queue panel.
+
+    Returned as a mapping so the caller can lay the rows out in queue order without a
+    query per track.
+
+    :param session: Open session.
+    :param track_ids: Track ids to read.
+    :returns: dict - QueueTrack per id, missing ids simply absent.
+    """
+    if not track_ids:
+        return {}
+    query = (
+        select(Track.id, Track.title, Artist.name, Track.duration)
+        .select_from(Track)
+        .outerjoin(Artist, Artist.id == Track.artist_id)
+        .where(Track.id.in_(track_ids))
+    )
+    return {row[0]: QueueTrack(*row) for row in session.execute(query).all()}
+
+
 def get_counts(session: Session) -> LibraryCounts:
     """Count what the library holds.
 

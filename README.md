@@ -209,6 +209,13 @@ Deleting the last track of an album removes the album and, if it also empties ou
 so the grid never shows a tile that has nothing behind it. A database from before this rule is
 cleaned once by the schema migration.
 
+Playing an album, or a track from any list, fills a play queue: the player then walks it on its
+own at the end of each track, and the previous and next buttons on the player panel step through
+it. The queue button opens a side panel that shows the current track and what comes next, where
+a click jumps to a track and an upcoming track can be removed. A single playback controller owns
+the queue and the current track, so the album page, the track list and the queue panel all show
+the same playing state.
+
 ### Database schema
 
 `storage.db` carries its schema version in `PRAGMA user_version`, and `src/api/db/migrations.py`

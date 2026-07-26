@@ -133,6 +133,28 @@ class PlaybackController(QObject):
         self.queueChanged.emit()
         self._open_current()
 
+    def remove_from_queue(self, index: int) -> None:
+        """Remove a track from the queue by position.
+
+        The playing track keeps playing even if removed; the cursor is clamped by the
+        queue so next and previous still make sense.
+
+        :param index: Position in the queue.
+        :returns: None.
+        """
+        self.queue.remove_at(index)
+        self.queueChanged.emit()
+
+    def move_in_queue(self, from_index: int, to_index: int) -> None:
+        """Reorder a track in the queue.
+
+        :param from_index: Position to move from.
+        :param to_index: Position to move to.
+        :returns: None.
+        """
+        self.queue.move(from_index, to_index)
+        self.queueChanged.emit()
+
     def has_next(self) -> bool:
         """Whether a next track exists.
 

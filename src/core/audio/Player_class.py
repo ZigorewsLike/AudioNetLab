@@ -103,6 +103,27 @@ class AudioPlayer(QWidget):
         self.play_button.setIconSize(QSize(25, 25))
         self.play_button.setObjectName("PlayerButtons")
 
+        self.prev_button = QPushButton("", self)
+        self.prev_button.setObjectName("PlayerButtons")
+        self.prev_button.resize(22, 22)
+        self.prev_button.setIcon(QIcon('res/icons/skip_previous.png'))
+        self.prev_button.setIconSize(QSize(22, 22))
+        self.prev_button.clicked.connect(lambda: self.mf.playback.play_prev())
+
+        self.next_button = QPushButton("", self)
+        self.next_button.setObjectName("PlayerButtons")
+        self.next_button.resize(22, 22)
+        self.next_button.setIcon(QIcon('res/icons/skip_next.png'))
+        self.next_button.setIconSize(QSize(22, 22))
+        self.next_button.clicked.connect(lambda: self.mf.playback.play_next())
+
+        self.queue_button = QPushButton("", self)
+        self.queue_button.setObjectName("PlayerButtons")
+        self.queue_button.resize(22, 20)
+        self.queue_button.setIcon(QIcon('res/icons/queue_music.png'))
+        self.queue_button.setIconSize(QSize(22, 20))
+        self.queue_button.clicked.connect(lambda: self.mf.queue_panel.toggle())
+
         self.track_meta_image_bytes: Optional[bytes] = None
         self.track_meta_image_drawable = QImage()
 
@@ -236,10 +257,12 @@ class AudioPlayer(QWidget):
         self.author_tack.move(80, self.height() - 35)
         self.play_button.move(round(self.width() / 2 - self.play_button.width() / 2),
                               self.height() - 22 - self.play_button.height())
+        # Previous and next flank the play button, vertically centred on it
+        button_y = self.play_button.y() + (self.play_button.height() - self.prev_button.height()) // 2
+        self.prev_button.move(self.play_button.x() - self.prev_button.width() - 14, button_y)
+        self.next_button.move(self.play_button.x() + self.play_button.width() + 14, button_y)
 
         self.position_slider.resize(self.width() - 40, 16)
-        self.volume_slider.move(self.width() - self.volume_slider.width() - 142,
-                                self.height() - self.volume_slider.height() - 24)
 
         self.audio_graph.resize(self.width() - 40, 120)
         if self.graph_visible:
@@ -256,12 +279,15 @@ class AudioPlayer(QWidget):
 
         self.graph_visible_button.move(self.width() - self.graph_visible_button.width() - 30,
                                        self.height() - self.graph_visible_button.height() - 25)
-
         self.meta_visible_button.move(self.graph_visible_button.x() - 20 - self.meta_visible_button.width(),
                                       self.graph_visible_button.y())
+        self.queue_button.move(self.meta_visible_button.x() - 20 - self.queue_button.width(),
+                               self.meta_visible_button.y())
+        self.mute_volume_button.move(self.queue_button.x() - 20 - self.mute_volume_button.width(),
+                                     self.queue_button.y())
+        self.volume_slider.move(self.mute_volume_button.x() - self.volume_slider.width() - 20,
+                                self.height() - self.volume_slider.height() - 24)
 
-        self.mute_volume_button.move(self.meta_visible_button.x() - 20 - self.mute_volume_button.width(),
-                                     self.meta_visible_button.y())
         self.label_duration_right.move(self.width() - self.label_duration_right.width() - 20 - 5,
                                        self.position_slider.y() + 1)
         self.label_duration_left.move(25, self.position_slider.y() + 1)

@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
 from src.ai_module.genre_classification import GenreClassifierModule
 from src.ai_module.transcription import AudioLyricsModule
 from src.core.audio import AudioPlayer, PlaybackController
+from src.core.audio.qt_widgets import QueuePanel
 from src.api.db import library_repo
 from src.api.db.db_handler import create_session
 from src.api.db.models import Track
@@ -146,6 +147,9 @@ class MainForm(QMainWindow):
         self.playback.currentTrackChanged.connect(self.last_file.set_playing_track)
         self.last_file.update_file_list()
         self.library_tab_index = self.tab_widget.addTab(self.library_widget, self.tr("Library"))
+
+        # The queue panel overlays the right side, toggled from the player panel
+        self.queue_panel = QueuePanel(self, self.central_widget)
 
         # region Overlap widgets
         self.drag_widget = DragFileWidget(self)
@@ -525,6 +529,12 @@ class MainForm(QMainWindow):
 
         self.tab_widget.resize(self.central_widget.width(),
                                self.central_widget.height() - self.audio_player.height() - scan_height)
+
+        # The queue panel overlays the right of the tab area, above the player
+        queue_width = min(340, self.central_widget.width() // 2)
+        self.queue_panel.resize(queue_width, self.tab_widget.height())
+        self.queue_panel.move(self.central_widget.width() - queue_width, 0)
+        self.queue_panel.raise_()
 
         self.drag_widget.resize(self.size())
 
