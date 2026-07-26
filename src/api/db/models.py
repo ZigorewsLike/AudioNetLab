@@ -152,6 +152,7 @@ class Track(Base):
     bitrate = Column(Integer, nullable=True)
     sample_rate = Column(Integer, nullable=True)
     channels = Column(Integer, nullable=True)
+    bits_per_sample = Column(Integer, nullable=True)  # NULL for a lossy format like MP3
 
     file_size = Column(Integer, nullable=True)
     file_mtime = Column(Float, nullable=True)  # st_mtime, lets a rescan skip unchanged files

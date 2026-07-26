@@ -386,6 +386,7 @@ class LibraryScanner:
                 "bitrate": tags.bitrate,
                 "sample_rate": tags.sample_rate,
                 "channels": tags.channels,
+                "bits_per_sample": tags.bits_per_sample,
                 "file_size": item.size,
                 "file_mtime": item.mtime,
                 "is_missing": False,

@@ -12,8 +12,36 @@ from .models import Base
 # To change the schema later: edit the models, append a step to MIGRATION_STEPS and the
 # version bumps itself. MIGRATION_STEPS[i] upgrades a database from schema version
 # (i + 1) to (i + 2), so a database at version v runs steps[v-1 ..].
+def _column_exists(conn: Connection, table: str, column: str) -> bool:
+    """Whether a table already has a column.
+
+    :param conn: Open connection.
+    :param table: Table name.
+    :param column: Column name.
+    :returns: bool - True when the column is present.
+    """
+    rows = conn.execute(sql_text(f"PRAGMA table_info({table})")).fetchall()
+    return any(row[1] == column for row in rows)
+
+
+def _migrate_to_2(conn: Connection) -> None:
+    """Add the bits_per_sample column the album page shows per track.
+
+    A fresh database already has it from the models, this fills it in on a database
+    made before the column existed. Existing rows stay NULL until the next scan reads
+    the value from the files.
+
+    :param conn: Open connection inside a transaction.
+    :returns: None.
+    """
+    if not _column_exists(conn, "track", "bits_per_sample"):
+        conn.execute(sql_text("ALTER TABLE track ADD COLUMN bits_per_sample INTEGER"))
+
+
 BASELINE_SCHEMA_VERSION = 1
-MIGRATION_STEPS: List[Callable[[Connection], None]] = []
+MIGRATION_STEPS: List[Callable[[Connection], None]] = [
+    _migrate_to_2,
+]
 CURRENT_SCHEMA_VERSION = BASELINE_SCHEMA_VERSION + len(MIGRATION_STEPS)
 
 

@@ -38,6 +38,7 @@ class LastFileList(QWidget):
         self.item_height: int = 100
         self.playing_track_id: Optional[int] = None
         self.item_track_map: Dict[int, int] = {}  # Position in the layout per track id
+        self.ordered_track_ids: list = []  # Track ids in display order, filled on refresh
 
         self.setStyleSheet("""
         QLabel{
@@ -120,6 +121,9 @@ class LastFileList(QWidget):
         self.db.connect()
         track_list = self.db.get_all_track()
         self.db.disconnect()
+        # The ids in display order, so a click can hand the whole list to the queue and
+        # next and previous walk what the user is looking at
+        self.ordered_track_ids = [track.id for track in track_list]
         for item_index, track in enumerate(track_list):
             file_exist = os.path.exists(track.path)  # Missing files stay listed but are marked
             last_file = LastFileItem(track, self.mf, self, file_exist=file_exist)
@@ -186,22 +190,33 @@ class LastFileList(QWidget):
         return None
 
     def item_click(self, track_id: int) -> None:
-        """Open the clicked track and move the playing marker onto it.
+        """Play the clicked track, queuing the rest of the list after it.
+
+        The controller drives the playing marker through set_playing_track, so this only
+        starts playback and the marker follows, including on an autoplay to the next.
 
         :param track_id: Track id.
         :returns: None.
         """
-        if track_id != self.playing_track_id:
-            if self.playing_track_id is not None:
-                item = self.get_item_by_track_id(self.playing_track_id)
-                if item:
-                    item.is_playing = False
-            self.playing_track_id = track_id
-            item = self.get_item_by_track_id(self.playing_track_id)
-            if item:
-                item.is_playing = True
-                self.mf.open_file(item.track.path, track_id)
-                self.update_track_last_opened(track_id)
+        playback = getattr(self.mf, "playback", None)
+        if playback is not None:
+            playback.play_track(self.ordered_track_ids, track_id)
+
+    def set_playing_track(self, track_id: int) -> None:
+        """Move the playing marker onto a track, driven by the controller.
+
+        :param track_id: Track now playing.
+        :returns: None.
+        """
+        if track_id == self.playing_track_id:
+            return
+        previous = self.get_item_by_track_id(self.playing_track_id)
+        if previous is not None:
+            previous.set_playing(False)
+        self.playing_track_id = track_id
+        current = self.get_item_by_track_id(track_id)
+        if current is not None:
+            current.set_playing(True)
 
 
 class LastFileItem(QWidget):
@@ -316,6 +331,25 @@ class LastFileItem(QWidget):
         else:
             self.label_path.setText(os.path.abspath(self.track.path).replace('\\', '/'))
         self.label_path.adjustSize()
+
+    def set_playing(self, playing: bool) -> None:
+        """Turn the playing indicator on this row on or off.
+
+        Starts or stops the equalizer-bar animation so the marker can be toggled live,
+        not only at the moment the row is first shown.
+
+        :param playing: Whether this row is the one playing.
+        :returns: None.
+        """
+        if self.is_playing == playing:
+            return
+        self.is_playing = playing
+        if playing and self.isVisible():
+            if not self.timer.isActive():
+                self.timer.start(10)
+        elif not playing and self.timer.isActive():
+            self.timer.stop()
+        self.update()
 
     def showEvent(self, event: QShowEvent) -> None:
         """Lay out the row and start the playing animation when needed.

@@ -43,6 +43,10 @@ class TrackRow(NamedTuple):
     year: Optional[int]
     cover_hash: Optional[str]
     is_missing: bool
+    bitrate: Optional[int]
+    sample_rate: Optional[int]
+    bits_per_sample: Optional[int]
+    file_ext: Optional[str]  # Uppercase codec label from the file extension, e.g. FLAC
 
 
 class LibraryCounts(NamedTuple):
@@ -196,7 +200,8 @@ def list_tracks(session: Session,
     query = (
         select(Track.id, Track.title, Track.path, Artist.name, Album.title, Track.album_id,
                Track.track_no, Track.disc_no, Track.duration, Track.year,
-               Cover.hash, Track.is_missing)
+               Cover.hash, Track.is_missing,
+               Track.bitrate, Track.sample_rate, Track.bits_per_sample)
         .select_from(Track)
         .outerjoin(Artist, Artist.id == Track.artist_id)
         .outerjoin(Album, Album.id == Track.album_id)
@@ -218,7 +223,18 @@ def list_tracks(session: Session,
     query = _apply_track_sort(query, sort)
     if limit is not None:
         query = query.limit(limit)
-    return [TrackRow(*row) for row in session.execute(query).all()]
+    return [_track_row(row) for row in session.execute(query).all()]
+
+
+def _track_row(row) -> TrackRow:
+    """Build a TrackRow from a query row, deriving the codec label from the path.
+
+    :param row: Query row with the track columns in select order.
+    :returns: TrackRow - The typed row.
+    """
+    path = row[2]
+    extension = path.rsplit(".", 1)[-1].upper() if path and "." in path else None
+    return TrackRow(*row, file_ext=extension)
 
 
 def get_album(session: Session, album_id: int) -> Optional[AlbumRow]:

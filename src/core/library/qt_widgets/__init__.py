@@ -1,4 +1,6 @@
 from .ScanProgressWidget_class import ScanProgressWidget
 from .AlbumGridView_class import AlbumGridView
 from .AlbumTileDelegate_class import AlbumTileDelegate
+from .AlbumTrackDelegate_class import AlbumTrackDelegate
+from .AlbumPage_class import AlbumPage
 from .LibraryTabWidget_class import LibraryTabWidget

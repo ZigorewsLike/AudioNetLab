@@ -72,6 +72,7 @@ class TrackTags(NamedTuple):
     bitrate: Optional[int]
     sample_rate: Optional[int]
     channels: Optional[int]
+    bits_per_sample: Optional[int]  # None for a lossy format
 
 
 def _first(tags: Any, *keys: str) -> Optional[str]:
@@ -204,10 +205,12 @@ def read_flac_tags_fast(path: str, file_size: Optional[int] = None) -> Optional[
                     if len(data) < 18:
                         return None
                     # Bytes 10..17 pack sample rate (20), channels (3),
-                    # bits per sample (5) and the total sample count (36)
+                    # bits per sample (5) and the total sample count (36). Channels and
+                    # bits per sample are stored as value minus one.
                     packed = int.from_bytes(data[10:18], "big")
                     sample_rate = packed >> 44
                     channels = ((packed >> 41) & 0x07) + 1
+                    bits_per_sample = ((packed >> 36) & 0x1F) + 1
                     total_samples = packed & ((1 << 36) - 1)
                 elif block_type == _BLOCK_VORBIS_COMMENT:
                     if length > _MAX_COMMENT_BLOCK:
@@ -233,13 +236,15 @@ def read_flac_tags_fast(path: str, file_size: Optional[int] = None) -> Optional[
             bitrate = int(audio_bytes * 8 / duration) if duration else None
 
             return _build_tags(comments, duration=duration, bitrate=bitrate,
-                               sample_rate=sample_rate, channels=channels)
+                               sample_rate=sample_rate, channels=channels,
+                               bits_per_sample=bits_per_sample)
     except (OSError, ValueError):
         return None
 
 
 def _build_tags(tags: Any, duration: Optional[float], bitrate: Optional[int],
-                sample_rate: Optional[int], channels: Optional[int]) -> TrackTags:
+                sample_rate: Optional[int], channels: Optional[int],
+                bits_per_sample: Optional[int] = None) -> TrackTags:
     """Assemble the record from a tag mapping and the stream properties.
 
     :param tags: Tag mapping, keyed the way mutagen easy mode keys it.
@@ -247,6 +252,7 @@ def _build_tags(tags: Any, duration: Optional[float], bitrate: Optional[int],
     :param bitrate: Bits per second.
     :param sample_rate: Samples per second.
     :param channels: Channel count.
+    :param bits_per_sample: Bit depth, None for a lossy format.
     :returns: TrackTags - Tags of the file.
     """
     return TrackTags(
@@ -262,6 +268,7 @@ def _build_tags(tags: Any, duration: Optional[float], bitrate: Optional[int],
         bitrate=bitrate,
         sample_rate=sample_rate,
         channels=channels,
+        bits_per_sample=bits_per_sample,
     )
 
 
@@ -297,6 +304,8 @@ def read_tags(path: str, file_size: Optional[int] = None) -> Optional[TrackTags]
         bitrate=getattr(info, "bitrate", None) if info is not None else None,
         sample_rate=getattr(info, "sample_rate", None) if info is not None else None,
         channels=getattr(info, "channels", None) if info is not None else None,
+        # Present on FLAC and other lossless formats, absent on MP3 and the like
+        bits_per_sample=getattr(info, "bits_per_sample", None) if info is not None else None,
     )
 
 

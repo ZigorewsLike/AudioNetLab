@@ -192,10 +192,13 @@ left: **Albums**, a grid of covers, and **Tracks**, the flat list of every track
 and add folder buttons sit in the same top bar, so nothing needs a separate home page.
 
 The album view is sorted by artist, title, year or add date, with a search box over the album
-and artist names and a slider for the tile size. Double-clicking a cover starts the album at its
-first track; a full play queue for the rest of the album comes with the player work in a later
-phase. The track view lists every track newest first and plays one on click, the same as the
-old recent-track list.
+and artist names and a slider for the tile size. Double-clicking a cover opens the album page:
+its cover, title and totals with a play button and a reveal-in-file-manager button, and below
+that the track list with each track's own number, format (codec, sample rate, bit depth,
+bitrate) and length. Playing an album queues the whole album, so it plays through and the next
+and previous walk it; the track that is playing is marked in the list and the mark follows an
+autoplay to the next one. The track view lists every track newest first and plays one on click,
+the same as the old recent-track list.
 
 The grid is a `QListView` with a `QStyledItemDelegate`, not a widget per album, so it paints
 only the tiles on screen and stays smooth on a library of thousands of albums. Covers are read

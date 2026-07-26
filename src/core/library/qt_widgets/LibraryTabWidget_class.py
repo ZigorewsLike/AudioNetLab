@@ -11,6 +11,7 @@ from src.api.db import library_repo
 from src.core.file_system.qt_widgets import LastFileList
 from src.core.library.cover_cache import CoverLoader
 from src.core.library.qt_widgets.AlbumGridView_class import AlbumGridView
+from src.core.library.qt_widgets.AlbumPage_class import AlbumPage
 from src.core.library.qt_widgets.AlbumTileDelegate_class import AlbumTileDelegate
 from src.enums import AlbumSort
 from src.global_styles import AppColorSchemes
@@ -29,6 +30,7 @@ _TILE_SIZES = (AlbumTileDelegate.COVER_SMALL,
 # Pages of the view switch
 _PAGE_ALBUMS = 0
 _PAGE_TRACKS = 1
+_PAGE_ALBUM_DETAIL = 2  # The detail page of one album, reached by clicking a tile
 
 
 class LibraryTabWidget(QWidget):
@@ -75,6 +77,9 @@ class LibraryTabWidget(QWidget):
         albums_layout = QStackedLayout(albums_page)
         albums_layout.setContentsMargins(0, 0, 0, 0)
         self.grid = AlbumGridView(self._cover_loader, self)
+        # A tile opens the album page; playing is started from there. albumActivated is
+        # still forwarded for anything that wants the raw activation.
+        self.grid.albumActivated.connect(self.open_album)
         self.grid.albumActivated.connect(self.albumActivated)
         self.grid.set_cover_size(_TILE_SIZES[self.size_slider.value()])
         self.empty_label = QLabel(self)
@@ -89,8 +94,13 @@ class LibraryTabWidget(QWidget):
         # Track page: the recent-track list, moved here from the old home page
         self.tracks_list = LastFileList(self.width(), self.mf, self)
 
-        self.pages.addWidget(albums_page)
-        self.pages.addWidget(self.tracks_list)
+        # Album detail page, shown when a tile is opened
+        self.album_page = AlbumPage(self.mf, self)
+        self.album_page.backRequested.connect(self._on_album_back)
+
+        self.pages.addWidget(albums_page)          # _PAGE_ALBUMS
+        self.pages.addWidget(self.tracks_list)     # _PAGE_TRACKS
+        self.pages.addWidget(self.album_page)      # _PAGE_ALBUM_DETAIL
         root.addWidget(self.pages, 1)
         # endregion
 
@@ -266,17 +276,39 @@ class LibraryTabWidget(QWidget):
 
     # region pages
     def _show_page(self, page: int) -> None:
-        """Switch between the album grid and the track list.
+        """Switch between the album grid, the track list and the album detail page.
+
+        The nav buttons only cover the grid and the list; opening an album from the grid
+        goes to the detail page but keeps the Albums button lit, since it is still part
+        of the albums view.
 
         :param page: One of the page constants.
         :returns: None.
         """
         self.pages.setCurrentIndex(page)
-        show_header = page == _PAGE_ALBUMS
+        # The album controls belong to the grid only
         for widget in self._album_header_widgets:
-            widget.setVisible(show_header)
+            widget.setVisible(page == _PAGE_ALBUMS)
         if page == _PAGE_ALBUMS:
             self._cover_loader.drop_pending()
+
+    @QtCore.pyqtSlot(int)
+    def open_album(self, album_id: int) -> None:
+        """Show the detail page of an album.
+
+        :param album_id: Album id.
+        :returns: None.
+        """
+        self.album_page.load(album_id)
+        self.button_albums.setChecked(True)
+        self._show_page(_PAGE_ALBUM_DETAIL)
+
+    def _on_album_back(self) -> None:
+        """Return from the album detail page to the grid.
+
+        :returns: None.
+        """
+        self._show_page(_PAGE_ALBUMS)
     # endregion
 
     # region data

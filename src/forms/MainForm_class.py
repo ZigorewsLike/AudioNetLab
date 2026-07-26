@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
 
 from src.ai_module.genre_classification import GenreClassifierModule
 from src.ai_module.transcription import AudioLyricsModule
-from src.core.audio import AudioPlayer
+from src.core.audio import AudioPlayer, PlaybackController
 from src.api.db import library_repo
 from src.api.db.db_handler import create_session
 from src.api.db.models import Track
@@ -130,11 +130,20 @@ class MainForm(QMainWindow):
         self.ai_modules_tab_indexes = []  # Tabs that stay disabled until a track is open
         self.audio_player = AudioPlayer(self, self.central_widget)
 
+        # Single source of truth for the queue and what is playing. The streamer reports
+        # the end of a track and its state; the controller advances the queue and tells
+        # the views which track is current.
+        self.playback = PlaybackController(self)
+        self.audio_player.audio_streamer.trackEnded.connect(self.playback.on_track_ended)
+        self.audio_player.audio_streamer.playbackStateChanged.connect(self.playback.on_streamer_state)
+        self.playback.currentTrackChanged.connect(self.on_current_track_changed)
+
         # The library is the single home of everything imported: the album grid and the
         # track list, with the open and add entry points that used to sit on the home page
+        # Activating a tile opens the album detail page; playing is started from there
         self.library_widget = LibraryTabWidget(self, self.central_widget)
-        self.library_widget.albumActivated.connect(self.play_album)
         self.last_file = self.library_widget.tracks_list  # The relocated recent-track list
+        self.playback.currentTrackChanged.connect(self.last_file.set_playing_track)
         self.last_file.update_file_list()
         self.library_tab_index = self.tab_widget.addTab(self.library_widget, self.tr("Library"))
 
@@ -677,35 +686,34 @@ class MainForm(QMainWindow):
     def play_album(self, album_id: int) -> None:
         """Play an album picked in the library.
 
-        The first track that still exists on disk is opened. A full play queue that
-        walks the rest of the album comes with the player work in a later phase, so for
-        now this starts the album at its first track.
+        The whole album becomes the play queue, so it plays through and next and
+        previous walk it. The controller starts at the first track whose file exists.
 
         :param album_id: Album id.
         :returns: None.
         """
         session = create_session()
         try:
-            first: Optional[tuple] = None
-            for track_id in library_repo.get_album_track_ids(session, album_id):
-                track = session.get(Track, track_id)
-                if track is not None and os.path.exists(track.path):
-                    first = (track_id, track.path)
-                    break
+            track_ids = library_repo.get_album_track_ids(session, album_id)
         finally:
             session.close()
-
-        if first is None:
+        if not track_ids:
             self.show_error_message_log(self.tr("Library"),
                                         self.tr("No playable file in this album"))
             return
-        track_id, path = first
-        # Reuse the recent-list path so the playing marker and the last-opened order stay
-        # consistent with a track started from the Home tab
-        self.last_file.playing_track_id = track_id
-        self.open_file(path, track_id)
+        self.playback.play_context(track_ids, 0)
+
+    @pyqtSlot(int)
+    def on_current_track_changed(self, track_id: int) -> None:
+        """Stamp the track as opened and move the playing marker.
+
+        Driven by the controller, so a track started from anywhere, including an
+        autoplay to the next one, updates the list the same way.
+
+        :param track_id: Id of the track now playing.
+        :returns: None.
+        """
         self.last_file.update_track_last_opened(track_id)
-        self.last_file.update_file_list()
 
     def open_file(self, file_path, track_id: int = 6) -> None:
         """Start opening a track: show the meta and cover, then decode in the worker thread.

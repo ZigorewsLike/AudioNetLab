@@ -20,7 +20,7 @@ class AlbumGridView(QListView):
     covers of tiles that scrolled past are dropped from the loader queue so a fast
     scroll never backs up behind covers nobody is looking at any more.
 
-    :signals: albumActivated (int) - album id of a double-clicked or entered tile
+    :signals: albumActivated (int) - album id of a clicked tile
     """
     albumActivated = QtCore.pyqtSignal(int)
 
@@ -66,9 +66,9 @@ class AlbumGridView(QListView):
 
         # A finished cover repaints just its tiles instead of the whole viewport
         self._loader.coverReady.connect(self._on_cover_ready)
-        # Only doubleClicked: on Windows the activated signal also fires on a double
-        # click, so connecting both would open the album twice on one gesture
-        self.doubleClicked.connect(self._on_activated)
+        # A single click opens the album. Only clicked is connected, not activated, so
+        # the album is opened once per gesture rather than twice.
+        self.clicked.connect(self._on_activated)
 
     def model(self) -> AlbumGridModel:
         """The typed model backing the grid.
@@ -146,9 +146,9 @@ class AlbumGridView(QListView):
             row += 1
 
     def _on_activated(self, index: QModelIndex) -> None:
-        """Emit the album id of an activated tile.
+        """Emit the album id of a clicked tile.
 
-        :param index: Activated cell.
+        :param index: Clicked cell.
         :returns: None.
         """
         album_id = index.data(AlbumRoles.ALBUM_ID)
