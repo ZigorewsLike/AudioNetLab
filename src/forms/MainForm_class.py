@@ -13,14 +13,17 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QMessageBox, QMenu,
 from src.ai_module.genre_classification import GenreClassifierModule
 from src.ai_module.transcription import AudioLyricsModule
 from src.core.audio import AudioPlayer
+from src.api.db import library_repo
+from src.api.db.db_handler import create_session
+from src.api.db.models import Track
 from src.core.file_system import FileMetaController
-from src.core.library.qt_widgets import ScanProgressWidget
+from src.core.library.qt_widgets import ScanProgressWidget, LibraryTabWidget
 from src.core.library.scanner import ScanStats
 from src.core.file_system.tag_reader import read_tags, title_from_path
 from src.core.log_system import print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
-from src.core.qt_widgets import (PreLoaderWidget, HomePageWidget, DragFileWidget,
+from src.core.qt_widgets import (PreLoaderWidget, DragFileWidget,
                                  TitleBar, SideGrip, ChatWidget)
 from src.core.settings import SettingsDataObject
 from src.core.settings.qt_widgets import SettingsFrame
@@ -36,7 +39,7 @@ from src.global_styles import AppColorSchemes
 class MainForm(QMainWindow):
     """Application main window.
 
-    Owns the tab bar (Home, EQ AI, Lyrics, Chat, Settings), the player panel pinned
+    Owns the tab bar (Library, EQ AI, Lyrics, Chat, Settings), the player panel pinned
     to the bottom, the settings object and the file opening worker. It also wires the
     modules together: the classifier drives the equalizer and the equalizer drives
     the audio streamer.
@@ -127,9 +130,13 @@ class MainForm(QMainWindow):
         self.ai_modules_tab_indexes = []  # Tabs that stay disabled until a track is open
         self.audio_player = AudioPlayer(self, self.central_widget)
 
-        self.home_page = HomePageWidget(self, self.central_widget)
-        self.home_page.last_file.update_file_list()
-        self.home_tab_index = self.tab_widget.addTab(self.home_page, self.tr("Home"))
+        # The library is the single home of everything imported: the album grid and the
+        # track list, with the open and add entry points that used to sit on the home page
+        self.library_widget = LibraryTabWidget(self, self.central_widget)
+        self.library_widget.albumActivated.connect(self.play_album)
+        self.last_file = self.library_widget.tracks_list  # The relocated recent-track list
+        self.last_file.update_file_list()
+        self.library_tab_index = self.tab_widget.addTab(self.library_widget, self.tr("Library"))
 
         # region Overlap widgets
         self.drag_widget = DragFileWidget(self)
@@ -287,9 +294,11 @@ class MainForm(QMainWindow):
 
         self.player_action = QAction("", self)
 
-        self.home_page_action = QAction("", self)
+        # Opens the library tab, the home page it used to open is gone
+        self.library_action = QAction("", self)
         icon = QPixmap(RESOURCE_ICON_DIR + "home_FILL0_wght400_GRAD0_opsz24.png")
-        self.home_page_action.setIcon(QIcon(icon))
+        self.library_action.setIcon(QIcon(icon))
+        self.library_action.triggered.connect(self.show_library_tab)
 
         self.exit_action = QAction("", self)
         self.exit_action.triggered.connect(lambda: self.close())
@@ -297,7 +306,7 @@ class MainForm(QMainWindow):
         self.file_menu.addAction(self.open_file_action)
         self.file_menu.addAction(self.add_folder_action)
         self.file_menu.addAction(self.player_action)
-        self.file_menu.addAction(self.home_page_action)
+        self.file_menu.addAction(self.library_action)
         self.file_menu.addSeparator()
         self.file_menu.addAction(self.exit_action)
         # endregion
@@ -329,7 +338,7 @@ class MainForm(QMainWindow):
         self.open_file_action.setText(self.tr("Open file"))
         self.add_folder_action.setText(self.tr("Add folder to the library"))
         self.player_action.setText(self.tr("Open player"))
-        self.home_page_action.setText(self.tr("Home page"))
+        self.library_action.setText(self.tr("Library"))
         self.exit_action.setText(self.tr("Exit"))
         self.profiling_action.setText(self.tr("Profiling"))
 
@@ -349,7 +358,7 @@ class MainForm(QMainWindow):
         :returns: None.
         """
         self.retranslate_menu_bars()
-        self.tab_widget.setTabText(self.home_tab_index, self.tr("Home"))
+        self.tab_widget.setTabText(self.library_tab_index, self.tr("Library"))
         self.tab_widget.setTabText(self.genre_tab_index, self.tr("EQ AI"))
         self.tab_widget.setTabText(self.lyrics_tab_index, self.tr("Lyrics"))
         if self.chat_tab_index is not None:
@@ -629,7 +638,7 @@ class MainForm(QMainWindow):
                 stats.tracks_added, stats.tracks_updated, stats.albums_added)
         self.scan_progress.finish(summary)
         if stats.changed:
-            self.home_page.last_file.update_file_list()
+            self.library_widget.reload()  # Refreshes both the album grid and the track list
 
     @pyqtSlot(str)
     def on_scan_failed(self, message: str) -> None:
@@ -658,11 +667,45 @@ class MainForm(QMainWindow):
         self.file_meta_controller.read_track_file(file_path)
         tags = read_tags(file_path)
         title = tags.title if tags is not None and tags.title else title_from_path(file_path)
-        track_id: int = self.home_page.last_file.add(title, file_path)
+        track_id: int = self.last_file.add(title, file_path)
         if track_id is None:  # The file is already in the list
             return
         self.file_meta_controller.save_meta_in_registry(track_id)
-        self.home_page.last_file.update_file_list()
+        self.last_file.update_file_list()
+
+    @pyqtSlot(int)
+    def play_album(self, album_id: int) -> None:
+        """Play an album picked in the library.
+
+        The first track that still exists on disk is opened. A full play queue that
+        walks the rest of the album comes with the player work in a later phase, so for
+        now this starts the album at its first track.
+
+        :param album_id: Album id.
+        :returns: None.
+        """
+        session = create_session()
+        try:
+            first: Optional[tuple] = None
+            for track_id in library_repo.get_album_track_ids(session, album_id):
+                track = session.get(Track, track_id)
+                if track is not None and os.path.exists(track.path):
+                    first = (track_id, track.path)
+                    break
+        finally:
+            session.close()
+
+        if first is None:
+            self.show_error_message_log(self.tr("Library"),
+                                        self.tr("No playable file in this album"))
+            return
+        track_id, path = first
+        # Reuse the recent-list path so the playing marker and the last-opened order stay
+        # consistent with a track started from the Home tab
+        self.last_file.playing_track_id = track_id
+        self.open_file(path, track_id)
+        self.last_file.update_track_last_opened(track_id)
+        self.last_file.update_file_list()
 
     def open_file(self, file_path, track_id: int = 6) -> None:
         """Start opening a track: show the meta and cover, then decode in the worker thread.
@@ -673,6 +716,12 @@ class MainForm(QMainWindow):
         """
         if not os.path.exists(file_path):
             self.show_error_message_log(self.tr("File open error"), self.tr("File not found, it may have been deleted"))
+            return
+        # Ignore a second open while one is still decoding. open_file blocks on
+        # work_thread.wait() before it starts, so re-entering while the thread runs
+        # would freeze the interface until the first decode finished.
+        if self.work_thread.isRunning():
+            print_d("Open ignored, a file is still being decoded")
             return
         self.audio_player.start_position_loading()
 
@@ -719,7 +768,7 @@ class MainForm(QMainWindow):
             self.show_error_message_log(self.tr("File open error"), self.tr("Unable to open the file"))
             self.audio_player.stop_position_loading()
             return
-        self.home_page.last_file.update_file_list()
+        self.last_file.update_file_list()
 
         self.audio_player.stop_position_loading()
         self.audio_player.play_music()
@@ -770,6 +819,7 @@ class MainForm(QMainWindow):
             self.scan_worker.cancel()
             self.scan_thread.quit()
             self.scan_thread.wait(5000)
+        self.library_widget.shutdown()  # Stop the cover loader threads
         self.save_config_app()
 
     def on_tab_changed(self, index: int):
@@ -779,6 +829,14 @@ class MainForm(QMainWindow):
         :returns: None.
         """
         pass
+
+    @pyqtSlot()
+    def show_library_tab(self) -> None:
+        """Bring the library tab to the front.
+
+        :returns: None.
+        """
+        self.tab_widget.setCurrentIndex(self.library_tab_index)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         """Fill the window background.

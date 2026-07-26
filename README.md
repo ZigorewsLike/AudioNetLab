@@ -11,6 +11,8 @@ device. That is why the equalizer reacts immediately, without restarting playbac
 ## Features
 
 * Playback of MP3, FLAC and WAV with a waveform view, a track list and tag display.
+* A Library tab: import folders and files, browse the albums as a cover grid, search and sort
+  them, and start an album from its tile.
 * 20 band equalizer applied live during playback.
 * Genre classification with an ONNX model: the track is split into 3 second fragments and each
   fragment gets its own genre.
@@ -65,10 +67,11 @@ database in the project folder, so run it from the project root.
 
 ## First steps
 
-1. Open the **Home** tab and press **Open file**, or drag an audio file onto the window. The
-   track is added to the list.
-2. Click a track in the list to start playback. The player panel is pinned to the bottom of
-   the window: transport button, position slider, volume, waveform toggle and tag panel toggle.
+1. On the **Library** tab press **Open file** or **Add folder**, or drag audio files and folders
+   onto the window. They are added to the library.
+2. Switch to the **Tracks** view and click a track to start playback, or double-click an album
+   cover on the **Albums** view. The player panel is pinned to the bottom of the window:
+   transport button, position slider, volume, waveform toggle and tag panel toggle.
 3. Open the **EQ AI** tab and press **Predict**. The track is analysed and a coloured genre
    timeline appears, together with the genre shares and the final genre.
 4. On the same tab the buttons on the left of the equalizer control it:
@@ -182,6 +185,27 @@ Files that disappear are flagged, never deleted: an unplugged drive would otherw
 library along with its play counts. They are listed as missing and unflag themselves when the
 drive comes back.
 
+### The Library tab
+
+The **Library** tab is the home of everything imported. It has two views, switched at the top
+left: **Albums**, a grid of covers, and **Tracks**, the flat list of every track. The open file
+and add folder buttons sit in the same top bar, so nothing needs a separate home page.
+
+The album view is sorted by artist, title, year or add date, with a search box over the album
+and artist names and a slider for the tile size. Double-clicking a cover starts the album at its
+first track; a full play queue for the rest of the album comes with the player work in a later
+phase. The track view lists every track newest first and plays one on click, the same as the
+old recent-track list.
+
+The grid is a `QListView` with a `QStyledItemDelegate`, not a widget per album, so it paints
+only the tiles on screen and stays smooth on a library of thousands of albums. Covers are read
+off the interface thread through a small loader: a tile shows whatever is already in memory and
+a placeholder otherwise, and the finished image repaints just that tile when it arrives.
+
+Deleting the last track of an album removes the album and, if it also empties out, the artist,
+so the grid never shows a tile that has nothing behind it. A database from before this rule is
+cleaned once by the schema migration.
+
 ### Database schema
 
 `storage.db` carries its schema version in `PRAGMA user_version`, and `src/api/db/migrations.py`
@@ -203,7 +227,7 @@ main.py                     Entry point: logging, DPI, main window
 src/
   forms/                    MainForm, the main window and the module wiring
   core/
-    library/                Folder scanner, cover cache, the scan progress strip
+    library/                Folder scanner, cover cache, the Library tab and album grid
     i18n/                   Translation manager, loads and switches the catalogs
     audio/                  AudioStreamer (streaming thread), AudioPlayer (player panel)
     render/graphics_system/ OpenGL waveform panels

@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from src.core.log_system import print_d
 from .migrations import migrate
-from .models import Track, normalize_key, normalize_path
+from .models import Album, Artist, Track, normalize_key, normalize_path
 
 DATABASE_URL = "sqlite:///./storage.db"
 
@@ -227,17 +227,45 @@ class DBHandler:
         return self.session.query(Track).filter(Track.path == normalize_path(path)).first()
 
     def delete_track(self, track: Track, commit: bool = True) -> None:
-        """Remove a track from the list.
+        """Remove a track from the list and drop its album and artist if they empty out.
 
-        :param track: Track row to delete.
+        The album and artist rows live independently of the tracks, so removing the
+        last track of an album would otherwise leave a ghost tile in the library that
+        shows nothing and cannot be played. They are cleaned up here in the same
+        transaction.
+
+        :param track: Track row to delete, may come from a closed session.
         :param commit: Commit the transaction right away.
         :returns: None.
         """
         assert self.is_connected, "Database is not connected"
-        self.session.delete(track)
+        # Rebind by id: the widgets hold tracks loaded in an earlier, now closed session
+        db_track = self.session.get(Track, track.id)
+        if db_track is None:
+            return
+        album_id = db_track.album_id
+        artist_id = db_track.artist_id
+        self.session.delete(db_track)
         self.flush()
+        self._delete_if_orphaned(album_id, artist_id)
         if commit:
             self.commit()
+
+    def _delete_if_orphaned(self, album_id: Optional[int], artist_id: Optional[int]) -> None:
+        """Drop an album or artist that no track references any more.
+
+        :param album_id: Album the deleted track belonged to, or None.
+        :param artist_id: Artist the deleted track belonged to, or None.
+        :returns: None.
+        """
+        if album_id is not None:
+            still_used = self.session.query(Track.id).filter(Track.album_id == album_id).first()
+            if still_used is None:
+                self.session.query(Album).filter(Album.id == album_id).delete()
+        if artist_id is not None:
+            still_used = self.session.query(Track.id).filter(Track.artist_id == artist_id).first()
+            if still_used is None:
+                self.session.query(Artist).filter(Artist.id == artist_id).delete()
 
     def update_track_last_opened(self, track_id: int, commit: bool = True) -> None:
         """Stamp the track as opened now, which also reorders the list.

@@ -1,6 +1,6 @@
 from typing import Dict, List, NamedTuple, Optional
 
-from sqlalchemy import func, select, nulls_last
+from sqlalchemy import delete, func, select, nulls_last
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Select
 
@@ -276,6 +276,22 @@ def get_path_index(session: Session) -> Dict[str, PathEntry]:
     rows = session.execute(select(Track.path, Track.id, Track.file_mtime, Track.is_missing)).all()
     return {path: PathEntry(track_id, mtime or 0.0, bool(is_missing))
             for path, track_id, mtime, is_missing in rows}
+
+
+def delete_orphans(session: Session) -> tuple:
+    """Remove every album and artist that no track references any more.
+
+    A whole-library sweep, unlike the targeted cleanup on a single delete. The caller
+    commits.
+
+    :param session: Open session.
+    :returns: tuple - Number of albums and artists removed.
+    """
+    used_albums = select(Track.album_id).where(Track.album_id.is_not(None))
+    albums = session.execute(delete(Album).where(Album.id.not_in(used_albums))).rowcount
+    used_artists = select(Track.artist_id).where(Track.artist_id.is_not(None))
+    artists = session.execute(delete(Artist).where(Artist.id.not_in(used_artists))).rowcount
+    return albums, artists
 
 
 def get_counts(session: Session) -> LibraryCounts:

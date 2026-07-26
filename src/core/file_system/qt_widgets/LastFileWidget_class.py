@@ -155,6 +155,11 @@ class LastFileList(QWidget):
         self.db.disconnect()
         self.mf.file_meta_controller.delete_track(item.track.id)
         self.update_file_list()
+        # Deleting the last track of an album drops the album too, refresh the grid so the
+        # tile disappears instead of lingering as an empty one
+        library_widget = getattr(self.mf, "library_widget", None)
+        if library_widget is not None:
+            library_widget.reload()
 
     def update_track_last_opened(self, track_id: int) -> None:
         """Stamp the track as opened now so it moves to the top of the list.
