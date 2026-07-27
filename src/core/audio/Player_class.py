@@ -7,9 +7,9 @@ import librosa
 import numpy as np
 import pyaudio
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QPoint, QRectF, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve, QThread
+from PyQt6.QtCore import Qt, QPoint, QRect, QRectF, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve, QThread
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QColor, QResizeEvent, QIcon, QShowEvent, QImage,
-                         QPainterPath)
+                         QMouseEvent, QPainterPath)
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton
 
 from src.core.log_system import print_d
@@ -72,6 +72,8 @@ class AudioPlayer(QWidget):
         self.audio_streamer: AudioStreamer = AudioStreamer()
         self.audio_thread: QThread = QThread()
 
+        self.setMouseTracking(True)
+
         self.track_meta: Optional[Dict[str, Any]] = None
 
         # region UI
@@ -96,6 +98,8 @@ class AudioPlayer(QWidget):
         font.setPointSize(9)
         font.setBold(False)
         self.author_tack.setFont(font)
+        # Clicks fall through to the panel, which routes them to the artist page
+        self.author_tack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         self.play_button = QPushButton("", self)
         self.play_button.clicked.connect(self.play_button_click)
@@ -221,6 +225,40 @@ class AudioPlayer(QWidget):
 
         if PROFILE:
             self.mf.profiling.add_draw_time("AudioPlayer", time.time() - start_time)
+
+    def _cover_rect(self) -> QRect:
+        """Rect of the painted track cover, the clickable area that opens the album.
+
+        :returns: QRect - Cover rect in panel coordinates.
+        """
+        return QRect(20, self.height() - 50 - 10, 50, 50)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Open the album from the cover and the artist page from the name.
+
+        :param event: Qt mouse event.
+        :returns: None.
+        """
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position().toPoint()
+            if self._cover_rect().contains(pos):
+                self.mf.open_current_album()
+                return
+            if self.author_tack.geometry().contains(pos):
+                self.mf.open_current_artist()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Show the hand cursor over the cover and the artist name.
+
+        :param event: Qt mouse event.
+        :returns: None.
+        """
+        pos = event.position().toPoint()
+        over_link = self._cover_rect().contains(pos) or self.author_tack.geometry().contains(pos)
+        self.setCursor(Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.ArrowCursor)
+        super().mouseMoveEvent(event)
 
     def showEvent(self, event: QShowEvent) -> None:
         """Lay out the child widgets when the panel becomes visible.

@@ -258,6 +258,19 @@ def get_album(session: Session, album_id: int) -> Optional[AlbumRow]:
     return AlbumRow(*row) if row is not None else None
 
 
+def get_track_nav_ids(session: Session, track_id: int) -> tuple:
+    """Read the album and artist a track belongs to, for jumping to them from the player.
+
+    :param session: Open session.
+    :param track_id: Track id.
+    :returns: tuple - (album_id, artist_id), each None when unset or the track is gone.
+    """
+    row = session.execute(
+        select(Track.album_id, Track.artist_id).where(Track.id == track_id)
+    ).first()
+    return (row[0], row[1]) if row is not None else (None, None)
+
+
 def get_album_track_ids(session: Session, album_id: int) -> List[int]:
     """Read the track ids of an album in playing order, for the play queue.
 

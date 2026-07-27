@@ -688,6 +688,42 @@ class MainForm(QMainWindow):
             return
         self.playback.play_context(track_ids, 0)
 
+    def open_current_album(self) -> None:
+        """Open the album of the playing track in the library tab, from the player cover.
+
+        :returns: None.
+        """
+        track_id = self.playback.current_track_id
+        if track_id < 0:
+            return
+        session = create_session()
+        try:
+            album_id, _ = library_repo.get_track_nav_ids(session, track_id)
+        finally:
+            session.close()
+        if album_id is None:
+            return
+        self.tab_widget.setCurrentIndex(self.library_tab_index)
+        self.library_widget.open_album(album_id)
+
+    def open_current_artist(self) -> None:
+        """Open the artist of the playing track in the library tab, from the player name.
+
+        :returns: None.
+        """
+        track_id = self.playback.current_track_id
+        if track_id < 0:
+            return
+        session = create_session()
+        try:
+            _, artist_id = library_repo.get_track_nav_ids(session, track_id)
+        finally:
+            session.close()
+        if artist_id is None:
+            return
+        self.tab_widget.setCurrentIndex(self.library_tab_index)
+        self.library_widget.open_artist(artist_id)
+
     @pyqtSlot(int)
     def on_current_track_changed(self, track_id: int) -> None:
         """Stamp the track as opened and move the playing marker.
