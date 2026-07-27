@@ -1,2 +1,3 @@
 from .SettingsFrame_class import SettingsFrame
 from .SettingsInterfaceWidget_class import SettingsInterfaceWidget
+from .SettingsSection_class import SettingsSection

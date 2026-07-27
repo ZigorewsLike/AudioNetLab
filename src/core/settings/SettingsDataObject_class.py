@@ -34,6 +34,7 @@ class PlayerSettings:
 class LibrarySettings:
     """Library view preferences restored on the next start."""
     tile_size: int = 180  # Cover edge in pixels of the album and artist grids
+    open_on_double_click: bool = False  # Open an album or artist on double click instead of single
 
 
 class SettingsDataObject:

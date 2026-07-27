@@ -3,8 +3,10 @@ from typing import Dict, TYPE_CHECKING, List
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSlot, Qt, QEvent
 from PyQt6.QtGui import QShowEvent
-from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QSlider, QComboBox, QFormLayout,
+from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QSlider, QComboBox, QVBoxLayout,
                              QCheckBox, QHBoxLayout, QMessageBox)
+
+from src.core.settings.qt_widgets.SettingsSection_class import SettingsSection
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -24,7 +26,7 @@ class SettingsAudioWidget(QWidget):
         self.mf: MainForm = mf
         self.devices: List[Dict[str, any]] = []
 
-        self.form_layout = QFormLayout(self)
+        root = QVBoxLayout(self)
 
         self.audio_out_device_combo = QComboBox()
         self.audio_out_device_button = QPushButton("")
@@ -45,17 +47,21 @@ class SettingsAudioWidget(QWidget):
         self.log_volume_checkbox = QCheckBox("")
         self.log_volume_checkbox.stateChanged.connect(self.set_log_volume)
 
-        h = QHBoxLayout()
-        h.addWidget(self.audio_out_device_combo)
-        h.addWidget(self.audio_out_device_button)
-        # Row labels are kept so retranslate_ui can reach them later
-        self.device_label = QLabel("")
-        self.parameters_label = QLabel("")
-        self.buffer_label = QLabel("")
-        self.form_layout.addRow(self.device_label, h)
-        self.form_layout.addRow(self.parameters_label, QWidget())
-        self.form_layout.addRow(self.buffer_label, chunk_layout)
-        self.form_layout.addRow("", self.log_volume_checkbox)
+        device_row = QHBoxLayout()
+        device_row.addWidget(self.audio_out_device_combo)
+        device_row.addWidget(self.audio_out_device_button)
+
+        self.device_section = SettingsSection(self)
+        self.device_section.add_full_row(device_row)
+
+        self.parameters_section = SettingsSection(self)
+        self.buffer_label = QLabel("")  # Field caption, reached by retranslate_ui
+        self.parameters_section.add_row(self.buffer_label, chunk_layout)
+        self.parameters_section.add_full_row(self.log_volume_checkbox)
+
+        root.addWidget(self.device_section)
+        root.addWidget(self.parameters_section)
+        root.addStretch(1)
 
         self.retranslate_ui()
 
@@ -76,8 +82,8 @@ class SettingsAudioWidget(QWidget):
         """
         self.audio_out_device_button.setText(self.tr("Switch"))
         self.log_volume_checkbox.setText(self.tr("Logarithmic volume control"))
-        self.device_label.setText(self.tr("Device"))
-        self.parameters_label.setText(self.tr("Parameters"))
+        self.device_section.set_title(self.tr("Device"))
+        self.parameters_section.set_title(self.tr("Parameters"))
         self.buffer_label.setText(self.tr("Buffer size"))
 
     def showEvent(self, event: QShowEvent) -> None:

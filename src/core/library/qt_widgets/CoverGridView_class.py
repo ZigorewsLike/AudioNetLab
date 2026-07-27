@@ -38,6 +38,7 @@ class CoverGridView(QListView):
         self._loader = cover_loader
         self._id_role = id_role
         self._cover_hash_role = cover_hash_role
+        self._open_on_double_click = False
 
         self._model = model
         self._model.setParent(self)
@@ -74,8 +75,9 @@ class CoverGridView(QListView):
 
         # A finished cover repaints just its tiles instead of the whole viewport
         self._loader.coverReady.connect(self._on_cover_ready)
-        # clicked only, not activated, to open once per gesture rather than twice
-        self.clicked.connect(self._on_activated)
+        # Both are wired; the flag decides which gesture opens, so it can change live
+        self.clicked.connect(self._on_clicked)
+        self.doubleClicked.connect(self._on_double_clicked)
 
     def model(self) -> QAbstractListModel:
         """The typed model backing the grid.
@@ -152,10 +154,36 @@ class CoverGridView(QListView):
                 self.viewport().update(item_rect)
             row += 1
 
-    def _on_activated(self, index: QModelIndex) -> None:
-        """Emit the id of a clicked tile.
+    def set_open_on_double_click(self, enabled: bool) -> None:
+        """Choose whether a tile opens on a double click instead of a single one.
+
+        :param enabled: True to open on double click.
+        :returns: None.
+        """
+        self._open_on_double_click = enabled
+
+    def _on_clicked(self, index: QModelIndex) -> None:
+        """Open on a single click when the double-click mode is off.
 
         :param index: Clicked cell.
+        :returns: None.
+        """
+        if not self._open_on_double_click:
+            self._on_activated(index)
+
+    def _on_double_clicked(self, index: QModelIndex) -> None:
+        """Open on a double click when the double-click mode is on.
+
+        :param index: Double-clicked cell.
+        :returns: None.
+        """
+        if self._open_on_double_click:
+            self._on_activated(index)
+
+    def _on_activated(self, index: QModelIndex) -> None:
+        """Emit the id of an opened tile.
+
+        :param index: Opened cell.
         :returns: None.
         """
         item_id = index.data(self._id_role)

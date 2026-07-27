@@ -4,9 +4,26 @@ from typing import Dict, Tuple
 import numpy as np
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QPixmap, QPolygonF
+from PyQt6.QtWidgets import QLabel
 
 # Cache of the scaled status markers, keyed by (paused, size)
 _status_icon_cache: Dict[Tuple[bool, int], QPixmap] = {}
+
+
+def style_section_header(label: QLabel, delta_pt: int = 2) -> None:
+    """Style a label as a settings section header: bold and a couple of points larger.
+
+    :param label: Label to restyle in place.
+    :param delta_pt: Points added to the current font size.
+    :returns: None.
+    """
+    font = label.font()
+    base = font.pointSize()
+    if base <= 0:
+        base = 9
+    font.setPointSize(base + delta_pt)
+    font.setBold(True)
+    label.setFont(font)
 
 
 def status_icon_pixmap(paused: bool, size: int) -> QPixmap:

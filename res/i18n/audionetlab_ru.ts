@@ -24,7 +24,7 @@
       <translation>Неизвестный альбом</translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\AlbumPage_class.py" line="222" />
+      <location filename="..\..\src\core\library\qt_widgets\AlbumPage_class.py" line="221" />
       <source>%n track(s)</source>
       <translation>
         <numerusform>%n трек</numerusform>
@@ -123,7 +123,7 @@
       <translation>Неизвестный исполнитель</translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\ArtistPage_class.py" line="228" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistPage_class.py" line="225" />
       <source>%n album(s)</source>
       <translation>
         <numerusform>%n альбом</numerusform>
@@ -132,7 +132,7 @@
       </translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\ArtistPage_class.py" line="229" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistPage_class.py" line="226" />
       <source>%n track(s)</source>
       <translation>
         <numerusform>%n трек</numerusform>
@@ -169,32 +169,32 @@
   <context>
     <name>ArtistsPage</name>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="153" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="155" />
       <source>Name</source>
       <translation>Имя</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="154" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="156" />
       <source>Album count</source>
       <translation>По числу альбомов</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="169" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="171" />
       <source>Search artists</source>
       <translation>Поиск исполнителей</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="170" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="172" />
       <source>Sort:</source>
       <translation>Сортировка:</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="171" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="173" />
       <source>Size:</source>
       <translation>Размер:</translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="198" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="200" />
       <source>%n artist(s)</source>
       <translation>
         <numerusform>%n исполнитель</numerusform>
@@ -203,12 +203,12 @@
       </translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="215" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="217" />
       <source>Nothing found</source>
       <translation>Ничего не найдено</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="217" />
+      <location filename="..\..\src\core\library\qt_widgets\ArtistsPage_class.py" line="219" />
       <source>No artists yet.
 Add a folder to fill the library.</source>
       <translation>Пока нет исполнителей.
@@ -218,7 +218,7 @@ Add a folder to fill the library.</source>
   <context>
     <name>AudioPlayer</name>
     <message>
-      <location filename="..\..\src\core\audio\Player_class.py" line="464" />
+      <location filename="..\..\src\core\audio\Player_class.py" line="502" />
       <source>Unknown</source>
       <translation>Неизвестен</translation>
     </message>
@@ -330,72 +330,72 @@ Add a folder to fill the library.</source>
   <context>
     <name>LibraryTabWidget</name>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="280" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="278" />
       <source>Artist</source>
       <translation>Исполнитель</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="281" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="279" />
       <source>Title</source>
       <translation>Название</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="282" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="280" />
       <source>Year</source>
       <translation>Год</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="283" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="281" />
       <source>Recently added</source>
       <translation>Недавно добавленные</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="298" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="296" />
       <source>Albums</source>
       <translation>Альбомы</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="299" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="297" />
       <source>Artists</source>
       <translation>Исполнители</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="300" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="298" />
       <source>Tracks</source>
       <translation>Треки</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="301" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="299" />
       <source>Recent</source>
       <translation>Недавние</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="302" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="300" />
       <source>Open file</source>
       <translation>Открыть файл</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="303" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="301" />
       <source>Add folder</source>
       <translation>Добавить папку</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="304" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="302" />
       <source>Search albums and artists</source>
       <translation>Поиск альбомов и исполнителей</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="305" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="303" />
       <source>Sort:</source>
       <translation>Сортировка:</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="306" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="304" />
       <source>Size:</source>
       <translation>Размер:</translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="412" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="409" />
       <source>%n album(s)</source>
       <translation>
         <numerusform>%n альбом</numerusform>
@@ -404,12 +404,12 @@ Add a folder to fill the library.</source>
       </translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="429" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="426" />
       <source>Nothing found</source>
       <translation>Ничего не найдено</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="431" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="428" />
       <source>The library is empty.
 Add a folder to fill it.</source>
       <translation>Медиатека пуста.
@@ -563,20 +563,20 @@ Add a folder to fill it.</source>
       <translation>В этом альбоме нет воспроизводимых файлов</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="761" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="731" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="711" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="797" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="767" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="747" />
       <source>File open error</source>
       <translation>Ошибка открытия файла</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="711" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="747" />
       <source>File not found, it may have been deleted</source>
       <translation>Файл не найден, возможно он удалён</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="761" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="731" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="797" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="767" />
       <source>Unable to open the file</source>
       <translation>Не удалось открыть файл</translation>
     </message>
@@ -679,37 +679,37 @@ Add a folder to fill it.</source>
   <context>
     <name>SettingsAudioWidget</name>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="77" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="83" />
       <source>Switch</source>
       <translation>Переключить</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="78" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="84" />
       <source>Logarithmic volume control</source>
       <translation>Логарифмический регулятор громкости</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="79" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="85" />
       <source>Device</source>
       <translation>Устройство</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="80" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="86" />
       <source>Parameters</source>
       <translation>Параметры</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="81" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="87" />
       <source>Buffer size</source>
       <translation>Размер буфера</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="121" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="127" />
       <source>Unable to switch to the device {0}. The format is not supported, the system default device is used instead.</source>
       <translation>Не удалось переключиться на устройство {0}. Формат не поддерживается, используется устройство по умолчанию.</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="126" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsAudioWidget_class.py" line="132" />
       <source>Device switch error</source>
       <translation>Ошибка переключения устройства</translation>
     </message>
@@ -753,14 +753,37 @@ Add a folder to fill it.</source>
   <context>
     <name>SettingsInterfaceWidget</name>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="88" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="115" />
       <source>Interface language</source>
       <translation>Язык интерфейса</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="89" />
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="116" />
       <source>The language is applied immediately and is saved between runs.</source>
       <translation>Язык применяется сразу и сохраняется между запусками.</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="117" />
+      <source>Library</source>
+      <translation>Медиатека</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="119" />
+      <source>By default albums and artists in the library open on a single click.</source>
+      <translation>По умолчанию альбомы и исполнители в библиотеке открываются одиночным кликом.</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\settings\qt_widgets\SettingsInterfaceWidget_class.py" line="120" />
+      <source>Open them on a double click instead</source>
+      <translation>Открывать двойным кликом</translation>
+    </message>
+    <message>
+      <source>Open albums and artists</source>
+      <translation type="vanished">Открывать альбомы и исполнителей</translation>
+    </message>
+    <message>
+      <source>On double click</source>
+      <translation type="vanished">Двойным кликом</translation>
     </message>
   </context>
   <context>

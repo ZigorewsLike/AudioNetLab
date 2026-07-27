@@ -134,6 +134,7 @@ class LibraryTabWidget(QWidget):
         self.retranslate_ui()
         self._show_page(_PAGE_ALBUMS)
         self.reload_albums()
+        self.set_open_on_double_click(self._restore_double_click())
 
     # region build
     def _build_style(self) -> str:
@@ -493,6 +494,27 @@ class LibraryTabWidget(QWidget):
         settings = getattr(self.mf, "settings", None)
         if settings is not None and hasattr(settings, "library_settings"):
             settings.library_settings.tile_size = value
+
+    def _restore_double_click(self) -> bool:
+        """Read the open-on-double-click preference from the settings.
+
+        :returns: bool - True when tiles should open on a double click.
+        """
+        settings = getattr(self.mf, "settings", None)
+        library = getattr(settings, "library_settings", None)
+        return bool(getattr(library, "open_on_double_click", False))
+
+    def set_open_on_double_click(self, enabled: bool) -> None:
+        """Apply the open gesture to every grid: the albums, the artists and the artist page.
+
+        Called from the settings page so a change takes effect without a restart.
+
+        :param enabled: True to open on a double click instead of a single one.
+        :returns: None.
+        """
+        self.grid.set_open_on_double_click(enabled)
+        self.artists_page.grid.set_open_on_double_click(enabled)
+        self.artist_page.album_grid.set_open_on_double_click(enabled)
     # endregion
 
     def shutdown(self) -> None:
