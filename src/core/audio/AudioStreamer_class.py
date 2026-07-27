@@ -138,8 +138,7 @@ class AudioStreamer(QThread):
                 wave_crop = self.waveform_ref[self._position - left_padding:self._position + self._chunk_size + right_padding]
 
                 if wave_crop is None or wave_crop.size == 0:  # End of the track
-                    # A distinct signal so the queue can tell this apart from a user stop
-                    # and advance to the next track. The empty chunk must not be processed.
+                    # Distinct from a user stop so the queue advances; the empty chunk is not processed
                     self.trackEnded.emit()
                     self.stop()
                     continue

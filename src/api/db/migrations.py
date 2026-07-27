@@ -6,12 +6,8 @@ from sqlalchemy import text as sql_text
 from src.core.log_system import print_d, print_e
 from .models import Base
 
-# Schema version the tables in models.py describe. A brand new database is created at
-# this version directly; there is nothing to upgrade from yet.
-#
-# To change the schema later: edit the models, append a step to MIGRATION_STEPS and the
-# version bumps itself. MIGRATION_STEPS[i] upgrades a database from schema version
-# (i + 1) to (i + 2), so a database at version v runs steps[v-1 ..].
+# Fresh databases are created at the current version directly. To change the schema:
+# edit the models and append a step to MIGRATION_STEPS; steps[i] upgrades v (i+1) -> (i+2)
 def _column_exists(conn: Connection, table: str, column: str) -> bool:
     """Whether a table already has a column.
 
@@ -80,8 +76,7 @@ def migrate(engine: Engine) -> int:
     with engine.connect() as conn:
         version = _get_user_version(conn)
 
-    # A fresh database reads version 0, but create_all just built the current schema,
-    # so it only needs to be stamped, not upgraded.
+    # A fresh database reads version 0; create_all already built the current schema, just stamp it
     if version == 0:
         with engine.begin() as conn:
             _set_user_version(conn, CURRENT_SCHEMA_VERSION)

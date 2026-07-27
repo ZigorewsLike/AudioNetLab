@@ -13,9 +13,7 @@ from .models import Album, Artist, Track, normalize_key, normalize_path
 
 DATABASE_URL = "sqlite:///./storage.db"
 
-# The engine owns the connection pool, so it is created once for the whole process.
-# Building one per query, as the first version did, reopened the file and re-ran the
-# pragmas on every list refresh.
+# One engine for the whole process; it owns the connection pool
 _engine: Optional[Engine] = None
 _session_factory: Optional[sessionmaker] = None
 _engine_lock = threading.Lock()
@@ -60,9 +58,7 @@ def get_engine() -> Engine:
                 bind=engine,
                 autocommit=False,
                 autoflush=False,
-                # Widgets keep Track objects after their session is closed and read the
-                # attributes while painting. Expiring on commit would turn those reads
-                # into lazy loads against a dead session.
+                # Widgets read Track attributes after the session closes; expiring would lazy-load on a dead session
                 expire_on_commit=False,
             )
             _engine = engine
@@ -192,8 +188,7 @@ class DBHandler:
         existing_track = self.session.query(Track.id).filter(Track.path == path).first()
         if existing_track:
             return None
-        # title_key mirrors what the scanner writes, so a track added one at a time is
-        # found by the library search the same as a scanned one
+        # title_key mirrors what the scanner writes, so search finds one-off adds too
         track_object = Track(title=title, title_key=normalize_key(title), path=path,
                              dt_create=datetime.datetime.now(),
                              dt_last_opened=datetime.datetime.now())

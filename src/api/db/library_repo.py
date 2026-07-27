@@ -205,8 +205,7 @@ def list_tracks(session: Session,
         .select_from(Track)
         .outerjoin(Artist, Artist.id == Track.artist_id)
         .outerjoin(Album, Album.id == Track.album_id)
-        # The track cover wins, the album cover is the fallback. The join matches at
-        # most one row, so the query needs no grouping.
+        # Track cover wins over the album cover; the join matches one row, so no grouping
         .outerjoin(Cover, Cover.id == func.coalesce(Track.cover_id, Album.cover_id))
     )
     pattern = _search_pattern(search)

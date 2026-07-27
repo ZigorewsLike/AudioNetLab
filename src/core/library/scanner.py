@@ -19,8 +19,7 @@ from src.core.log_system import print_d, print_e, print_traceback
 from src.enums import ScanStage
 from src.global_constants import SCAN_CHUNK_SIZE, SUPPORTED_AUDIO_EXTENSIONS
 
-# Marks an album whose cover was looked for and not found, so it is not looked for
-# again on every following chunk.
+# Marks an album whose cover was searched and not found, so later chunks skip it
 _NO_COVER = 0
 
 # Ids per statement when the finalize pass updates rows by primary key
@@ -102,8 +101,7 @@ class LibraryScanner:
         self.progress_callback = progress_callback
         self.cancel_event = cancel_event or threading.Event()
         self.extensions = [extension.lower() for extension in extensions]
-        # Reading tags is dominated by waiting on the disk, so more threads than cores
-        # still helps, but only up to a point on a mechanical drive
+        # Tag reads are disk-bound, so more threads than cores still helps, up to a point
         self.max_workers = max_workers or min(8, (os.cpu_count() or 2) + 2)
 
         self.stats = ScanStats()
@@ -274,8 +272,7 @@ class LibraryScanner:
             return None
         if tags is None:
             return None
-        # The album artist decides the album, falling back to the track artist. Without
-        # that a compilation turns into one album per track.
+        # Album artist keys the album (track artist as fallback), else a compilation splits per track
         artist_key = normalize_key(tags.artist)
         album_artist_key = normalize_key(tags.album_artist) or artist_key
         album_key = make_album_key(album_artist_key, tags.album) if tags.album else ""
@@ -375,8 +372,7 @@ class LibraryScanner:
                 "title_key": normalize_key(title),
                 "artist_id": artist_id,
                 "album_id": album_id,
-                # A track in an album leaves this NULL and inherits the album cover,
-                # the query coalesces the two. Only a track without an album owns one.
+                # Only a loose track owns a cover; an album track inherits the album's
                 "cover_id": loose_covers.get(item.path) if album_id is None else None,
                 "track_no": tags.track_no,
                 "disc_no": tags.disc_no,

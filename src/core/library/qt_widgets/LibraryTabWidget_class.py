@@ -80,8 +80,7 @@ class LibraryTabWidget(QWidget):
         albums_layout = QStackedLayout(albums_page)
         albums_layout.setContentsMargins(0, 0, 0, 0)
         self.grid = AlbumGridView(self._cover_loader, self)
-        # A tile opens the album page; playing is started from there. albumActivated is
-        # still forwarded for anything that wants the raw activation.
+        # A tile opens the album page; albumActivated is also forwarded for raw activation
         self.grid.albumActivated.connect(self.open_album)
         self.grid.albumActivated.connect(self.albumActivated)
         self.grid.set_cover_size(self._tile_px)
@@ -244,7 +243,7 @@ class LibraryTabWidget(QWidget):
         count_font.setPointSize(9)
         self.count_label.setFont(count_font)
 
-        # Kept as widgets so the header can be shown and hidden as a whole
+        # Grouped so the header can be shown and hidden as a whole
         self._album_header_widgets = [self.search_edit, self.sort_label, self.sort_combo,
                                       self.size_label, self.size_slider, self.count_label]
 

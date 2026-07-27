@@ -115,8 +115,7 @@ class CoverCache:
                 target = CoverCache.path_for(cover_hash, size)
                 if os.path.exists(target):
                     continue
-                # Keep the aspect ratio, a non square cover is letterboxed by the view
-                # rather than cropped, so nothing is cut off the artwork
+                # Keep the aspect ratio; the view letterboxes rather than crops the artwork
                 scaled = image.scaled(size, size,
                                       Qt.AspectRatioMode.KeepAspectRatio,
                                       Qt.TransformationMode.SmoothTransformation)

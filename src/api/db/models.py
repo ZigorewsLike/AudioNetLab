@@ -7,8 +7,7 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-# Separator between the parts of a composite matching key, a control character that
-# cannot appear in a tag value.
+# Separator between the parts of a composite key, a control char no tag value can hold
 KEY_SEPARATOR = "\x1f"
 
 # Articles stripped from the beginning of a name to build its sort name.

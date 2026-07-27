@@ -204,8 +204,7 @@ class ArtistPage(QWidget):
         self.albums_label.setVisible(bool(albums))
         self.album_grid.setVisible(bool(albums))
 
-        # Artist tracks not on one of the artist's own albums: loose singles and guest
-        # appearances on another album artist's album
+        # Artist tracks not on the artist's own albums: loose singles and guest appearances
         own_album_ids = {a.id for a in albums}
         other_tracks = [t for t in artist_tracks if t.album_id not in own_album_ids]
         self.tracks_model.set_rows(other_tracks)

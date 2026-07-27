@@ -212,8 +212,7 @@ class PlaybackController(QObject):
         :param state: New streamer state.
         :returns: None.
         """
-        # The STOP the streamer fires the instant a track ends is immediately followed by
-        # the next track opening, so it is not broadcast as a real stop during autoplay
+        # The end-of-track STOP is followed by the next track opening, so it is not a real stop
         if state is PlayerState.STOP and self._state is PlayerState.PLAY and self.queue.has_next():
             return
         self._state = state
