@@ -24,7 +24,7 @@
       <translation>Неизвестный альбом</translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\AlbumPage_class.py" line="219" />
+      <location filename="..\..\src\core\library\qt_widgets\AlbumPage_class.py" line="222" />
       <source>%n track(s)</source>
       <translation>
         <numerusform>%n трек</numerusform>
@@ -51,6 +51,48 @@
       <location filename="..\..\src\core\library\qt_widgets\AlbumTrackDelegate_class.py" line="112" />
       <source>File not found</source>
       <translation>Файл не найден</translation>
+    </message>
+  </context>
+  <context>
+    <name>AllTracksPage</name>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="133" />
+      <source>Title</source>
+      <translation>Название</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="134" />
+      <source>Artist</source>
+      <translation>Исполнитель</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="135" />
+      <source>Recently added</source>
+      <translation>Недавно добавленные</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="136" />
+      <source>Length</source>
+      <translation>Длительность</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="151" />
+      <source>Search tracks</source>
+      <translation>Поиск треков</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="152" />
+      <source>Sort:</source>
+      <translation>Сортировка:</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="..\..\src\core\library\qt_widgets\AllTracksPage_class.py" line="178" />
+      <source>%n track(s)</source>
+      <translation>
+        <numerusform>%n трек</numerusform>
+        <numerusform>%n трека</numerusform>
+        <numerusform>%n треков</numerusform>
+      </translation>
     </message>
   </context>
   <context>
@@ -144,7 +186,7 @@
       <source>Last opened: </source>
       <translation>Посл. открытие: </translation>
     </message>
-<message>
+    <message>
       <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="337" />
       <source>File not found</source>
       <translation>Файл не найден</translation>
@@ -168,62 +210,67 @@
   <context>
     <name>LibraryTabWidget</name>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="247" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="257" />
       <source>Artist</source>
       <translation>Исполнитель</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="248" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="258" />
       <source>Title</source>
       <translation>Название</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="249" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="259" />
       <source>Year</source>
       <translation>Год</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="250" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="260" />
       <source>Recently added</source>
       <translation>Недавно добавленные</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="265" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="275" />
       <source>Albums</source>
       <translation>Альбомы</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="266" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="276" />
+      <source>Tracks</source>
+      <translation>Треки</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="277" />
       <source>Recent</source>
       <translation>Недавние</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="267" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="278" />
       <source>Open file</source>
       <translation>Открыть файл</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="268" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="279" />
       <source>Add folder</source>
       <translation>Добавить папку</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="269" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="280" />
       <source>Search albums and artists</source>
       <translation>Поиск альбомов и исполнителей</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="270" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="281" />
       <source>Sort:</source>
       <translation>Сортировка:</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="271" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="282" />
       <source>Size:</source>
       <translation>Размер:</translation>
     </message>
     <message numerus="yes">
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="346" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="361" />
       <source>%n album(s)</source>
       <translation>
         <numerusform>%n альбом</numerusform>
@@ -232,20 +279,16 @@
       </translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="363" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="378" />
       <source>Nothing found</source>
       <translation>Ничего не найдено</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="365" />
+      <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="380" />
       <source>The library is empty.
 Add a folder to fill it.</source>
       <translation>Медиатека пуста.
 Добавьте папку, чтобы её наполнить.</translation>
-    </message>
-    <message>
-      <source>Tracks</source>
-      <translation type="vanished">Треки</translation>
     </message>
   </context>
   <context>
@@ -611,6 +654,19 @@ Add a folder to fill it.</source>
       <location filename="..\..\src\ai_module\transcription\SummariserModule_class.py" line="88" />
       <source>What the song is about:</source>
       <translation>Общий смысл песни:</translation>
+    </message>
+  </context>
+  <context>
+    <name>TrackRowDelegate</name>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\TrackRowDelegate_class.py" line="103" />
+      <source>File not found</source>
+      <translation>Файл не найден</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\core\library\qt_widgets\TrackRowDelegate_class.py" line="131" />
+      <source>Unknown artist</source>
+      <translation>Неизвестный исполнитель</translation>
     </message>
   </context>
   <context>

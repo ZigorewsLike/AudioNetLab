@@ -13,6 +13,7 @@ from src.core.library.cover_cache import CoverLoader
 from src.core.library.qt_widgets.AlbumGridView_class import AlbumGridView
 from src.core.library.qt_widgets.AlbumPage_class import AlbumPage
 from src.core.library.qt_widgets.AlbumTileDelegate_class import AlbumTileDelegate
+from src.core.library.qt_widgets.AllTracksPage_class import AllTracksPage
 from src.enums import AlbumSort
 from src.global_styles import AppColorSchemes
 
@@ -29,8 +30,9 @@ _TILE_SIZES = (AlbumTileDelegate.COVER_SMALL,
 
 # Pages of the view switch
 _PAGE_ALBUMS = 0
-_PAGE_TRACKS = 1
-_PAGE_ALBUM_DETAIL = 2  # The detail page of one album, reached by clicking a tile
+_PAGE_ALL_TRACKS = 1     # The flat list of every track, home of loose tracks
+_PAGE_RECENT = 2         # The recent-track widget list, moved from the old home page
+_PAGE_ALBUM_DETAIL = 3   # The detail page of one album, reached by clicking a tile
 
 
 class LibraryTabWidget(QWidget):
@@ -91,16 +93,20 @@ class LibraryTabWidget(QWidget):
         albums_layout.addWidget(self.empty_label)
         self._albums_layout = albums_layout
 
-        # Track page: the recent-track list, moved here from the old home page
+        # All-tracks page: the flat, scalable list of every track, loose ones included
+        self.all_tracks_page = AllTracksPage(self.mf, self)
+
+        # Recent page: the recent-track list, moved here from the old home page
         self.tracks_list = LastFileList(self.width(), self.mf, self)
 
         # Album detail page, shown when a tile is opened
         self.album_page = AlbumPage(self.mf, self)
         self.album_page.backRequested.connect(self._on_album_back)
 
-        self.pages.addWidget(albums_page)          # _PAGE_ALBUMS
-        self.pages.addWidget(self.tracks_list)     # _PAGE_TRACKS
-        self.pages.addWidget(self.album_page)      # _PAGE_ALBUM_DETAIL
+        self.pages.addWidget(albums_page)             # _PAGE_ALBUMS
+        self.pages.addWidget(self.all_tracks_page)    # _PAGE_ALL_TRACKS
+        self.pages.addWidget(self.tracks_list)        # _PAGE_RECENT
+        self.pages.addWidget(self.album_page)         # _PAGE_ALBUM_DETAIL
         root.addWidget(self.pages, 1)
         # endregion
 
@@ -165,10 +171,13 @@ class LibraryTabWidget(QWidget):
         self.button_albums = QPushButton(self)
         self.button_albums.setCheckable(True)
         self.button_albums.setChecked(True)
-        self.button_tracks = QPushButton(self)
-        self.button_tracks.setCheckable(True)
+        self.button_all_tracks = QPushButton(self)
+        self.button_all_tracks.setCheckable(True)
+        self.button_recent = QPushButton(self)
+        self.button_recent.setCheckable(True)
         self.nav_group.addButton(self.button_albums, _PAGE_ALBUMS)
-        self.nav_group.addButton(self.button_tracks, _PAGE_TRACKS)
+        self.nav_group.addButton(self.button_all_tracks, _PAGE_ALL_TRACKS)
+        self.nav_group.addButton(self.button_recent, _PAGE_RECENT)
         self.nav_group.idClicked.connect(self._show_page)
 
         self.button_open = QPushButton(self)
@@ -177,7 +186,8 @@ class LibraryTabWidget(QWidget):
         self.button_add_folder.clicked.connect(lambda: self.mf.add_folder_dialog())
 
         bar.addWidget(self.button_albums)
-        bar.addWidget(self.button_tracks)
+        bar.addWidget(self.button_all_tracks)
+        bar.addWidget(self.button_recent)
         bar.addStretch(1)
         bar.addWidget(self.button_open)
         bar.addWidget(self.button_add_folder)
@@ -263,7 +273,8 @@ class LibraryTabWidget(QWidget):
         :returns: None.
         """
         self.button_albums.setText(self.tr("Albums"))
-        self.button_tracks.setText(self.tr("Recent"))
+        self.button_all_tracks.setText(self.tr("Tracks"))
+        self.button_recent.setText(self.tr("Recent"))
         self.button_open.setText(self.tr("Open file"))
         self.button_add_folder.setText(self.tr("Add folder"))
         self.search_edit.setPlaceholderText(self.tr("Search albums and artists"))
@@ -286,11 +297,14 @@ class LibraryTabWidget(QWidget):
         :returns: None.
         """
         self.pages.setCurrentIndex(page)
-        # The album controls belong to the grid only
+        # The album controls belong to the grid only; the all-tracks page carries its own
         for widget in self._album_header_widgets:
             widget.setVisible(page == _PAGE_ALBUMS)
         if page == _PAGE_ALBUMS:
             self._cover_loader.drop_pending()
+        elif page == _PAGE_ALL_TRACKS:
+            # Reload on show so a track added while another page was up is there
+            self.all_tracks_page.reload()
 
     @QtCore.pyqtSlot(int)
     def open_album(self, album_id: int) -> None:
@@ -330,11 +344,12 @@ class LibraryTabWidget(QWidget):
         self._update_empty_state()
 
     def reload(self) -> None:
-        """Reload both views after the library changed.
+        """Reload every view after the library changed.
 
         :returns: None.
         """
         self.reload_albums()
+        self.all_tracks_page.reload()
         self.tracks_list.update_file_list()
 
     def _update_count(self) -> None:

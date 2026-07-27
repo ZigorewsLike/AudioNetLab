@@ -13,6 +13,8 @@ class TrackRoles:
     DURATION = Qt.ItemDataRole.UserRole + 4
     FORMAT = Qt.ItemDataRole.UserRole + 5
     IS_MISSING = Qt.ItemDataRole.UserRole + 6
+    ARTIST = Qt.ItemDataRole.UserRole + 7
+    ALBUM = Qt.ItemDataRole.UserRole + 8
 
 
 def format_duration(seconds: Optional[float]) -> str:
@@ -128,4 +130,8 @@ class AlbumTracksModel(QAbstractListModel):
             return format_track_format(row)
         if role == TrackRoles.IS_MISSING:
             return row.is_missing
+        if role == TrackRoles.ARTIST:
+            return row.artist
+        if role == TrackRoles.ALBUM:
+            return row.album
         return None
