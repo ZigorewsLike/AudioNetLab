@@ -97,6 +97,33 @@ class PlaybackController(QObject):
         self.queueChanged.emit()
         self._open_current()
 
+    def activate_track(self, track_ids: List[int], track_id: int) -> None:
+        """Play a track, or toggle pause when it is already the one playing.
+
+        Clicking the row that already carries the playing marker pauses it, and clicking
+        again resumes, which is what the user expects; only a click on a different track
+        reopens the context from that track.
+
+        :param track_ids: Track ids of the context in play order.
+        :param track_id: Track that was clicked.
+        :returns: None.
+        """
+        if self.is_playing(track_id):
+            self.toggle_pause()
+        else:
+            self.play_track(track_ids, track_id)
+
+    def toggle_pause(self) -> None:
+        """Pause the current track if it is playing, resume it if it is paused.
+
+        Routed through the player transport button so the button icon, the streamer and
+        the state the views read all move together; the streamer's state change flows
+        back through on_streamer_state and updates every playing marker.
+
+        :returns: None.
+        """
+        self.mf.audio_player.play_button_click()
+
     def play_next(self, auto: bool = False) -> None:
         """Advance to the next track.
 

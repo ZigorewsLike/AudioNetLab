@@ -1,8 +1,34 @@
 import os
+from typing import Dict, Tuple
 
 import numpy as np
-from PyQt6.QtCore import QPointF
-from PyQt6.QtGui import QPolygonF
+from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtGui import QPixmap, QPolygonF
+
+# Cache of the scaled status markers, keyed by (paused, size)
+_status_icon_cache: Dict[Tuple[bool, int], QPixmap] = {}
+
+
+def status_icon_pixmap(paused: bool, size: int) -> QPixmap:
+    """Load the play or pause marker shown on the track that is playing.
+
+    Reads a dedicated icon file so the marker is drawn from an image rather than
+    painted by hand.
+
+    :param paused: True for the pause marker, False for the play marker.
+    :param size: Edge length to scale the marker to.
+    :returns: QPixmap - The scaled marker, may be null when no icon file exists.
+    """
+    key = (paused, size)
+    cached = _status_icon_cache.get(key)
+    if cached is not None:
+        return cached
+    pixmap = QPixmap("res/icons/track_paused.png" if paused else "res/icons/track_playing.png")
+    if not pixmap.isNull():
+        pixmap = pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
+                               Qt.TransformationMode.SmoothTransformation)
+    _status_icon_cache[key] = pixmap
+    return pixmap
 
 
 def array2d_to_qpolygonf(xdata, ydata) -> QPolygonF:

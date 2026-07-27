@@ -203,19 +203,23 @@ class DBHandler:
             self.commit()
         return track_object.id
 
-    def get_all_track(self) -> List[Track]:
-        """Read the whole track list, most recently added or opened first.
+    def get_all_track(self, limit: Optional[int] = None) -> List[Track]:
+        """Read the track list, most recently added or opened first.
 
         A track imported by the scanner has never been opened, so its dt_last_opened
         is NULL and it would sink below every opened track, out of sight at the bottom
         of the list. Ordering on the add time as a fallback keeps a freshly imported
         track where the user expects it, at the top.
 
+        :param limit: Keep only this many of the most recent tracks, None for all.
         :returns: List[Track] - Track rows.
         """
         assert self.is_connected, "Database is not connected"
         recency = func.coalesce(Track.dt_last_opened, Track.dt_create)
-        return self.session.query(Track).order_by(recency.desc()).all()
+        query = self.session.query(Track).order_by(recency.desc())
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     def get_track_by_path(self, path: str) -> Optional[Track]:
         """Find a track by its file path.

@@ -1,8 +1,8 @@
 from typing import Optional, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QEvent, Qt, QPointF
-from PyQt6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPainterPath
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QColor, QFont, QMouseEvent, QPainter
 from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
                              QWidget)
 
@@ -10,12 +10,14 @@ from src.api.db.db_handler import create_session
 from src.api.db import library_repo
 from src.core.library.AlbumTracksModel_class import format_duration
 from src.enums import PlayerState
+from src.function_lib.qt_utils import status_icon_pixmap
 from src.global_styles import AppColorSchemes, DEFAULT_SCROLLBAR_STYLE
 
 if TYPE_CHECKING:
     from src.forms import MainForm
 
-_ACCENT = QColor("#2f8f43")
+# Edge length of the play or pause marker drawn in the left inset of a queue row
+_STATUS_ICON_SIZE = 14
 
 
 class QueueRow(QFrame):
@@ -106,7 +108,7 @@ class QueueRow(QFrame):
         super().mouseReleaseEvent(event)
 
     def paintEvent(self, event) -> None:
-        """Draw the play or pause marker on the current row.
+        """Draw the play or pause marker icon on the current row.
 
         :param event: Qt paint event.
         :returns: None.
@@ -114,22 +116,13 @@ class QueueRow(QFrame):
         super().paintEvent(event)
         if not self._is_current:
             return
+        pixmap = status_icon_pixmap(self._paused, _STATUS_ICON_SIZE)
+        if pixmap.isNull():
+            return
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(_ACCENT)
-        cx, cy = 17, self.height() // 2
-        size = 5
-        if self._paused:
-            painter.drawRect(cx - size, cy - size, 3, size * 2)
-            painter.drawRect(cx + 2, cy - size, 3, size * 2)
-        else:
-            path = QPainterPath()
-            path.moveTo(QPointF(cx - size + 1, cy - size))
-            path.lineTo(QPointF(cx - size + 1, cy + size))
-            path.lineTo(QPointF(cx + size + 1, cy))
-            path.closeSubpath()
-            painter.drawPath(path)
+        x = 17 - pixmap.width() // 2
+        y = (self.height() - pixmap.height()) // 2
+        painter.drawPixmap(x, y, pixmap)
 
 
 class QueuePanel(QWidget):
@@ -320,9 +313,21 @@ class QueuePanel(QWidget):
         duration = track.duration if track is not None else None
         row = QueueRow(position, track_id, title, artist, duration, is_current, paused, removable,
                        self.rows_container)
-        row.clicked.connect(self.mf.playback.jump_to)
+        row.clicked.connect(self._on_row_clicked)
         row.removeRequested.connect(self.mf.playback.remove_from_queue)
         self.rows_layout.insertWidget(self.rows_layout.count() - 1, row)
+
+    @QtCore.pyqtSlot(int)
+    def _on_row_clicked(self, track_id: int) -> None:
+        """Jump to the clicked track, or pause it when it is already the one playing.
+
+        :param track_id: Track id of the clicked row.
+        :returns: None.
+        """
+        if self.mf.playback.is_playing(track_id):
+            self.mf.playback.toggle_pause()
+        else:
+            self.mf.playback.jump_to(track_id)
 
     def _clear_rows(self) -> None:
         """Remove every row and section, keeping the trailing stretch.

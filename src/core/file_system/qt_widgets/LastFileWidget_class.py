@@ -20,8 +20,15 @@ if TYPE_CHECKING:
 
 
 class LastFileList(QWidget):
-    """Scrollable list of recently opened tracks read from the database."""
+    """Scrollable list of the most recently added or opened tracks.
+
+    It builds one widget per row, so it is capped at RECENT_LIMIT tracks: without the
+    cap a large library made hundreds of rows at once and the interface stalled. The
+    whole library is browsed on the album grid instead.
+    """
     resource_icon_dir = "resource/2x/"
+
+    RECENT_LIMIT = 20  # Rows kept in the recent list
 
     def __init__(self, width, mf, *args, **kwargs):
         """Build the scroll area that holds the track items.
@@ -119,7 +126,7 @@ class LastFileList(QWidget):
                 item.widget().deleteLater()
             self.v_layout.removeItem(item)
         self.db.connect()
-        track_list = self.db.get_all_track()
+        track_list = self.db.get_all_track(limit=self.RECENT_LIMIT)
         self.db.disconnect()
         # The ids in display order, so a click can hand the whole list to the queue and
         # next and previous walk what the user is looking at
@@ -190,7 +197,7 @@ class LastFileList(QWidget):
         return None
 
     def item_click(self, track_id: int) -> None:
-        """Play the clicked track, queuing the rest of the list after it.
+        """Play the clicked track, or pause it when it is already the one playing.
 
         The controller drives the playing marker through set_playing_track, so this only
         starts playback and the marker follows, including on an autoplay to the next.
@@ -200,7 +207,7 @@ class LastFileList(QWidget):
         """
         playback = getattr(self.mf, "playback", None)
         if playback is not None:
-            playback.play_track(self.ordered_track_ids, track_id)
+            playback.activate_track(self.ordered_track_ids, track_id)
 
     def set_playing_track(self, track_id: int) -> None:
         """Move the playing marker onto a track, driven by the controller.

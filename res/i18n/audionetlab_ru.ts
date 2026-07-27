@@ -48,7 +48,7 @@
   <context>
     <name>AlbumTrackDelegate</name>
     <message>
-      <location filename="..\..\src\core\library\qt_widgets\AlbumTrackDelegate_class.py" line="109" />
+      <location filename="..\..\src\core\library\qt_widgets\AlbumTrackDelegate_class.py" line="112" />
       <source>File not found</source>
       <translation>Файл не найден</translation>
     </message>
@@ -56,7 +56,7 @@
   <context>
     <name>AudioPlayer</name>
     <message>
-      <location filename="..\..\src\core\audio\Player_class.py" line="506" />
+      <location filename="..\..\src\core\audio\Player_class.py" line="464" />
       <source>Unknown</source>
       <translation>Неизвестен</translation>
     </message>
@@ -140,27 +140,27 @@
   <context>
     <name>LastFileItem</name>
     <message>
-      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="327" />
+      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="334" />
       <source>Last opened: </source>
       <translation>Посл. открытие: </translation>
     </message>
-    <message>
-      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="330" />
+<message>
+      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="337" />
       <source>File not found</source>
       <translation>Файл не найден</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="434" />
+      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="441" />
       <source>Open</source>
       <translation>Открыть</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="435" />
+      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="442" />
       <source>Show in file manager</source>
       <translation>Показать в проводнике</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="436" />
+      <location filename="..\..\src\core\file_system\qt_widgets\LastFileWidget_class.py" line="443" />
       <source>Remove from the list</source>
       <translation>Удалить из списка</translation>
     </message>
@@ -194,8 +194,8 @@
     </message>
     <message>
       <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="266" />
-      <source>Tracks</source>
-      <translation>Треки</translation>
+      <source>Recent</source>
+      <translation>Недавние</translation>
     </message>
     <message>
       <location filename="..\..\src\core\library\qt_widgets\LibraryTabWidget_class.py" line="267" />
@@ -243,6 +243,10 @@ Add a folder to fill it.</source>
       <translation>Медиатека пуста.
 Добавьте папку, чтобы её наполнить.</translation>
     </message>
+    <message>
+      <source>Tracks</source>
+      <translation type="vanished">Треки</translation>
+    </message>
   </context>
   <context>
     <name>LyricsPropertyCommon</name>
@@ -280,133 +284,131 @@ Add a folder to fill it.</source>
   <context>
     <name>MainForm</name>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="711" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="671" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="637" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="374" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="354" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="149" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="686" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="668" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="634" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="373" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="353" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="148" />
       <source>Library</source>
       <translation>Медиатека</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="375" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="166" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="374" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="165" />
       <source>EQ AI</source>
       <translation>EQ AI</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="376" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="173" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="375" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="172" />
       <source>Lyrics</source>
       <translation>Текст</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="378" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="184" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="377" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="183" />
       <source>Chat</source>
       <translation>Чат</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="379" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="215" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="378" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="214" />
       <source>Settings</source>
       <translation>Настройки</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="348" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="347" />
       <source>&amp;File</source>
       <translation>&amp;Файл</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="349" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="348" />
       <source>&amp;Edit</source>
       <translation>&amp;Правка</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="350" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="349" />
       <source>&amp;Tools</source>
       <translation>&amp;Инструменты</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="593" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="351" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="592" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="350" />
       <source>Open file</source>
       <translation>Открыть файл</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="605" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="352" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="604" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="351" />
       <source>Add folder to the library</source>
       <translation>Добавить папку в медиатеку</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="353" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="352" />
       <source>Open player</source>
       <translation>Открыть плеер</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="355" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="354" />
       <source>Exit</source>
       <translation>Выход</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="356" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="355" />
       <source>Profiling</source>
       <translation>Профилирование</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="590" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="589" />
       <source>All audio formats</source>
       <translation>Все музыкальные форматы</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="592" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="591" />
       <source>All files</source>
       <translation>Все файлы</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="638" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="635" />
       <source>A scan is already running, wait for it to finish</source>
       <translation>Сканирование уже идёт, дождитесь его завершения</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="654" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="651" />
       <source>Scan cancelled, {0} tracks added</source>
       <translation>Сканирование отменено, добавлено треков: {0}</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="656" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="653" />
       <source>{0} tracks added, {1} updated, {2} albums</source>
       <translation>Добавлено треков: {0}, обновлено: {1}, альбомов: {2}</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="670" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="667" />
       <source>Scan failed</source>
       <translation>Сканирование не удалось</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="786" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="756" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="736" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="680" />
-      <source>File open error</source>
-      <translation>Ошибка открытия файла</translation>
-    </message>
-    <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="736" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="680" />
-      <source>File not found, it may have been deleted</source>
-      <translation>Файл не найден, возможно он удалён</translation>
-    </message>
-    <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="712" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="687" />
       <source>No playable file in this album</source>
       <translation>В этом альбоме нет воспроизводимых файлов</translation>
     </message>
     <message>
-      <location filename="..\..\src\forms\MainForm_class.py" line="786" />
-      <location filename="..\..\src\forms\MainForm_class.py" line="756" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="761" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="731" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="711" />
+      <source>File open error</source>
+      <translation>Ошибка открытия файла</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\forms\MainForm_class.py" line="711" />
+      <source>File not found, it may have been deleted</source>
+      <translation>Файл не найден, возможно он удалён</translation>
+    </message>
+    <message>
+      <location filename="..\..\src\forms\MainForm_class.py" line="761" />
+      <location filename="..\..\src\forms\MainForm_class.py" line="731" />
       <source>Unable to open the file</source>
       <translation>Не удалось открыть файл</translation>
     </message>
@@ -448,27 +450,27 @@ Add a folder to fill it.</source>
   <context>
     <name>QueuePanel</name>
     <message>
-      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="222" />
+      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="215" />
       <source>Queue</source>
       <translation>Очередь</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="263" />
+      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="256" />
       <source>The queue is empty</source>
       <translation>Очередь пуста</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="280" />
+      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="273" />
       <source>Now playing</source>
       <translation>Сейчас играет</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="285" />
+      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="278" />
       <source>Next up</source>
       <translation>Далее</translation>
     </message>
     <message>
-      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="318" />
+      <location filename="..\..\src\core\audio\qt_widgets\QueuePanel_class.py" line="311" />
       <source>Unknown track</source>
       <translation>Неизвестный трек</translation>
     </message>

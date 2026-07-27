@@ -263,7 +263,7 @@ class LibraryTabWidget(QWidget):
         :returns: None.
         """
         self.button_albums.setText(self.tr("Albums"))
-        self.button_tracks.setText(self.tr("Tracks"))
+        self.button_tracks.setText(self.tr("Recent"))
         self.button_open.setText(self.tr("Open file"))
         self.button_add_folder.setText(self.tr("Add folder"))
         self.search_edit.setPlaceholderText(self.tr("Search albums and artists"))

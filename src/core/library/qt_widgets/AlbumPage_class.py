@@ -198,6 +198,9 @@ class AlbumPage(QWidget):
         self._apply_subtitle()
         self._set_cover(album.cover_hash, album_id)
         self.model.set_rows(tracks)
+        # A fresh album must start at the top: the view keeps its scroll offset between
+        # loads, so without this a previously scrolled album would open half way down
+        self.track_view.scrollToTop()
         self._first_path = next((t.path for t in tracks if t.path), None)
         self.button_reveal.setEnabled(self._first_path is not None)
         # Reflect the track that is currently playing, if it belongs to this album
@@ -246,14 +249,14 @@ class AlbumPage(QWidget):
             self.mf.playback.play_context(ids, 0)
 
     def _on_track_activated(self, index: QModelIndex) -> None:
-        """Play the clicked track, queuing the album after it.
+        """Play the clicked track, or pause it when it is already playing.
 
         :param index: Clicked row.
         :returns: None.
         """
         track_id = index.data(TrackRoles.TRACK_ID)
         if track_id is not None:
-            self.mf.playback.play_track(self.model.track_ids(), int(track_id))
+            self.mf.playback.activate_track(self.model.track_ids(), int(track_id))
 
     def _on_reveal(self) -> None:
         """Open the album folder in the system file manager.

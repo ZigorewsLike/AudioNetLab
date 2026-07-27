@@ -1,14 +1,17 @@
 from typing import Optional
 
-from PyQt6.QtCore import QModelIndex, QPointF, QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPolygonF
+from PyQt6.QtCore import QModelIndex, QRect, QSize, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from src.core.library.AlbumTracksModel_class import TrackRoles
-from src.enums import PlayerState
+from src.function_lib.qt_utils import status_icon_pixmap
 
-# Accent used for the number and the status glyph of the current track
+# Accent used for the title of the current track
 _ACCENT = QColor("#2f8f43")
+
+# Edge length of the play or pause marker drawn in the number column
+_STATUS_ICON_SIZE = 14
 
 
 class AlbumTrackDelegate(QStyledItemDelegate):
@@ -123,25 +126,15 @@ class AlbumTrackDelegate(QStyledItemDelegate):
         painter.restore()
 
     def _draw_status(self, painter: QPainter, rect: QRect) -> None:
-        """Draw the play triangle or the pause bars centred in a rect.
+        """Draw the play or pause marker icon centred in a rect.
 
         :param painter: Active painter.
-        :param rect: Cell to centre the glyph in.
+        :param rect: Cell to centre the marker in.
         :returns: None.
         """
-        painter.save()
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(_ACCENT)
-        cx, cy = rect.center().x() + 1, rect.center().y() + 1
-        size = 5
-        if self._paused:
-            painter.drawRect(cx - size, cy - size, 3, size * 2)
-            painter.drawRect(cx + 2, cy - size, 3, size * 2)
-        else:
-            triangle = QPolygonF([QPointF(cx - size + 1, cy - size),
-                                  QPointF(cx - size + 1, cy + size),
-                                  QPointF(cx + size + 1, cy)])
-            path = QPainterPath()
-            path.addPolygon(triangle)
-            painter.drawPath(path)
-        painter.restore()
+        pixmap = status_icon_pixmap(self._paused, _STATUS_ICON_SIZE)
+        if pixmap.isNull():
+            return
+        x = rect.x() + (rect.width() - pixmap.width()) // 2
+        y = rect.y() + (rect.height() - pixmap.height()) // 2
+        painter.drawPixmap(x, y, pixmap)

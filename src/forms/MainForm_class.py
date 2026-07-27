@@ -20,7 +20,6 @@ from src.api.db.models import Track
 from src.core.file_system import FileMetaController
 from src.core.library.qt_widgets import ScanProgressWidget, LibraryTabWidget
 from src.core.library.scanner import ScanStats
-from src.core.file_system.tag_reader import read_tags, title_from_path
 from src.core.log_system import print_d
 from src.core.log_system.profiling import ProfileDrawWidget
 from src.core.point_system import Point
@@ -611,9 +610,10 @@ class MainForm(QMainWindow):
     def add_paths(self, paths: Sequence[str]) -> None:
         """Add any mix of files and folders to the library.
 
-        A single dropped file is registered right away, since starting a thread for it
-        would only make it slower. Anything larger goes through the scanner, which
-        reads and writes in batches and keeps the window responsive meanwhile.
+        Everything, even a single file, goes through the scanner so it gets its album,
+        artist and cover the same way a folder import does. Registering a single file on
+        its own used to skip that, leaving the track with no album and invisible in the
+        album view.
 
         :param paths: Files and folders to add.
         :returns: None.
@@ -621,9 +621,6 @@ class MainForm(QMainWindow):
         folders = [path for path in paths if os.path.isdir(path)]
         files = [path for path in paths if os.path.isfile(path) and self.is_supported_audio(path)]
         if not folders and not files:
-            return
-        if not folders and len(files) == 1:
-            self.add_file(files[0])
             return
         self.start_library_scan(folders + files)
 
@@ -669,28 +666,6 @@ class MainForm(QMainWindow):
         self.scan_thread.quit()
         self.scan_progress.finish(self.tr("Scan failed"))
         self.show_error_message_log(self.tr("Library"), message)
-
-    def add_file(self, file_path: str) -> None:
-        """Register a file in the database and store its tags in the registry.
-
-        :param file_path: Path to the audio file.
-        :returns: None.
-        """
-        if not os.path.exists(file_path):
-            self.show_error_message_log(self.tr("File open error"), self.tr("File not found, it may have been deleted"))
-            return
-        # read_track_file fills the registry with the raw mutagen object, but its keys
-        # are format specific: an ID3 tag answers to TIT2, not to title, so reading the
-        # name off it left every MP3 named after its file. The title comes from the
-        # normalized reader instead.
-        self.file_meta_controller.read_track_file(file_path)
-        tags = read_tags(file_path)
-        title = tags.title if tags is not None and tags.title else title_from_path(file_path)
-        track_id: int = self.last_file.add(title, file_path)
-        if track_id is None:  # The file is already in the list
-            return
-        self.file_meta_controller.save_meta_in_registry(track_id)
-        self.last_file.update_file_list()
 
     @pyqtSlot(int)
     def play_album(self, album_id: int) -> None:
