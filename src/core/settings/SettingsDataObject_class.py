@@ -30,6 +30,13 @@ class PlayerSettings:
     graph_visible: bool
 
 
+@dataclass()
+class LibrarySettings:
+    """Library view preferences restored on the next start."""
+    tile_size: int = 180  # Cover edge in pixels of the album and artist grids
+    open_on_double_click: bool = False  # Open an album or artist on double click instead of single
+
+
 class SettingsDataObject:
     """Application settings backed by an ini file.
 
@@ -45,6 +52,7 @@ class SettingsDataObject:
         self.system_settings = SystemSettings(form_width=1600, form_height=900, form_position=Point(-1.0, -1.0),
                                               version=f"{VERSION}")
         self.player_settings = PlayerSettings(volume=500, auto_play=False, graph_visible=True)
+        self.library_settings = LibrarySettings()
 
     def __repr__(self) -> str:
         """Describe the current settings.
@@ -93,7 +101,7 @@ class SettingsDataObject:
         :returns: None.
         """
         conf = configparser.ConfigParser()
-        for class_field in [self.system_settings, self.player_settings]:
+        for class_field in [self.system_settings, self.player_settings, self.library_settings]:
             conf.add_section(class_field.__class__.__name__)
             for data_field in fields(class_field):
                 conf.set(class_field.__class__.__name__, data_field.name,
@@ -112,7 +120,7 @@ class SettingsDataObject:
             config.read(file, encoding='UTF-8')
             # Owning dataclass and declared type per field name
             field_dict: Dict[str, Tuple[object, type]] = {}
-            for class_field in [self.system_settings, self.player_settings]:
+            for class_field in [self.system_settings, self.player_settings, self.library_settings]:
                 for data_field in fields(class_field):
                     field_dict[data_field.name] = (class_field, data_field.type)
             for each_section in config.sections():

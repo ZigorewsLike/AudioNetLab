@@ -5,3 +5,5 @@ from .DragFileState_enum import DragFileState
 from .ProfileDataType_enum import ProfileDataType
 from .EQType_enum import EQType
 from .RegistryFileName_enum import RegistryFileName
+from .LibrarySort_enum import AlbumSort, TrackSort, ArtistSort
+from .ScanStage_enum import ScanStage

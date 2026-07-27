@@ -11,6 +11,8 @@ device. That is why the equalizer reacts immediately, without restarting playbac
 ## Features
 
 * Playback of MP3, FLAC and WAV with a waveform view, a track list and tag display.
+* A Library tab: import folders and files, browse the albums as a cover grid, search and sort
+  them, and start an album from its tile.
 * 20 band equalizer applied live during playback.
 * Genre classification with an ONNX model: the track is split into 3 second fragments and each
   fragment gets its own genre.
@@ -65,10 +67,11 @@ database in the project folder, so run it from the project root.
 
 ## First steps
 
-1. Open the **Home** tab and press **Open file**, or drag an audio file onto the window. The
-   track is added to the list.
-2. Click a track in the list to start playback. The player panel is pinned to the bottom of
-   the window: transport button, position slider, volume, waveform toggle and tag panel toggle.
+1. On the **Library** tab press **Open file** or **Add folder**, or drag audio files and folders
+   onto the window. They are added to the library.
+2. Switch to the **Tracks** view and click a track to start playback, or double-click an album
+   cover on the **Albums** view. The player panel is pinned to the bottom of the window:
+   transport button, position slider, volume, waveform toggle and tag panel toggle.
 3. Open the **EQ AI** tab and press **Predict**. The track is analysed and a coloured genre
    timeline appears, together with the genre shares and the final genre.
 4. On the same tab the buttons on the left of the equalizer control it:
@@ -146,8 +149,9 @@ after saving.
 
 | Path | Content |
 | --- | --- |
-| `storage.db` | SQLite database with the track list (path, title, timestamps) |
+| `storage.db` | SQLite database with the library: tracks, artists, albums, covers, scanned folders |
 | `data/registry/<track_id>/` | Per track cache: tags, feature vectors, lyrics |
+| `data/covers/` | Pre-scaled covers, named after the hash of the source image |
 | `res/presets.pickle` | EQ presets per genre |
 | `res/i18n/` | Translation catalogs, `.ts` sources and compiled `.qm` |
 | `res/icons/` | Interface icons |
@@ -155,8 +159,76 @@ after saving.
 | `config_app.ini` | Application settings |
 | `error_log.txt` | Uncaught exceptions |
 
-Deleting a track from the list also deletes its registry folder. The audio file itself is never
-touched, the application only stores its path.
+Deleting a track from the list also deletes its registry folder, if it has one: a track
+imported by the scanner keeps its tags in the database and only gets a registry folder once it
+is opened. The audio file itself is never touched, the application only stores its path.
+
+### Importing into the library
+
+Drop any number of files and whole folders on the window, use **File, Open file** for a
+multiple selection, or **File, Add folder to the library** for a folder. A single dropped
+file is registered immediately; anything larger goes to the scanner, which runs on its own
+thread and reports on a strip above the player with a cancel button. The window stays usable
+while it works, and a cancelled scan keeps everything it had already imported.
+
+Two things keep a large import affordable:
+
+* A file whose modification time did not change is never opened again, so a rescan of an
+  unchanged collection costs a directory walk. On a collection of 3663 tracks that is 0.1 s.
+* FLAC tags are read by a small parser that seeks past the artwork instead of loading it,
+  because mutagen reads every metadata block and a FLAC with a cover carries a few hundred
+  kilobytes of it. That is 0.6 KB read per track instead of 306 KB. The cover itself is
+  decoded once per album, not once per track, and cached under `data/covers/` named after
+  the hash of the image, so albums sharing artwork share one file.
+
+Files that disappear are flagged, never deleted: an unplugged drive would otherwise wipe the
+library along with its play counts. They are listed as missing and unflag themselves when the
+drive comes back.
+
+### The Library tab
+
+The **Library** tab is the home of everything imported. It has two views, switched at the top
+left: **Albums**, a grid of covers, and **Tracks**, the flat list of every track. The open file
+and add folder buttons sit in the same top bar, so nothing needs a separate home page.
+
+The album view is sorted by artist, title, year or add date, with a search box over the album
+and artist names and a slider for the tile size. Double-clicking a cover opens the album page:
+its cover, title and totals with a play button and a reveal-in-file-manager button, and below
+that the track list with each track's own number, format (codec, sample rate, bit depth,
+bitrate) and length. Playing an album queues the whole album, so it plays through and the next
+and previous walk it; the track that is playing is marked in the list and the mark follows an
+autoplay to the next one. The track view lists every track newest first and plays one on click,
+the same as the old recent-track list.
+
+The grid is a `QListView` with a `QStyledItemDelegate`, not a widget per album, so it paints
+only the tiles on screen and stays smooth on a library of thousands of albums. Covers are read
+off the interface thread through a small loader: a tile shows whatever is already in memory and
+a placeholder otherwise, and the finished image repaints just that tile when it arrives.
+
+Deleting the last track of an album removes the album and, if it also empties out, the artist,
+so the grid never shows a tile that has nothing behind it. A database from before this rule is
+cleaned once by the schema migration.
+
+Playing an album, or a track from any list, fills a play queue: the player then walks it on its
+own at the end of each track, and the previous and next buttons on the player panel step through
+it. The queue button opens a side panel that shows the current track and what comes next, where
+a click jumps to a track and an upcoming track can be removed. A single playback controller owns
+the queue and the current track, so the album page, the track list and the queue panel all show
+the same playing state.
+
+### Database schema
+
+`storage.db` carries its schema version in `PRAGMA user_version`, and `src/api/db/migrations.py`
+upgrades it on the first connection of a run. There is no Alembic: each version is one function
+in `MIGRATION_STEPS`, run in its own transaction, so a failed upgrade leaves the file on the
+previous version. To change the schema, edit the models, append a step and bump
+`CURRENT_SCHEMA_VERSION`.
+
+Artists and albums are deduplicated on a key column that is casefolded in Python rather than by
+`COLLATE NOCASE`, because SQLite only folds ASCII and would file "Ария" and "ария" as two
+artists. The same keys are what the library search matches against. Tracks are grouped into an
+album by album artist and title, taking the `ALBUMARTIST` tag when the file has one, otherwise a
+compilation would break up into one album per track.
 
 ## Project structure
 
@@ -165,19 +237,20 @@ main.py                     Entry point: logging, DPI, main window
 src/
   forms/                    MainForm, the main window and the module wiring
   core/
+    library/                Folder scanner, cover cache, the Library tab and album grid
     i18n/                   Translation manager, loads and switches the catalogs
     audio/                  AudioStreamer (streaming thread), AudioPlayer (player panel)
     render/graphics_system/ OpenGL waveform panels
     qt_widgets/             Shared widgets: sliders, equalizer, title bar, overlays
-    file_system/            Track registry and the recent track list
+    file_system/            Tag reader, track registry and the recent track list
     settings/               Settings object and the settings pages
-    workers/                Background workers: file opening, genre prediction
+    workers/                Background workers: file opening, genre prediction, library scan
     log_system/             Logging and the profiler
     point_system/           Point helper type
   ai_module/
     genre_classification/   The EQ AI tab: prediction, timeline, auto EQ
     transcription/          Experimental lyrics modules
-  api/db/                   SQLAlchemy models and the database handler
+  api/db/                   SQLAlchemy models, schema migrations, library queries
   function_lib/             Audio features, the equalizer, ONNX loading, math helpers
   enums/                    Enumerations
   global_constants.py       Switches and paths

@@ -18,11 +18,13 @@ from src.function_lib.audio import equalizer_librosa
 class AudioStreamer(QThread):
     """Background thread that streams a waveform to an output device with optional EQ.
 
-    :signals: progress (int), finished (), playbackStateChanged (PlayerState), durationChanged (float)
+    :signals: progress (int), finished (), trackEnded (), playbackStateChanged (PlayerState),
+              durationChanged (float)
     """
 
     progress = QtCore.pyqtSignal(int)  # Playback position, ms
     finished = QtCore.pyqtSignal()  # Streaming loop has stopped
+    trackEnded = QtCore.pyqtSignal()  # The waveform played to its end, unlike a user stop
     playbackStateChanged = QtCore.pyqtSignal(PlayerState)
     durationChanged = QtCore.pyqtSignal(float)  # Track duration, ms
 
@@ -136,7 +138,10 @@ class AudioStreamer(QThread):
                 wave_crop = self.waveform_ref[self._position - left_padding:self._position + self._chunk_size + right_padding]
 
                 if wave_crop is None or wave_crop.size == 0:  # End of the track
+                    # Distinct from a user stop so the queue advances; the empty chunk is not processed
+                    self.trackEnded.emit()
                     self.stop()
+                    continue
 
                 wave_type = wave_crop.dtype
 

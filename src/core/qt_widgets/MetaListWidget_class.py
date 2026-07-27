@@ -105,13 +105,13 @@ class MetaListWidget(QWidget):
 
     def recalculate_size(self) -> None:
         for item in self._item_container:
-            print_d(self.item_max_width_header, item.label_header.width())
+            # print_d(self.item_max_width_header, item.label_header.width())
             item.set_padding(self.item_max_width_header - item.label_header.width())
             item.adjustSize()
             widget_height = (len(self._item_container)) * self.item_height
 
             self.item_max_width = max(item.width(), self.item_max_width)
-            print_d(self.item_max_width, item.width())
+            # print_d(self.item_max_width, item.width())
             self.item_frame.resize(self.item_max_width, widget_height + self.item_height)
 
 

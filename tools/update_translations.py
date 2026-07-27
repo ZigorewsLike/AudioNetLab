@@ -10,6 +10,7 @@ New strings appear in the .ts as unfinished, translate them in Qt Linguist
 (venv\\Scripts\\pyside6-linguist.exe res/i18n/audionetlab_ru.ts) and run the script again.
 """
 import os
+import re
 import subprocess
 import sys
 
@@ -18,6 +19,9 @@ I18N_DIR = os.path.join(PROJECT_ROOT, "res", "i18n")
 SOURCE_DIRS = ["src"]
 SOURCE_FILES = ["main.py"]
 LANGUAGES = ["ru"]  # Languages that need a catalog, the source language does not
+# Qt locale per language code. lrelease reads it to pick the plural rules, without it
+# a "%n" string collapses to a single form and Russian loses its three cases.
+LANGUAGE_LOCALES = {"ru": "ru_RU"}
 
 
 def script_path(name: str) -> str:
@@ -47,6 +51,29 @@ def collect_sources() -> list:
     return sorted(sources)
 
 
+def ensure_language_attribute(ts_path: str, locale: str) -> None:
+    """Make sure the .ts declares its language, so lrelease keeps the plural forms.
+
+    pylupdate6 writes the <TS> tag without a language attribute, and lrelease then
+    treats a "%n" message as having one plural form. Setting the locale here fixes the
+    Russian cases once, and is preserved on the following runs.
+
+    :param ts_path: Path to the .ts catalog.
+    :param locale: Qt locale, for example "ru_RU".
+    :returns: None.
+    """
+    with open(ts_path, encoding="utf-8") as handle:
+        text = handle.read()
+    if 'language="' in text[:text.find(">", text.find("<TS")) + 1]:
+        return  # Already set
+    updated = text.replace("<TS version=\"2.1\">", f"<TS version=\"2.1\" language=\"{locale}\">", 1)
+    if updated == text:  # A different version string, patch the tag generically
+        updated = re.sub(r"<TS version=\"([^\"]+)\">",
+                         rf'<TS version="\1" language="{locale}">', text, count=1)
+    with open(ts_path, "w", encoding="utf-8") as handle:
+        handle.write(updated)
+
+
 def main() -> int:
     """Update the .ts files and compile them into .qm.
 
@@ -66,6 +93,8 @@ def main() -> int:
         if update.returncode != 0:
             print(f"pylupdate6 failed for '{language}'")
             return update.returncode
+
+        ensure_language_attribute(ts_path, LANGUAGE_LOCALES.get(language, language))
 
         release = subprocess.run([script_path("pyside6-lrelease"), ts_path, "-qm", qm_path],
                                  cwd=PROJECT_ROOT)

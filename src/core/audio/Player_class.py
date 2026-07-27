@@ -7,9 +7,9 @@ import librosa
 import numpy as np
 import pyaudio
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QPoint, QRectF, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve, QThread
+from PyQt6.QtCore import Qt, QPoint, QRect, QRectF, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve, QThread
 from PyQt6.QtGui import (QPainter, QFont, QPaintEvent, QColor, QResizeEvent, QIcon, QShowEvent, QImage,
-                         QPainterPath)
+                         QMouseEvent, QPainterPath)
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton
 
 from src.core.log_system import print_d
@@ -72,6 +72,8 @@ class AudioPlayer(QWidget):
         self.audio_streamer: AudioStreamer = AudioStreamer()
         self.audio_thread: QThread = QThread()
 
+        self.setMouseTracking(True)
+
         self.track_meta: Optional[Dict[str, Any]] = None
 
         # region UI
@@ -96,12 +98,35 @@ class AudioPlayer(QWidget):
         font.setPointSize(9)
         font.setBold(False)
         self.author_tack.setFont(font)
+        # Clicks fall through to the panel, which routes them to the artist page
+        self.author_tack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         self.play_button = QPushButton("", self)
         self.play_button.clicked.connect(self.play_button_click)
         self.play_button.resize(self.image_size, self.image_size)
         self.play_button.setIconSize(QSize(25, 25))
         self.play_button.setObjectName("PlayerButtons")
+
+        self.prev_button = QPushButton("", self)
+        self.prev_button.setObjectName("PlayerButtons")
+        self.prev_button.resize(22, 22)
+        self.prev_button.setIcon(QIcon('res/icons/skip_previous.png'))
+        self.prev_button.setIconSize(QSize(22, 22))
+        self.prev_button.clicked.connect(lambda: self.mf.playback.play_prev())
+
+        self.next_button = QPushButton("", self)
+        self.next_button.setObjectName("PlayerButtons")
+        self.next_button.resize(22, 22)
+        self.next_button.setIcon(QIcon('res/icons/skip_next.png'))
+        self.next_button.setIconSize(QSize(22, 22))
+        self.next_button.clicked.connect(lambda: self.mf.playback.play_next())
+
+        self.queue_button = QPushButton("", self)
+        self.queue_button.setObjectName("PlayerButtons")
+        self.queue_button.resize(22, 20)
+        self.queue_button.setIcon(QIcon('res/icons/queue_music.png'))
+        self.queue_button.setIconSize(QSize(22, 20))
+        self.queue_button.clicked.connect(lambda: self.mf.queue_panel.toggle())
 
         self.track_meta_image_bytes: Optional[bytes] = None
         self.track_meta_image_drawable = QImage()
@@ -201,6 +226,40 @@ class AudioPlayer(QWidget):
         if PROFILE:
             self.mf.profiling.add_draw_time("AudioPlayer", time.time() - start_time)
 
+    def _cover_rect(self) -> QRect:
+        """Rect of the painted track cover, the clickable area that opens the album.
+
+        :returns: QRect - Cover rect in panel coordinates.
+        """
+        return QRect(20, self.height() - 50 - 10, 50, 50)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Open the album from the cover and the artist page from the name.
+
+        :param event: Qt mouse event.
+        :returns: None.
+        """
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position().toPoint()
+            if self._cover_rect().contains(pos):
+                self.mf.open_current_album()
+                return
+            if self.author_tack.geometry().contains(pos):
+                self.mf.open_current_artist()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Show the hand cursor over the cover and the artist name.
+
+        :param event: Qt mouse event.
+        :returns: None.
+        """
+        pos = event.position().toPoint()
+        over_link = self._cover_rect().contains(pos) or self.author_tack.geometry().contains(pos)
+        self.setCursor(Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.ArrowCursor)
+        super().mouseMoveEvent(event)
+
     def showEvent(self, event: QShowEvent) -> None:
         """Lay out the child widgets when the panel becomes visible.
 
@@ -236,10 +295,12 @@ class AudioPlayer(QWidget):
         self.author_tack.move(80, self.height() - 35)
         self.play_button.move(round(self.width() / 2 - self.play_button.width() / 2),
                               self.height() - 22 - self.play_button.height())
+        # Previous and next flank the play button, vertically centred on it
+        button_y = self.play_button.y() + (self.play_button.height() - self.prev_button.height()) // 2
+        self.prev_button.move(self.play_button.x() - self.prev_button.width() - 14, button_y)
+        self.next_button.move(self.play_button.x() + self.play_button.width() + 14, button_y)
 
         self.position_slider.resize(self.width() - 40, 16)
-        self.volume_slider.move(self.width() - self.volume_slider.width() - 142,
-                                self.height() - self.volume_slider.height() - 24)
 
         self.audio_graph.resize(self.width() - 40, 120)
         if self.graph_visible:
@@ -256,12 +317,15 @@ class AudioPlayer(QWidget):
 
         self.graph_visible_button.move(self.width() - self.graph_visible_button.width() - 30,
                                        self.height() - self.graph_visible_button.height() - 25)
-
         self.meta_visible_button.move(self.graph_visible_button.x() - 20 - self.meta_visible_button.width(),
                                       self.graph_visible_button.y())
+        self.queue_button.move(self.meta_visible_button.x() - 20 - self.queue_button.width(),
+                               self.meta_visible_button.y())
+        self.mute_volume_button.move(self.queue_button.x() - 20 - self.mute_volume_button.width(),
+                                     self.queue_button.y())
+        self.volume_slider.move(self.mute_volume_button.x() - self.volume_slider.width() - 20,
+                                self.height() - self.volume_slider.height() - 24)
 
-        self.mute_volume_button.move(self.meta_visible_button.x() - 20 - self.mute_volume_button.width(),
-                                     self.meta_visible_button.y())
         self.label_duration_right.move(self.width() - self.label_duration_right.width() - 20 - 5,
                                        self.position_slider.y() + 1)
         self.label_duration_left.move(25, self.position_slider.y() + 1)
@@ -424,7 +488,7 @@ class AudioPlayer(QWidget):
         if track_meta is not None:
             for key, value in track_meta.items():
                 self.meta_list.add(MetaListItem(key, value))
-                print_d(key, value)
+                # print_d(key, value)
             self.meta_list.recalculate_size()
         else:
             track_meta = {}
