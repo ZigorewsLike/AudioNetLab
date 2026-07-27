@@ -74,8 +74,7 @@ class CoverGridView(QListView):
 
         # A finished cover repaints just its tiles instead of the whole viewport
         self._loader.coverReady.connect(self._on_cover_ready)
-        # A single click opens the item. Only clicked is connected, not activated, so
-        # the item is opened once per gesture rather than twice.
+        # clicked only, not activated, to open once per gesture rather than twice
         self.clicked.connect(self._on_activated)
 
     def model(self) -> QAbstractListModel:

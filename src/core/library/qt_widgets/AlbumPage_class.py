@@ -198,8 +198,7 @@ class AlbumPage(QWidget):
         self._apply_subtitle()
         self._set_cover(album.cover_hash, album_id)
         self.model.set_rows(tracks)
-        # A fresh album must start at the top: the view keeps its scroll offset between
-        # loads, so without this a previously scrolled album would open half way down
+        # The view keeps its scroll offset between loads, reset it for the new album
         self.track_view.scrollToTop()
         self._first_path = next((t.path for t in tracks if t.path), None)
         self.button_reveal.setEnabled(self._first_path is not None)

@@ -21,7 +21,6 @@ class AlbumGridView(CoverGridView):
         """
         super().__init__(cover_loader, AlbumGridModel(), AlbumTileDelegate(cover_loader),
                          AlbumRoles.ALBUM_ID, AlbumRoles.COVER_HASH, *args, **kwargs)
-        # Kept as the album-specific name the library tab already connects to
         self.itemActivated.connect(self.albumActivated)
 
     def model(self) -> AlbumGridModel:

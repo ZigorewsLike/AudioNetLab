@@ -124,7 +124,7 @@ class ArtistPage(QWidget):
         root.addWidget(self.album_grid, 3)
         # endregion
 
-        # region tracks (singles and guest appearances not on the artist's own albums)
+        # region tracks
         self.tracks_label = QLabel("", self)
         self.tracks_label.setObjectName("SectionLabel")
         self.tracks_label.setFont(section_font)
@@ -204,10 +204,8 @@ class ArtistPage(QWidget):
         self.albums_label.setVisible(bool(albums))
         self.album_grid.setVisible(bool(albums))
 
-        # Tracks credited to the artist that are not on one of the artist's own albums:
-        # loose singles (no album) and guest appearances on an album owned by another
-        # album artist. Their album, if any, is attributed to someone else, so they would
-        # otherwise never surface on this page.
+        # Artist tracks not on one of the artist's own albums: loose singles and guest
+        # appearances on another album artist's album
         own_album_ids = {a.id for a in albums}
         other_tracks = [t for t in artist_tracks if t.album_id not in own_album_ids]
         self.tracks_model.set_rows(other_tracks)

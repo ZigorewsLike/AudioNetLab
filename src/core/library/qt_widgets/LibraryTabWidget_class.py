@@ -12,10 +12,10 @@ from src.core.file_system.qt_widgets import LastFileList
 from src.core.library.cover_cache import CoverLoader
 from src.core.library.qt_widgets.AlbumGridView_class import AlbumGridView
 from src.core.library.qt_widgets.AlbumPage_class import AlbumPage
-from src.core.library.qt_widgets.AlbumTileDelegate_class import AlbumTileDelegate
 from src.core.library.qt_widgets.AllTracksPage_class import AllTracksPage
 from src.core.library.qt_widgets.ArtistsPage_class import ArtistsPage
 from src.core.library.qt_widgets.ArtistPage_class import ArtistPage
+from src.core.library.qt_widgets.CoverTileDelegate_class import CoverTileDelegate
 from src.enums import AlbumSort
 from src.global_styles import AppColorSchemes
 
@@ -24,11 +24,6 @@ if TYPE_CHECKING:
 
 # Debounce so a search reloads once the user pauses, not on every keystroke
 _SEARCH_DEBOUNCE_MS = 250
-
-# Slider stop to cover edge, the middle stop is the default
-_TILE_SIZES = (AlbumTileDelegate.COVER_SMALL,
-               AlbumTileDelegate.COVER_MEDIUM,
-               AlbumTileDelegate.COVER_LARGE)
 
 # Pages of the view switch
 _PAGE_ALBUMS = 0
@@ -64,6 +59,8 @@ class LibraryTabWidget(QWidget):
         self._cover_loader = CoverLoader(max_workers=2)
         self._sort: AlbumSort = AlbumSort.ARTIST
         self._has_search: bool = False
+        # Cover edge shared by the album and artist grids
+        self._tile_px: int = self._restore_tile_size()
 
         self.setObjectName("LibraryRoot")
         self.setStyleSheet(self._build_style())
@@ -87,7 +84,7 @@ class LibraryTabWidget(QWidget):
         # still forwarded for anything that wants the raw activation.
         self.grid.albumActivated.connect(self.open_album)
         self.grid.albumActivated.connect(self.albumActivated)
-        self.grid.set_cover_size(_TILE_SIZES[self.size_slider.value()])
+        self.grid.set_cover_size(self._tile_px)
         self.empty_label = QLabel(self)
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_font = QFont("Arima")
@@ -98,13 +95,14 @@ class LibraryTabWidget(QWidget):
         self._albums_layout = albums_layout
 
         # Artist grid page, its own search, sort and size like the all-tracks page
-        self.artists_page = ArtistsPage(self.mf, self._cover_loader, self)
+        self.artists_page = ArtistsPage(self.mf, self._cover_loader, self._tile_px, self)
         self.artists_page.artistActivated.connect(self.open_artist)
+        self.artists_page.tileSizeChanged.connect(self._on_artists_tile_size)
 
         # All-tracks page: the flat, scalable list of every track, loose ones included
         self.all_tracks_page = AllTracksPage(self.mf, self)
 
-        # Recent page: the recent-track list, moved here from the old home page
+        # Recent page: the recent-track list
         self.tracks_list = LastFileList(self.width(), self.mf, self)
 
         # Album detail page, shown when a tile is opened
@@ -114,10 +112,9 @@ class LibraryTabWidget(QWidget):
         # Artist detail page, shown when an artist tile is opened
         self.artist_page = ArtistPage(self.mf, self._cover_loader, self)
         self.artist_page.backRequested.connect(self._on_artist_back)
-        # Opening an album from the artist page returns there, not to the album grid
+        # An album opened from the artist page returns there, not to the album grid
         self.artist_page.albumActivated.connect(
             lambda album_id: self.open_album(album_id, back_page=_PAGE_ARTIST_DETAIL))
-        # Where the album detail's Back button returns to, set each time it is opened
         self._album_back_page: int = _PAGE_ALBUMS
 
         self.pages.addWidget(albums_page)             # _PAGE_ALBUMS
@@ -234,11 +231,12 @@ class LibraryTabWidget(QWidget):
 
         self.size_label = QLabel(self)
         self.size_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.size_slider.setMinimum(0)
-        self.size_slider.setMaximum(len(_TILE_SIZES) - 1)
-        self.size_slider.setValue(1)
+        self.size_slider.setMinimum(CoverTileDelegate.TILE_MIN_PX)
+        self.size_slider.setMaximum(CoverTileDelegate.TILE_MAX_PX)
+        self.size_slider.setSingleStep(CoverTileDelegate.TILE_STEP_PX)
+        self.size_slider.setPageStep(CoverTileDelegate.TILE_STEP_PX)
+        self.size_slider.setValue(self._tile_px)
         self.size_slider.setFixedWidth(90)
-        self.size_slider.setPageStep(1)
         self.size_slider.valueChanged.connect(self._on_size_changed)
 
         self.count_label = QLabel(self)
@@ -329,7 +327,6 @@ class LibraryTabWidget(QWidget):
         if page == _PAGE_ARTISTS:
             self.artists_page.reload()
         elif page == _PAGE_ALL_TRACKS:
-            # Reload on show so a track added while another page was up is there
             self.all_tracks_page.reload()
 
     @QtCore.pyqtSlot(int)
@@ -452,12 +449,51 @@ class LibraryTabWidget(QWidget):
             self.reload_albums()
 
     def _on_size_changed(self, value: int) -> None:
-        """Apply a new tile size.
+        """Apply a new tile size from the album slider and share it with the artist grid.
 
-        :param value: Slider stop.
+        :param value: Cover edge in pixels from the slider.
         :returns: None.
         """
-        self.grid.set_cover_size(_TILE_SIZES[value])
+        self.grid.set_cover_size(value)
+        self.artists_page.set_tile_size(value)
+        self._store_tile_size(value)
+
+    def _on_artists_tile_size(self, value: int) -> None:
+        """Mirror a size chosen on the artist grid onto the album slider and the setting.
+
+        :param value: Cover edge in pixels chosen on the artist page.
+        :returns: None.
+        """
+        if value != self.size_slider.value():
+            self.size_slider.blockSignals(True)
+            self.size_slider.setValue(value)
+            self.size_slider.blockSignals(False)
+            self.grid.set_cover_size(value)
+        self._store_tile_size(value)
+
+    def _restore_tile_size(self) -> int:
+        """Read the saved tile size from the settings, clamped to the slider range.
+
+        Falls back to the default when there is no settings object, which is the case in
+        the widget tests, so the library tab can be built without a full main form.
+
+        :returns: int - Cover edge in pixels.
+        """
+        settings = getattr(self.mf, "settings", None)
+        library = getattr(settings, "library_settings", None)
+        size = getattr(library, "tile_size", CoverTileDelegate.TILE_DEFAULT_PX)
+        return max(CoverTileDelegate.TILE_MIN_PX, min(CoverTileDelegate.TILE_MAX_PX, int(size)))
+
+    def _store_tile_size(self, value: int) -> None:
+        """Remember the tile size in the settings, persisted when the window closes.
+
+        :param value: Cover edge in pixels.
+        :returns: None.
+        """
+        self._tile_px = value
+        settings = getattr(self.mf, "settings", None)
+        if settings is not None and hasattr(settings, "library_settings"):
+            settings.library_settings.tile_size = value
     # endregion
 
     def shutdown(self) -> None:

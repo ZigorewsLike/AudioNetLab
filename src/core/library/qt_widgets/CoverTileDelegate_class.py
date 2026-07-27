@@ -23,10 +23,16 @@ class CoverTileDelegate(QStyledItemDelegate):
     grid of thousands scrolls without building an extra object per row.
     """
 
-    # Tile geometry for the three sizes, cover edge in pixels
+    # Named cover edges in pixels
     COVER_SMALL = 130
     COVER_MEDIUM = 180
     COVER_LARGE = 260
+
+    # Tile-size slider range, default and step, cover edge in pixels
+    TILE_MIN_PX = 100
+    TILE_MAX_PX = 180
+    TILE_DEFAULT_PX = 180
+    TILE_STEP_PX = 10
 
     _PADDING = 10
     _TEXT_HEIGHT = 42  # Two lines under the cover

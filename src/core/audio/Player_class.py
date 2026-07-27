@@ -450,7 +450,7 @@ class AudioPlayer(QWidget):
         if track_meta is not None:
             for key, value in track_meta.items():
                 self.meta_list.add(MetaListItem(key, value))
-                print_d(key, value)
+                # print_d(key, value)
             self.meta_list.recalculate_size()
         else:
             track_meta = {}

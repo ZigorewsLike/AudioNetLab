@@ -20,10 +20,6 @@ if TYPE_CHECKING:
 # Debounce so a search reloads once the user pauses, not on every keystroke
 _SEARCH_DEBOUNCE_MS = 250
 
-_TILE_SIZES = (CoverTileDelegate.COVER_SMALL,
-               CoverTileDelegate.COVER_MEDIUM,
-               CoverTileDelegate.COVER_LARGE)
-
 
 class ArtistsPage(QWidget):
     """The artist grid: a wrapping grid of circular artist tiles with its own controls.
@@ -32,21 +28,26 @@ class ArtistsPage(QWidget):
     size rather than sharing the album header, so switching views never leaves a control
     pointed at the wrong list.
 
-    :signals: artistActivated (int) - artist id of a clicked tile
+    :signals: artistActivated (int) - artist id of a clicked tile,
+              tileSizeChanged (int) - cover edge in pixels chosen on the size slider
     """
     artistActivated = QtCore.pyqtSignal(int)
+    tileSizeChanged = QtCore.pyqtSignal(int)
 
-    def __init__(self, mf: "MainForm", cover_loader: CoverLoader, *args, **kwargs):
+    def __init__(self, mf: "MainForm", cover_loader: CoverLoader, tile_size: int,
+                 *args, **kwargs):
         """Build the page.
 
         :param mf: Main form.
         :param cover_loader: Cover loader shared with the rest of the library tab.
+        :param tile_size: Initial cover edge in pixels for the tiles.
         :returns: None.
         """
         super().__init__(*args, **kwargs)
         self.mf = mf
         self._sort: ArtistSort = ArtistSort.NAME
         self._has_search: bool = False
+        tile_size = max(CoverTileDelegate.TILE_MIN_PX, min(CoverTileDelegate.TILE_MAX_PX, tile_size))
 
         self.setObjectName("ArtistsRoot")
         self.setStyleSheet(f"""
@@ -87,11 +88,12 @@ class ArtistsPage(QWidget):
         self.sort_combo.currentIndexChanged.connect(self._on_sort_changed)
         self.size_label = QLabel(self)
         self.size_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.size_slider.setMinimum(0)
-        self.size_slider.setMaximum(len(_TILE_SIZES) - 1)
-        self.size_slider.setValue(1)
+        self.size_slider.setMinimum(CoverTileDelegate.TILE_MIN_PX)
+        self.size_slider.setMaximum(CoverTileDelegate.TILE_MAX_PX)
+        self.size_slider.setSingleStep(CoverTileDelegate.TILE_STEP_PX)
+        self.size_slider.setPageStep(CoverTileDelegate.TILE_STEP_PX)
+        self.size_slider.setValue(tile_size)
         self.size_slider.setFixedWidth(90)
-        self.size_slider.setPageStep(1)
         self.size_slider.valueChanged.connect(self._on_size_changed)
         self.count_label = QLabel(self)
         count_font = QFont("Arima")
@@ -113,7 +115,7 @@ class ArtistsPage(QWidget):
         self._stack.setContentsMargins(0, 0, 0, 0)
         self.grid = ArtistGridView(cover_loader, self)
         self.grid.artistActivated.connect(self.artistActivated)
-        self.grid.set_cover_size(_TILE_SIZES[self.size_slider.value()])
+        self.grid.set_cover_size(tile_size)
         self.empty_label = QLabel(self)
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_font = QFont("Arima")
@@ -238,10 +240,26 @@ class ArtistsPage(QWidget):
             self.reload()
 
     def _on_size_changed(self, value: int) -> None:
-        """Apply a new tile size.
+        """Apply a new tile size and announce it so the album grid and the setting follow.
 
-        :param value: Slider stop.
+        :param value: Cover edge in pixels from the slider.
         :returns: None.
         """
-        self.grid.set_cover_size(_TILE_SIZES[value])
+        self.grid.set_cover_size(value)
+        self.tileSizeChanged.emit(value)
+
+    def set_tile_size(self, tile_size: int) -> None:
+        """Set the tile size from outside, without re-emitting tileSizeChanged.
+
+        Used to mirror the size chosen on the album grid so the two stay in step.
+
+        :param tile_size: Cover edge in pixels.
+        :returns: None.
+        """
+        if tile_size == self.size_slider.value():
+            return
+        self.size_slider.blockSignals(True)
+        self.size_slider.setValue(tile_size)
+        self.size_slider.blockSignals(False)
+        self.grid.set_cover_size(tile_size)
     # endregion
