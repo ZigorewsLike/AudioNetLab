@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from src.forms import MainForm
 
 from src.core.qt_widgets import BaseTabWidget
-from src.global_constants import VERSION
+from src.global_constants import VERSION_FULL, APP_COPYRIGHT
 
 
 class SettingsFrame(QFrame):
@@ -69,8 +69,13 @@ class SettingsFrame(QFrame):
         self.tree_widget.expandAll()
         self.tree_widget.setCurrentItem(self.tree_widget.topLevelItem(0))
 
-        self.app_version_label = QLabel(f"{VERSION}", self)
+        self.app_version_label = QLabel(f"{VERSION_FULL}", self)
         self.app_version_label.adjustSize()
+
+        self.app_copyright_label = QLabel(APP_COPYRIGHT, self)
+        self.app_copyright_label.setWordWrap(True)
+        self.app_copyright_label.setMaximumWidth(self.tree_widget_width)
+        self.app_copyright_label.adjustSize()
 
         self.retranslate_ui()
 
@@ -120,7 +125,8 @@ class SettingsFrame(QFrame):
 
         :returns: None.
         """
-        self.app_version_label.move(10, self.height() - self.app_version_label.height() - 10)
+        self.app_copyright_label.move(10, self.height() - self.app_copyright_label.height() - 2)
+        self.app_version_label.move(10, self.app_copyright_label.y() - self.app_version_label.height() - 2)
         self.tab_widget.content_width = self.width() - self.tree_widget_width - 20
         self.tab_widget.resize(self.tab_widget.content_width, self.height() - self.bottom_panel_height)
         self.tree_widget.resize(self.tree_widget_width,

@@ -1,4 +1,8 @@
+import datetime
 import os
+import sys
+
+from src.version import VERSION, VERSION_FULL, GIT_HASH, BUILD_DATE  # derived from git / build
 
 # region Feature flags
 DEBUG = True  # Debug logging and access to the AI tabs without an opened track
@@ -15,16 +19,34 @@ CUSTOM_TITLE_BAR = True  # Frameless window with the custom title bar
 # network and no requests package, while lyrics display, tag extraction and the timeline
 # on the Lyrics tab keep working.
 EXPERIMENTAL_MODULES = False
+
+# A packaged exe is always a production build: force the safe defaults regardless of the
+# development values above, and send output to a log file since there is no console.
+IS_FROZEN = getattr(sys, "frozen", False)
+if IS_FROZEN:
+    DEBUG = False
+    PROFILE = False
+    SHOW_TRACEBACK = False
+    TRACE = False
+    LOG_IN_FILE = True
+    LOG_IN_SIGNAL = False
 # endregion
+
 
 APP_NAME = "AudioNetLab"
 APP_TITLE = f"{APP_NAME}"
-VERSION = "0.0.2.0"
+
+APP_AUTHOR = "Igor Cherepanov"
+APP_AUTHOR_EMAIL = "zigorewslike@gmail.com"
+_COPYRIGHT_YEAR = BUILD_DATE[:4] if BUILD_DATE else str(datetime.date.today().year)
+_AUTHOR_FULL = f"{APP_AUTHOR} <{APP_AUTHOR_EMAIL}>" if APP_AUTHOR_EMAIL else APP_AUTHOR
+APP_COPYRIGHT = f"© {_COPYRIGHT_YEAR} {_AUTHOR_FULL}"
 
 APP_ROAMING_DIR = os.path.join(os.getenv('APPDATA'), APP_NAME)
 CONFIG_FILENAME = "config_app.ini"
 RESOURCE_ICON_DIR = "res/icons/"
 RESOURCE_DIR = "res/"
+LOG_DIR = "logs"
 
 PATH_TO_LAST_REGISTRY = "data/registry/"  # Per track cache: tags, cover, features, lyrics
 

@@ -25,7 +25,8 @@ warnings.filterwarnings('ignore')
 if TRACE:
     tracemalloc.start(1)
 
-os.system('cls')
+if not getattr(sys, 'frozen', False):
+    os.system('cls')
 os.environ['QT_MULTIMEDIA_PREFERRED_PLUGINS'] = 'windowsmediafoundation'
 
 
