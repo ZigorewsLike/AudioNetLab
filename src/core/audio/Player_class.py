@@ -669,7 +669,7 @@ class AudioPlayer(QWidget):
         :param gains: Linear multiplier per band.
         :returns: None.
         """
-        self.audio_streamer.eq_gains = gains
+        self.audio_streamer.set_eq_gains(gains)
 
     def start_position_loading(self) -> None:
         """Turn the progress slider into an indeterminate loading bar.

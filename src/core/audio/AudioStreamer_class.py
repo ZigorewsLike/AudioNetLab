@@ -1,10 +1,10 @@
 import time
 import math
-from typing import Optional, List, Dict
+import threading
+from typing import Optional, List, Dict, Tuple
 
 import numpy as np
 import pyaudio
-import wavio
 import sounddevice as sd
 
 from PyQt6 import QtCore
@@ -15,8 +15,106 @@ from src.enums import PlayerState
 from src.function_lib.audio import equalizer_librosa
 
 
+class _AudioRingBuffer:
+    """Lock-guarded ring buffer of interleaved float32 frames shared by producer and callback."""
+
+    def __init__(self, capacity_frames: int, channels: int):
+        """Allocate the buffer.
+
+        :param capacity_frames: Buffer size in frames (samples per channel).
+        :param channels: Channel count per frame.
+        :returns: None.
+        """
+        self._cap = max(capacity_frames, 1)
+        self._ch = channels
+        self._buf = np.zeros((self._cap, channels), dtype=np.float32)
+        self._read = 0
+        self._write = 0
+        self._count = 0  # Frames currently stored
+        self._lock = threading.Lock()
+
+    def clear(self) -> None:
+        """Drop every buffered frame.
+
+        :returns: None.
+        """
+        with self._lock:
+            self._read = self._write = self._count = 0
+
+    def available(self) -> int:
+        """Frames ready to be read.
+
+        :returns: int - Stored frame count.
+        """
+        with self._lock:
+            return self._count
+
+    def free(self) -> int:
+        """Free space left for the producer.
+
+        :returns: int - Writable frame count.
+        """
+        with self._lock:
+            return self._cap - self._count
+
+    def write(self, frames: np.ndarray) -> int:
+        """Append frames, dropping any overflow the producer failed to throttle.
+
+        :param frames: Array of shape [n, channels], float32.
+        :returns: int - Number of frames actually stored.
+        """
+        n = frames.shape[0]
+        with self._lock:
+            n = min(n, self._cap - self._count)
+            if n <= 0:
+                return 0
+            first = min(n, self._cap - self._write)
+            self._buf[self._write:self._write + first] = frames[:first]
+            second = n - first
+            if second:
+                self._buf[0:second] = frames[first:first + second]
+            self._write = (self._write + n) % self._cap
+            self._count += n
+            return n
+
+    def keep_head(self, n: int) -> int:
+        """Drop the newest frames, keeping at most n of the oldest ones near the playhead.
+
+        :param n: Frames to keep.
+        :returns: int - Frames discarded from the tail.
+        """
+        with self._lock:
+            keep = min(n, self._count)
+            discarded = self._count - keep
+            self._count = keep
+            self._write = (self._read + keep) % self._cap
+            return discarded
+
+    def read(self, n: int) -> Tuple[np.ndarray, int]:
+        """Pull up to n frames, zero padding the tail on underrun.
+
+        :param n: Requested frame count.
+        :returns: Tuple - (frames [n, channels] float32, real frames delivered).
+        """
+        out = np.zeros((n, self._ch), dtype=np.float32)
+        with self._lock:
+            real = min(n, self._count)
+            first = min(real, self._cap - self._read)
+            out[:first] = self._buf[self._read:self._read + first]
+            second = real - first
+            if second:
+                out[first:real] = self._buf[0:second]
+            self._read = (self._read + real) % self._cap
+            self._count -= real
+        return out, real
+
+
 class AudioStreamer(QThread):
-    """Background thread that streams a waveform to an output device with optional EQ.
+    """Streams a waveform to an output device with optional EQ.
+
+    The thread runs as a producer that processes audio into a decode-ahead ring buffer,
+    while a PortAudio callback pulls the pre-processed float32 frames on its own high
+    priority thread. This isolates playback from load on the Python/GUI threads.
 
     :signals: progress (int), finished (), trackEnded (), playbackStateChanged (PlayerState),
               durationChanged (float)
@@ -34,12 +132,13 @@ class AudioStreamer(QThread):
         :returns: None.
         """
         super().__init__()
-        self._position: int = 0  # Playback position, samples
+        self._position: int = 0  # Producer read cursor, frames
+        self._frames_played: int = 0  # Frames drained by the callback, frames
         self.player_state = PlayerState.NONE
         self.waveform_ref: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
         self.thread_stop: bool = False
-        self._chunk_size: int = 512 * 2  # Output buffer size, samples per channel
+        self._chunk_size: int = 512 * 2  # Producer block and device buffer, frames
         self._duration: float = 0
         self._channels: int = 2
         self._volume: float = 1.0
@@ -48,32 +147,70 @@ class AudioStreamer(QThread):
         self.eq_gains: List[float] = [1.0 for _ in range(20)]  # Linear multiplier per EQ band
         self.bands: List[tuple] = []  # Frequency ranges (f_low, f_high) matching eq_gains
 
+        self._buffer: Optional[_AudioRingBuffer] = None
+        self._target_fill: int = 0  # Frames the producer keeps queued ahead of playback
+        self._prebuffer: int = 0  # Frames to gather before the callback starts a fresh segment
+        self._prebuffering: bool = True
+        self._reached_end: bool = False
+        self._lock = threading.Lock()  # Guards waveform/position swaps
+        self._last_progress: float = 0.0
+
+        self._eq_target: int = 0  # Small lookahead kept while the EQ is being changed
+        self._resync_requested: bool = False  # Set by the UI, handled by the producer thread
+        self._eq_interacting_until: float = 0.0  # Timestamp until which the EQ counts as active
+        self._epoch: int = 0  # Bumped on every seek/stop so in-flight chunks are dropped
+
         self.pyaudio_port: pyaudio.PyAudio = pyaudio.PyAudio()
         self.pyaudio_stream: Optional[pyaudio.Stream] = None
 
     def init_file(self, waveform: np.ndarray, sample_rate: int) -> None:
-        """Bind a decoded track to the streamer and reopen the output stream.
+        """Bind a decoded track to the streamer, reusing the open stream when possible.
 
         :param waveform: Interleaved sample array of shape [samples, channels].
         :param sample_rate: Sampling rate in Hz.
         :returns: None.
         """
         self.stop()
-        time.sleep(self._chunk_size / sample_rate + 0.01)  # Let the current chunk drain
 
-        self.waveform_ref = waveform
-        self.sample_rate = sample_rate
-        self._duration = waveform.size / sample_rate * 1000 / self._channels
+        channels = waveform.shape[1] if waveform.ndim == 2 else 1
+        # Only the sample rate or channel count forces a stream reopen; a plain track
+        # change keeps the device open so it does not glitch.
+        needs_reopen = (self.pyaudio_stream is None
+                        or sample_rate != self.sample_rate
+                        or channels != self._channels)
+
+        with self._lock:
+            self.waveform_ref = waveform
+            self.sample_rate = sample_rate
+            self._channels = channels
+            self._duration = waveform.size / sample_rate * 1000 / channels
+            self._position = 0
+            self._frames_played = 0
+            self._reached_end = False
+            self._prebuffering = True
+            self._epoch += 1
+            self._setup_buffer()
 
         self.durationChanged.emit(self._duration)
 
-        if self.pyaudio_stream is not None:
-            self.pyaudio_stream.close()
+        if needs_reopen:
+            if self.pyaudio_stream is not None:
+                self.pyaudio_stream.close()
+            self.open_stream()
 
-        self.open_stream()
+    def _setup_buffer(self) -> None:
+        """Size the ring buffer and the fill thresholds for the current sample rate.
+
+        :returns: None (call while holding the lock).
+        """
+        sr = int(self.sample_rate)
+        self._target_fill = sr  # Keep ~1 s queued ahead of the device
+        self._prebuffer = int(sr * 0.15)  # Cushion gathered before a fresh segment starts
+        self._eq_target = int(sr * 0.12)  # Lookahead while the EQ is being dragged, ~120 ms
+        self._buffer = _AudioRingBuffer(sr * 2, self._channels)  # ~2 s capacity
 
     def open_stream(self, device_index: Optional[int] = None) -> None:
-        """Open a 16-bit output stream on the given device.
+        """Open a float32 callback stream on the given device.
 
         :param device_index: Output device index, system default when None.
         :returns: None.
@@ -82,16 +219,37 @@ class AudioStreamer(QThread):
             device_index = sd.query_devices(kind='output').get("index")
 
         self.pyaudio_stream = self.pyaudio_port.open(
-            format=self.pyaudio_port.get_format_from_width(2),
+            format=pyaudio.paFloat32,
             channels=self._channels,
             rate=int(self.sample_rate),
             output_device_index=device_index,
             frames_per_buffer=self._chunk_size,
-            output=True
+            output=True,
+            stream_callback=self._audio_callback,
         )
 
+    def _audio_callback(self, in_data, frame_count, time_info, status):
+        """Feed the device from the ring buffer without any processing on this thread.
+
+        :returns: Tuple - (interleaved float32 bytes, paContinue).
+        """
+        buffer = self._buffer
+        if buffer is None or self.player_state is not PlayerState.PLAY:
+            return bytes(frame_count * self._channels * 4), pyaudio.paContinue
+
+        # Wait until a cushion is queued before a freshly started or seeked segment plays
+        if self._prebuffering:
+            if not self._reached_end and buffer.available() < self._prebuffer:
+                return bytes(frame_count * self._channels * 4), pyaudio.paContinue
+            self._prebuffering = False
+
+        data, real = buffer.read(frame_count)
+        self._frames_played += real  # Only real frames count, so progress pauses on underrun
+        data *= self._volume  # Applied here, past the buffer, so the slider reacts instantly
+        return data.tobytes(), pyaudio.paContinue
+
     def switch_device(self, device_index: Optional[int] = None) -> bool:
-        """Move playback to another output device.
+        """Move playback to another output device, keeping the buffered audio.
 
         :param device_index: Target device index, system default when None.
         :returns: True on success, False when the device was rejected and the default was used.
@@ -102,7 +260,6 @@ class AudioStreamer(QThread):
                     self.pyaudio_stream.stop_stream()
                 self.pyaudio_stream.close()
             self.open_stream(device_index)
-
             return True
         except Exception as e:
             print_e("Unable to switch device", e)
@@ -110,70 +267,138 @@ class AudioStreamer(QThread):
             return False
 
     def close_audio_port(self) -> None:
-        """Release the PyAudio port and the output stream.
+        """Stop the producer, release the PyAudio port and the output stream.
 
         :returns: None.
         """
-        self.pyaudio_port.terminate()
+        self.thread_stop = True
         if self.pyaudio_stream is not None:
             self.pyaudio_stream.close()
+        self.pyaudio_port.terminate()
 
     def run(self):
-        """Stream the waveform chunk by chunk until the thread is stopped.
+        """Fill the ring buffer ahead of playback until the thread is stopped.
 
         :returns: None (runs inside the thread).
         """
         print_d("AudioStreamer is running")
 
         while not self.thread_stop:
-            if self.player_state is PlayerState.PLAY:
-
-                # Overlap the cut with neighbour samples so the EQ does not produce edge artifacts
-                left_padding = self._chunk_size
-                right_padding = self._chunk_size
-
-                if self._position == 0:
-                    left_padding = 0
-
-                wave_crop = self.waveform_ref[self._position - left_padding:self._position + self._chunk_size + right_padding]
-
-                if wave_crop is None or wave_crop.size == 0:  # End of the track
-                    # Distinct from a user stop so the queue advances; the empty chunk is not processed
-                    self.trackEnded.emit()
-                    self.stop()
-                    continue
-
-                wave_type = wave_crop.dtype
-
-                wave_crop = wave_crop.astype(np.float32) / np.iinfo(wave_type).max  # Normalise to [-1, 1]
-
-                # region EQ
-                if self.eq_active:
-                    wave_crop = equalizer_librosa(wave_crop, self.sample_rate, self.eq_gains, self.bands)
-                    wave_crop = np.clip(wave_crop, -1.0, 1.0)
-                # endregion
-
-                wave_crop = (wave_crop * self._volume)
-                wave_crop = (wave_crop * np.iinfo(wave_type).max).astype(wave_type)
-
-                # Drop the padding and pack the payload chunk into raw PCM bytes
-                data = wavio._array2wav(wave_crop[left_padding:self._chunk_size + left_padding], 2)
-
-                try:
-                    self.pyaudio_stream.write(data)
-                except OSError as e:
-                    self.switch_device()  # Device disappeared, retry on another one
-                    self.pyaudio_stream.write(data)
-
-                self._position += self._chunk_size
-
-                self.progress.emit(int(self._position / self.sample_rate * 1000))
-
-            else:
+            if self.player_state is not PlayerState.PLAY or self._buffer is None:
+                self._emit_progress()
                 time.sleep(0.01)
                 continue
 
+            if self._reached_end:
+                # Wait for the queued tail to drain, then advance the queue
+                if self._buffer.available() == 0:
+                    with self._lock:
+                        still_end = self._reached_end  # A seek here resets it before clearing
+                        self._reached_end = False
+                    if still_end:
+                        self.trackEnded.emit()
+                        self.stop()
+                else:
+                    self._emit_progress()
+                    time.sleep(0.01)
+                continue
+
+            # While the EQ is being changed, keep only a short lookahead so new gains are
+            # heard almost at once; otherwise run ~1 s ahead for load protection.
+            interacting = time.time() < self._eq_interacting_until
+            if self._resync_requested:
+                self._resync_requested = False
+                self._apply_resync()
+            target = self._eq_target if interacting else self._target_fill
+
+            if self._buffer.free() < self._chunk_size or self._buffer.available() >= target:
+                self._emit_progress()
+                time.sleep(0.005)  # Enough queued, wait before topping up
+                continue
+
+            payload = self._produce_chunk()
+            if payload is None:  # End of track or a chunk dropped after a seek
+                continue
+
+            self._buffer.write(payload)
+            self._emit_progress()
+
         self.finished.emit()
+
+    def _produce_chunk(self) -> Optional[np.ndarray]:
+        """Process the next block into interleaved float32, or None at the end of the track.
+
+        :returns: numpy.ndarray - Processed frames [n, channels], or None.
+        """
+        with self._lock:
+            waveform = self.waveform_ref
+            if waveform is None:
+                return None
+            epoch = self._epoch  # Captured so a seek during the render can be detected
+            position = self._position
+            chunk = self._chunk_size
+
+            # Overlap the cut with neighbour samples so the EQ does not produce edge artifacts
+            left_padding = min(position, chunk)
+            start = position - left_padding
+            crop = waveform[start:position + chunk + chunk]
+            end_of_track = crop.shape[0] <= left_padding  # Nothing beyond the padding
+
+        if end_of_track:
+            with self._lock:
+                if epoch == self._epoch:
+                    self._reached_end = True
+            return None
+
+        wave = crop.astype(np.float32) / 32767.0
+
+        gains = self.eq_gains
+        if self.eq_active and self.bands and not np.allclose(gains, 1.0):
+            wave = equalizer_librosa(wave, self.sample_rate, gains, self.bands)
+            np.clip(wave, -1.0, 1.0, out=wave)
+
+        payload = wave[left_padding:left_padding + chunk]
+
+        # Volume is applied in the callback, not here, so it stays out of the buffered audio
+
+        with self._lock:
+            if epoch != self._epoch:
+                return None  # A seek landed while rendering, drop this now stale chunk
+            if payload.shape[0] == 0:
+                self._reached_end = True
+                return None
+            self._position += payload.shape[0]
+
+        return np.ascontiguousarray(payload, dtype=np.float32)
+
+    def _apply_resync(self) -> None:
+        """Shrink the lookahead to the interaction window so a new EQ curve is heard quickly.
+
+        Runs on the producer thread, between chunks, so it never races an in-flight render.
+        Only the tail past the kept cushion is dropped, so playback does not fall silent, and
+        once the lookahead is already small this is a no-op splice.
+
+        :returns: None.
+        """
+        if self._buffer is None:
+            return
+        with self._lock:
+            discarded = self._buffer.keep_head(self._eq_target)
+            self._position -= discarded  # Rewind the producer over the frames it must redo
+            self._reached_end = False
+
+    def _emit_progress(self) -> None:
+        """Report the played position, throttled to keep UI redraws off the audio path.
+
+        :returns: None.
+        """
+        if not self.sample_rate:
+            return
+        now = time.time()
+        if now - self._last_progress < 0.04:
+            return
+        self._last_progress = now
+        self.progress.emit(int(self._frames_played / self.sample_rate * 1000))
 
     def set_position(self, position: int) -> None:
         """Seek to a position inside the track.
@@ -181,7 +406,14 @@ class AudioStreamer(QThread):
         :param position: Offset from the track start in milliseconds.
         :returns: None.
         """
-        self._position = round(position * self.sample_rate / 1000)
+        with self._lock:
+            self._position = round(position * self.sample_rate / 1000)
+            self._frames_played = self._position
+            self._reached_end = False
+            self._prebuffering = True
+            self._epoch += 1
+        if self._buffer is not None:
+            self._buffer.clear()
 
     def pause(self) -> None:
         """Suspend playback and keep the current position.
@@ -206,7 +438,14 @@ class AudioStreamer(QThread):
         """
         self.player_state = PlayerState.STOP
         self.playbackStateChanged.emit(self.player_state)
-        self._position = 0
+        with self._lock:
+            self._position = 0
+            self._frames_played = 0
+            self._reached_end = False
+            self._prebuffering = True
+            self._epoch += 1
+        if self._buffer is not None:
+            self._buffer.clear()
 
     def set_volume(self, volume: float) -> None:
         """Set the output volume.
@@ -227,17 +466,33 @@ class AudioStreamer(QThread):
         return self._volume
 
     def set_chunk_size(self, chunk_size: int) -> None:
-        """Change the output buffer size.
+        """Change the device buffer and producer block size, reopening the stream.
 
-        :param chunk_size: Buffer size in samples. Larger values are safer against dropouts but add latency.
+        :param chunk_size: Buffer size in frames. Larger values are safer against dropouts but add latency.
         :returns: None.
         """
+        if chunk_size == self._chunk_size:
+            return
         self._chunk_size = chunk_size
+        if self.pyaudio_stream is not None and self.sample_rate is not None:
+            was_playing = self.player_state is PlayerState.PLAY
+            self.player_state = PlayerState.PAUSE
+            try:
+                self.pyaudio_stream.close()
+                with self._lock:
+                    self._prebuffering = True
+                if self._buffer is not None:
+                    self._buffer.clear()
+                self.open_stream()
+            except Exception as e:
+                print_e("Unable to resize the audio buffer", e)
+            if was_playing:
+                self.player_state = PlayerState.PLAY
 
     def get_chunk_size(self) -> int:
-        """Return the current output buffer size.
+        """Return the current device buffer size.
 
-        :returns: int - Buffer size in samples.
+        :returns: int - Buffer size in frames.
         """
         return self._chunk_size
 
@@ -248,14 +503,34 @@ class AudioStreamer(QThread):
         """
         return self._duration
 
+    def _request_eq_resync(self) -> None:
+        """Ask the producer to shorten its lookahead so EQ edits are heard quickly.
+
+        :returns: None.
+        """
+        self._eq_interacting_until = time.time() + 0.35  # Keep the short lookahead during a drag
+        self._resync_requested = True
+
+    def set_eq_gains(self, gains: List[float]) -> None:
+        """Set the EQ band gains and re-render the buffered audio so the change is heard at once.
+
+        :param gains: Linear multiplier per band.
+        :returns: None.
+        """
+        self.eq_gains = gains
+        if self.player_state is PlayerState.PLAY:
+            self._request_eq_resync()
+
     @pyqtSlot(bool)
     def set_eq_active(self, eq_active: bool) -> None:
         """Enable or disable the equalizer during playback.
 
-        :param eq_active: True enables the EQ, applied starting from the next chunk.
+        :param eq_active: True enables the EQ, re-rendering the buffered audio.
         :returns: None.
         """
         self.eq_active = eq_active
+        if self.player_state is PlayerState.PLAY:
+            self._request_eq_resync()
 
     def print_all_devices(self):
         """Print every available output device to the console.
