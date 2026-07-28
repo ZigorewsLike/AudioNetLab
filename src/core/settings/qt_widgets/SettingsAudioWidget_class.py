@@ -35,8 +35,8 @@ class SettingsAudioWidget(QWidget):
 
         self.chunk_size_slider = QSlider(Qt.Orientation.Horizontal)
         self.chunk_size_slider.setTickPosition(QSlider.TickPosition.TicksBothSides)
-        self.chunk_size_slider.setTickInterval(100)
-        self.chunk_size_slider.setRange(2**8, 2**12)
+        self.chunk_size_slider.setTickInterval(1024)
+        self.chunk_size_slider.setRange(2**9, 2**14)
         self.chunk_size_slider.valueChanged.connect(self.chunk_size_changed)
         self.chunk_size_label = QLabel("", self)
 

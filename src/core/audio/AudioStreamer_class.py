@@ -97,6 +97,16 @@ class _AudioRingBuffer:
         :returns: Tuple - (frames [n, channels] float32, real frames delivered).
         """
         out = np.zeros((n, self._ch), dtype=np.float32)
+        real = self.read_into(out, n)
+        return out, real
+
+    def read_into(self, out: np.ndarray, n: int) -> int:
+        """Fill out[:n] from the buffer, zero padding the tail on underrun.
+
+        :param out: Preallocated target array of shape [>= n, channels], float32.
+        :param n: Requested frame count.
+        :returns: int - Real frames delivered.
+        """
         with self._lock:
             real = min(n, self._count)
             first = min(real, self._cap - self._read)
@@ -104,9 +114,11 @@ class _AudioRingBuffer:
             second = real - first
             if second:
                 out[first:real] = self._buf[0:second]
+            if real < n:
+                out[real:n] = 0.0
             self._read = (self._read + real) % self._cap
             self._count -= real
-        return out, real
+        return real
 
 
 class AudioStreamer(QThread):
@@ -138,7 +150,8 @@ class AudioStreamer(QThread):
         self.waveform_ref: Optional[np.ndarray] = None
         self.sample_rate: Optional[int] = None
         self.thread_stop: bool = False
-        self._chunk_size: int = 512 * 2  # Producer block and device buffer, frames
+        self._chunk_size: int = 512 * 2  # Producer processing block, frames
+        self._device_buffer: int = 4096  # PortAudio buffer, frames - the stutter-resistance knob
         self._duration: float = 0
         self._channels: int = 2
         self._volume: float = 1.0
@@ -150,6 +163,8 @@ class AudioStreamer(QThread):
         self._buffer: Optional[_AudioRingBuffer] = None
         self._target_fill: int = 0  # Frames the producer keeps queued ahead of playback
         self._prebuffer: int = 0  # Frames to gather before the callback starts a fresh segment
+        self._cb_out: Optional[np.ndarray] = None  # Preallocated callback output, avoids per-call alloc
+        self._silence: bytes = b""  # Preallocated silence for one device buffer
         self._prebuffering: bool = True
         self._reached_end: bool = False
         self._lock = threading.Lock()  # Guards waveform/position swaps
@@ -205,9 +220,20 @@ class AudioStreamer(QThread):
         """
         sr = int(self.sample_rate)
         self._target_fill = sr  # Keep ~1 s queued ahead of the device
-        self._prebuffer = int(sr * 0.15)  # Cushion gathered before a fresh segment starts
+        # Cushion before a fresh segment: at least two device buffers, so the callback
+        # never starts against a partially filled buffer even at large buffer sizes.
+        self._prebuffer = max(int(sr * 0.15), self._device_buffer * 2)
         self._eq_target = int(sr * 0.12)  # Lookahead while the EQ is being dragged, ~120 ms
         self._buffer = _AudioRingBuffer(sr * 2, self._channels)  # ~2 s capacity
+        self._alloc_callback_scratch()
+
+    def _alloc_callback_scratch(self) -> None:
+        """Preallocate the callback output and silence so the audio thread never allocates.
+
+        :returns: None (call while holding the lock).
+        """
+        self._cb_out = np.zeros((self._device_buffer, self._channels), dtype=np.float32)
+        self._silence = bytes(self._device_buffer * self._channels * 4)
 
     def open_stream(self, device_index: Optional[int] = None) -> None:
         """Open a float32 callback stream on the given device.
@@ -223,7 +249,7 @@ class AudioStreamer(QThread):
             channels=self._channels,
             rate=int(self.sample_rate),
             output_device_index=device_index,
-            frames_per_buffer=self._chunk_size,
+            frames_per_buffer=self._device_buffer,
             output=True,
             stream_callback=self._audio_callback,
         )
@@ -235,18 +261,36 @@ class AudioStreamer(QThread):
         """
         buffer = self._buffer
         if buffer is None or self.player_state is not PlayerState.PLAY:
-            return bytes(frame_count * self._channels * 4), pyaudio.paContinue
+            return self._silence_bytes(frame_count), pyaudio.paContinue
 
         # Wait until a cushion is queued before a freshly started or seeked segment plays
         if self._prebuffering:
             if not self._reached_end and buffer.available() < self._prebuffer:
-                return bytes(frame_count * self._channels * 4), pyaudio.paContinue
+                return self._silence_bytes(frame_count), pyaudio.paContinue
             self._prebuffering = False
 
-        data, real = buffer.read(frame_count)
+        out = self._cb_out
+        if out is None or frame_count > out.shape[0] or out.shape[1] != self._channels:
+            data, real = buffer.read(frame_count)  # Fallback for an unexpected frame count
+            self._frames_played += real
+            data *= self._volume
+            return data.tobytes(), pyaudio.paContinue
+
+        real = buffer.read_into(out, frame_count)
         self._frames_played += real  # Only real frames count, so progress pauses on underrun
-        data *= self._volume  # Applied here, past the buffer, so the slider reacts instantly
-        return data.tobytes(), pyaudio.paContinue
+        view = out[:frame_count]
+        view *= self._volume  # Applied here, past the buffer, so the slider reacts instantly
+        return view.tobytes(), pyaudio.paContinue
+
+    def _silence_bytes(self, frame_count: int) -> bytes:
+        """Return a silent buffer, reusing the preallocated one for the common size.
+
+        :param frame_count: Requested frame count.
+        :returns: bytes - Interleaved float32 zeros.
+        """
+        if frame_count == self._device_buffer and self._silence:
+            return self._silence
+        return bytes(frame_count * self._channels * 4)
 
     def switch_device(self, device_index: Optional[int] = None) -> bool:
         """Move playback to another output device, keeping the buffered audio.
@@ -466,20 +510,26 @@ class AudioStreamer(QThread):
         return self._volume
 
     def set_chunk_size(self, chunk_size: int) -> None:
-        """Change the device buffer and producer block size, reopening the stream.
+        """Change the device (PortAudio) buffer size, reopening the stream.
 
-        :param chunk_size: Buffer size in frames. Larger values are safer against dropouts but add latency.
+        This is the stutter-resistance knob: a larger buffer lets the Python callback
+        tolerate longer stalls under CPU load, at the cost of latency. The producer's
+        processing block is independent and stays small so the EQ keeps reacting quickly.
+
+        :param chunk_size: Device buffer size in frames.
         :returns: None.
         """
-        if chunk_size == self._chunk_size:
+        if chunk_size == self._device_buffer:
             return
-        self._chunk_size = chunk_size
+        self._device_buffer = chunk_size
         if self.pyaudio_stream is not None and self.sample_rate is not None:
             was_playing = self.player_state is PlayerState.PLAY
             self.player_state = PlayerState.PAUSE
             try:
                 self.pyaudio_stream.close()
                 with self._lock:
+                    self._prebuffer = max(int(self.sample_rate * 0.15), self._device_buffer * 2)
+                    self._alloc_callback_scratch()
                     self._prebuffering = True
                 if self._buffer is not None:
                     self._buffer.clear()
@@ -492,9 +542,9 @@ class AudioStreamer(QThread):
     def get_chunk_size(self) -> int:
         """Return the current device buffer size.
 
-        :returns: int - Buffer size in frames.
+        :returns: int - Device buffer size in frames.
         """
-        return self._chunk_size
+        return self._device_buffer
 
     def duration(self) -> float:
         """Return the duration of the bound track.
