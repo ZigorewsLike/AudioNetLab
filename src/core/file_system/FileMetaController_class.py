@@ -76,7 +76,8 @@ class FileMetaController:
             with open(f"{path_to_reg_folder}/{RegistryFileName.TRACK_META}", "wb") as p_file:
                 pickle.dump(self.track_meta, p_file)
 
-    def get_preview_cover(self, track_id: int, file_path: str = None) -> Optional[QImage]:
+    def get_preview_cover(self, track_id: int, file_path: str = None,
+                          meta: Optional[dict] = None) -> Optional[QImage]:
         """Get the track cover from the tags, or from an image next to the file.
 
         Both lookups are delegated: the picture frames to cover_bytes_from_audio and
@@ -85,9 +86,12 @@ class FileMetaController:
 
         :param track_id: Track id.
         :param file_path: Path to the audio file, enables the search on disk.
+        :param meta: Already read tags, avoids a second registry read when the caller has them.
         :returns: QImage - Cover image, None when nothing was found.
         """
-        image_bytes = cover_bytes_from_audio(self.get_track_meta(track_id))
+        if meta is None:
+            meta = self.get_track_meta(track_id)
+        image_bytes = cover_bytes_from_audio(meta)
         if image_bytes is not None:
             image = QImage()
             if image.loadFromData(image_bytes):

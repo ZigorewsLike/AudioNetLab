@@ -767,7 +767,7 @@ class MainForm(QMainWindow):
             self.show_error_message_log(self.tr("File open error"), self.tr("Unable to open the file"))
             self.audio_player.stop_position_loading()
             return
-        cover = self.file_meta_controller.get_preview_cover(track_id, file_path=file_path)
+        cover = self.file_meta_controller.get_preview_cover(track_id, file_path=file_path, meta=meta)
         if cover is None:
             icon_index: int = fixed_hash(str(track_id)) % 6
             self.audio_player.set_default_track_cover(icon_index=icon_index)
@@ -780,6 +780,10 @@ class MainForm(QMainWindow):
 
         self.worker.file_path = file_path
         self.worker.moveToThread(self.work_thread)
+        try:
+            self.work_thread.started.disconnect()  # Drop stale worker connections, decode this file only
+        except TypeError:
+            pass
         self.work_thread.started.connect(self.worker.run)
         print_d(f"RUN Thread {track_id}")
         self.work_thread.wait()
