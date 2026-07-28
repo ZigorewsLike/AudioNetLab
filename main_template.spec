@@ -29,6 +29,7 @@ a = Analysis(
     datas=[
         ('res/icons/*.png', 'res/icons'),
         ('res/i18n/*.qm', 'res/i18n'),
+        ('res/presets.pickle', 'res'),
         ('$GENRE_MODEL_PATH', 'models'),
     ],
     hiddenimports=['src._version'],
