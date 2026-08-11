@@ -154,11 +154,7 @@ class LastFileList(QWidget):
         return track_id
 
     def delete_elem(self, item: Union[QWidget, 'LastFileItem']):
-        """Remove a track from the library.
-
-        The work belongs to the main form: a delete touches the database, the registry,
-        the cover cache and the play queue, and every view has to be rebuilt afterwards,
-        this list among them.
+        """Remove a track from the library, through the main form like every other view.
 
         :param item: List item to remove.
         :returns: None.
@@ -424,19 +420,28 @@ class LastFileItem(QWidget):
         self.container.item_click(self.track.id)
 
     def contextMenuEvent(self, event):
-        """Show the row context menu: open, reveal in the file manager, remove.
+        """Show the row context menu, the same actions the library track lists carry.
 
         :param event: Qt context menu event.
         :returns: None.
         """
         self.update()
         contextMenu = QMenu(self)
-        open_folder = contextMenu.addAction(self.tr("Open"))
+        open_folder = contextMenu.addAction(self.tr("Play"))
+        queue_elem = contextMenu.addAction(self.tr("Add to queue"))
+        contextMenu.addSeparator()
+        open_album = contextMenu.addAction(self.tr("Go to album"))
+        open_album.setEnabled(self.track.album_id is not None)
         show_folder = contextMenu.addAction(self.tr("Show in file manager"))
-        delete_elem = contextMenu.addAction(self.tr("Remove from the list"))
+        contextMenu.addSeparator()
+        delete_elem = contextMenu.addAction(self.tr("Remove from library"))
         action = contextMenu.exec(self.mapToGlobal(event.pos()))
         if action == open_folder:
             self.button_open.click()
+        elif action == queue_elem:
+            self.mf.playback.enqueue([self.track.id])
+        elif action == open_album:
+            self.mf.library_widget.open_album(self.track.album_id)
         elif action == show_folder:
             reveal_in_file_manager(self.track.path)
         elif action == delete_elem:

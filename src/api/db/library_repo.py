@@ -357,11 +357,9 @@ def _album_has_tracks(session: Session, album_id: int) -> bool:
 
 
 def _artist_in_use(session: Session, artist_id: int) -> bool:
-    """Whether anything still credits an artist.
+    """Whether a track or an album still credits an artist.
 
-    An album counts even when none of its tracks name the artist: on a compilation the
-    album artist is the only place the name appears, and dropping the row would blank
-    the album's artist through the SET NULL foreign key.
+    An album counts on its own: on a compilation the album artist is named nowhere else.
 
     :param session: Open session.
     :param artist_id: Artist id.
@@ -373,10 +371,9 @@ def _artist_in_use(session: Session, artist_id: int) -> bool:
 
 
 def _cover_in_use(session: Session, cover_id: int) -> bool:
-    """Whether a cover is still referenced.
+    """Whether a track or an album still references a cover.
 
-    Covers are shared: one image can back several albums and any number of tracks, so a
-    cover may only be dropped once nothing points at it at all.
+    One image backs any number of albums and tracks, so all of them have to be gone.
 
     :param session: Open session.
     :param cover_id: Cover id.
@@ -393,9 +390,8 @@ def _cleanup_orphans(session: Session,
                      cover_ids: Set[int]) -> DeleteStats:
     """Drop the albums, artists and covers a delete left without an owner.
 
-    Targeted, unlike delete_orphans: only the rows the deleted tracks pointed at are
-    tested. An album that empties out contributes its own artist and cover to the
-    candidates, so a whole album disappears in one pass.
+    Only the rows the deleted tracks pointed at are tested, unlike delete_orphans. An
+    album that empties out adds its own artist and cover to the candidates.
 
     :param session: Open session.
     :param album_ids: Albums the deleted tracks belonged to.
@@ -443,10 +439,9 @@ def _cleanup_orphans(session: Session,
 def delete_tracks(session: Session, track_ids: Sequence[int]) -> DeleteStats:
     """Remove tracks from the library together with what they leave behind.
 
-    The tracks go first, then the album, artist and cover rows that nothing references
-    any more, all in the caller's transaction. The audio files are never touched, and
-    neither are the cover files: the returned hashes tell the caller which ones on disk
-    are now unreferenced.
+    The tracks go first, then the album, artist and cover rows nothing references any
+    more, all in the caller's transaction. Files are not touched: the returned hashes
+    name the covers on disk that are now unreferenced.
 
     :param session: Open session, the caller commits.
     :param track_ids: Tracks to remove.

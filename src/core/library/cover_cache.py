@@ -133,9 +133,7 @@ class CoverCache:
     def discard(cover_hash: str) -> int:
         """Delete every cached copy of a cover and forget it in memory.
 
-        Called once the library holds nothing that references the cover any more. A copy
-        that cannot be removed is left alone rather than raising: the file is orphaned
-        either way and the maintenance sweep will find it again.
+        A copy that cannot be removed is left where it is rather than raising.
 
         :param cover_hash: Hash of the source image.
         :returns: int - Bytes freed on disk.

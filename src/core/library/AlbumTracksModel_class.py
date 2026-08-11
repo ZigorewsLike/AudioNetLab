@@ -15,6 +15,8 @@ class TrackRoles:
     IS_MISSING = Qt.ItemDataRole.UserRole + 6
     ARTIST = Qt.ItemDataRole.UserRole + 7
     ALBUM = Qt.ItemDataRole.UserRole + 8
+    PATH = Qt.ItemDataRole.UserRole + 9
+    ALBUM_ID = Qt.ItemDataRole.UserRole + 10
 
 
 def format_duration(seconds: Optional[float]) -> str:
@@ -134,4 +136,8 @@ class AlbumTracksModel(QAbstractListModel):
             return row.artist
         if role == TrackRoles.ALBUM:
             return row.album
+        if role == TrackRoles.PATH:
+            return row.path
+        if role == TrackRoles.ALBUM_ID:
+            return row.album_id
         return None

@@ -1,17 +1,17 @@
 from typing import Optional, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QEvent, QModelIndex, Qt
+from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QFont, QPixmap
-from PyQt6.QtWidgets import (QAbstractItemView, QHBoxLayout, QLabel, QListView, QPushButton,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.api.db.db_handler import create_session
 from src.api.db import library_repo
-from src.core.library.AlbumTracksModel_class import AlbumTracksModel, TrackRoles, format_duration
+from src.core.library.AlbumTracksModel_class import AlbumTracksModel, format_duration
 from src.core.library.cover_cache import CoverCache
 from src.core.file_system.os_integration import reveal_in_file_manager
 from src.core.library.qt_widgets.AlbumTrackDelegate_class import AlbumTrackDelegate
+from src.core.library.qt_widgets.TrackListView_class import TrackListView
 from src.enums import TrackSort, PlayerState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import RESOURCE_ICON_DIR
@@ -128,18 +128,13 @@ class AlbumPage(QWidget):
         # region track list
         self.model = AlbumTracksModel(self)
         self.delegate = AlbumTrackDelegate(self)
-        self.track_view = QListView(self)
+        self.track_view = TrackListView(self.mf, self)
+        self.track_view.set_album_navigation(False)  # This page is the album
         self.track_view.setModel(self.model)
         self.track_view.setItemDelegate(self.delegate)
-        self.track_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.track_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.track_view.setUniformItemSizes(True)
-        self.track_view.setMouseTracking(True)
-        self.track_view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.track_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.track_view.setStyleSheet(DEFAULT_SCROLLBAR_STYLE)
         # A single click plays the track, matching the single click that opens the album
-        self.track_view.clicked.connect(self._on_track_activated)
+        self.track_view.playRequested.connect(self._on_track_activated)
         root.addWidget(self.track_view, 1)
         # endregion
 
@@ -173,11 +168,11 @@ class AlbumPage(QWidget):
     # endregion
 
     # region data
-    def load(self, album_id: int) -> None:
+    def load(self, album_id: int) -> bool:
         """Fill the page with an album and its tracks.
 
         :param album_id: Album id.
-        :returns: None.
+        :returns: bool - False when the album is not in the library any more.
         """
         self._album_id = album_id
         session = create_session()
@@ -187,7 +182,8 @@ class AlbumPage(QWidget):
         finally:
             session.close()
         if album is None:
-            return
+            self._album_id = None
+            return False
 
         self._album = album
         self._tracks = tracks
@@ -201,6 +197,20 @@ class AlbumPage(QWidget):
         self.button_reveal.setEnabled(self._first_path is not None)
         # Reflect the track that is currently playing, if it belongs to this album
         self._sync_playing()
+        return True
+
+    def reload(self) -> bool:
+        """Re-read the album after the library changed, keeping the scroll position.
+
+        :returns: bool - False when the album is gone, so the caller can leave the page.
+        """
+        if self._album_id is None:
+            return True
+        offset = self.track_view.verticalScrollBar().value()
+        if not self.load(self._album_id):
+            return False
+        self.track_view.verticalScrollBar().setValue(offset)
+        return True
 
     def _apply_subtitle(self) -> None:
         """Compose the artist, year and totals line.
@@ -244,15 +254,13 @@ class AlbumPage(QWidget):
         if ids:
             self.mf.playback.play_context(ids, 0)
 
-    def _on_track_activated(self, index: QModelIndex) -> None:
-        """Play the clicked track, or pause it when it is already playing.
+    def _on_track_activated(self, track_id: int) -> None:
+        """Play a track of the album, or pause it when it is already playing.
 
-        :param index: Clicked row.
+        :param track_id: Track to play.
         :returns: None.
         """
-        track_id = index.data(TrackRoles.TRACK_ID)
-        if track_id is not None:
-            self.mf.playback.activate_track(self.model.track_ids(), int(track_id))
+        self.mf.playback.activate_track(self.model.track_ids(), track_id)
 
     def _on_reveal(self) -> None:
         """Open the album folder in the system file manager.

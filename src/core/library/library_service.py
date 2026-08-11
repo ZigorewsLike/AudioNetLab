@@ -23,12 +23,9 @@ _EMPTY_RESULT = DeletionResult(track_ids=[], tracks=0, albums=0, artists=0, cove
 def delete_tracks(track_ids: Sequence[int], meta_controller: FileMetaController) -> DeletionResult:
     """Remove tracks from the library, with their registry folders and cover files.
 
-    The single place a delete happens, whatever asked for it. The database goes first
-    and commits on its own, then the files are removed: a file that cannot be deleted
-    then leaves the library consistent and only leaves garbage on disk, where a failure
-    the other way round would leave a cover row pointing at nothing.
-
-    The audio files themselves are never touched, only the path is forgotten.
+    The database commits first and the files go after, so a file that cannot be removed
+    leaves the library consistent and only leaves garbage on disk. The audio files
+    themselves are never touched, only the path is forgotten.
 
     :param track_ids: Tracks to remove.
     :param meta_controller: Registry controller, owns the data/registry folders.

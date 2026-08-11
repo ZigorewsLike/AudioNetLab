@@ -9,6 +9,9 @@ from PyQt6.QtWidgets import QLabel
 # Cache of the scaled status markers, keyed by (paused, size)
 _status_icon_cache: Dict[Tuple[bool, int], QPixmap] = {}
 
+# Cache of the scaled delete markers, keyed by size
+_delete_icon_cache: Dict[int, QPixmap] = {}
+
 
 def style_section_header(label: QLabel, delta_pt: int = 2) -> None:
     """Style a label as a settings section header: bold and a couple of points larger.
@@ -45,6 +48,23 @@ def status_icon_pixmap(paused: bool, size: int) -> QPixmap:
         pixmap = pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
     _status_icon_cache[key] = pixmap
+    return pixmap
+
+
+def delete_icon_pixmap(size: int) -> QPixmap:
+    """Load the delete marker shown on a hovered track row.
+
+    :param size: Edge length to scale the marker to.
+    :returns: QPixmap - The scaled marker, may be null when no icon file exists.
+    """
+    cached = _delete_icon_cache.get(size)
+    if cached is not None:
+        return cached
+    pixmap = QPixmap("res/icons/track_delete_icon_black.png")
+    if not pixmap.isNull():
+        pixmap = pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
+                               Qt.TransformationMode.SmoothTransformation)
+    _delete_icon_cache[size] = pixmap
     return pixmap
 
 

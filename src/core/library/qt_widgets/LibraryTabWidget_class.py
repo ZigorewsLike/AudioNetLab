@@ -399,6 +399,11 @@ class LibraryTabWidget(QWidget):
         self.artists_page.reload()
         self.all_tracks_page.reload()
         self.tracks_list.update_file_list()
+        # A detail page left without its album or artist falls back to the grid
+        if not self.album_page.reload() and self.pages.currentIndex() == _PAGE_ALBUM_DETAIL:
+            self._on_album_back()
+        if not self.artist_page.reload() and self.pages.currentIndex() == _PAGE_ARTIST_DETAIL:
+            self._show_page(_PAGE_ARTISTS)
 
     def _update_count(self) -> None:
         """Refresh the album count in the header.

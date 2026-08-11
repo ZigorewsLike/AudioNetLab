@@ -163,9 +163,8 @@ class PlayQueue:
     def remove_ids(self, track_ids: List[int]) -> bool:
         """Drop every occurrence of a set of tracks, for tracks deleted from the library.
 
-        The cursor follows the track it was on when that track survives. When it was one
-        of the removed ones it lands on whatever took its place, the same way remove_at
-        clamps, so next and previous still make sense afterwards.
+        The cursor follows the track it was on, or lands on whatever took its place when
+        that track was one of the removed ones, the same way remove_at clamps.
 
         :param track_ids: Tracks to remove.
         :returns: bool - True when the queue changed.

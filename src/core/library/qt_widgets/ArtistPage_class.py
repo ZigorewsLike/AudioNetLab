@@ -1,16 +1,16 @@
 from typing import List, Optional, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QEvent, QModelIndex, Qt
+from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (QAbstractItemView, QHBoxLayout, QLabel, QListView, QPushButton,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.api.db.db_handler import create_session
 from src.api.db import library_repo
-from src.core.library.AlbumTracksModel_class import AlbumTracksModel, TrackRoles
+from src.core.library.AlbumTracksModel_class import AlbumTracksModel
 from src.core.library.cover_cache import CoverLoader
 from src.core.library.qt_widgets.ArtistGridView_class import ArtistGridView
+from src.core.library.qt_widgets.TrackListView_class import TrackListView
 from src.core.library.qt_widgets.TrackRowDelegate_class import TrackRowDelegate
 from src.core.library.qt_widgets.AlbumGridView_class import AlbumGridView
 from src.core.library.qt_widgets.CoverTileDelegate_class import CoverTileDelegate
@@ -132,17 +132,11 @@ class ArtistPage(QWidget):
 
         self.tracks_model = AlbumTracksModel(self)
         self.tracks_delegate = TrackRowDelegate(self)
-        self.tracks_view = QListView(self)
+        self.tracks_view = TrackListView(self.mf, self)
         self.tracks_view.setModel(self.tracks_model)
         self.tracks_view.setItemDelegate(self.tracks_delegate)
-        self.tracks_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.tracks_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tracks_view.setUniformItemSizes(True)
-        self.tracks_view.setMouseTracking(True)
-        self.tracks_view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.tracks_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tracks_view.setStyleSheet(DEFAULT_SCROLLBAR_STYLE)
-        self.tracks_view.clicked.connect(self._on_track_activated)
+        self.tracks_view.playRequested.connect(self._on_track_activated)
         root.addWidget(self.tracks_view, 2)
         # endregion
 
@@ -177,11 +171,11 @@ class ArtistPage(QWidget):
     # endregion
 
     # region data
-    def load(self, artist_id: int) -> None:
+    def load(self, artist_id: int) -> bool:
         """Fill the page with an artist, their albums and their singles.
 
         :param artist_id: Artist id.
-        :returns: None.
+        :returns: bool - False when the artist is not in the library any more.
         """
         self._artist_id = artist_id
         session = create_session()
@@ -194,7 +188,8 @@ class ArtistPage(QWidget):
         finally:
             session.close()
         if artist is None:
-            return
+            self._artist_id = None
+            return False
 
         self._artist = artist
         self.title_label.setText(artist.name or self.tr("Unknown artist"))
@@ -213,6 +208,20 @@ class ArtistPage(QWidget):
         self.tracks_label.setVisible(has_tracks)
         self.tracks_view.setVisible(has_tracks)
         self._sync_playing()
+        return True
+
+    def reload(self) -> bool:
+        """Re-read the artist after the library changed, keeping the scroll position.
+
+        :returns: bool - False when the artist is gone, so the caller can leave the page.
+        """
+        if self._artist_id is None:
+            return True
+        offset = self.tracks_view.verticalScrollBar().value()
+        if not self.load(self._artist_id):
+            return False
+        self.tracks_view.verticalScrollBar().setValue(offset)
+        return True
 
     def _apply_subtitle(self) -> None:
         """Compose the album and track totals line.
@@ -244,15 +253,13 @@ class ArtistPage(QWidget):
         if ids:
             self.mf.playback.play_context(ids, 0)
 
-    def _on_track_activated(self, index: QModelIndex) -> None:
-        """Play the clicked track, or pause it when it is already playing.
+    def _on_track_activated(self, track_id: int) -> None:
+        """Play a track of the artist, or pause it when it is already playing.
 
-        :param index: Clicked row.
+        :param track_id: Track to play.
         :returns: None.
         """
-        track_id = index.data(TrackRoles.TRACK_ID)
-        if track_id is not None:
-            self.mf.playback.activate_track(self._track_ids, int(track_id))
+        self.mf.playback.activate_track(self._track_ids, track_id)
     # endregion
 
     # region playing status

@@ -172,14 +172,26 @@ class PlaybackController(QObject):
         self.queue.remove_at(index)
         self.queueChanged.emit()
 
-    def purge_tracks(self, track_ids: List[int]) -> None:
-        """Forget tracks that were deleted from the library.
+    def enqueue(self, track_ids: List[int]) -> None:
+        """Add tracks to the end of the queue, starting playback when it was empty.
 
-        The track playing right now is left alone: its audio is already decoded and the
-        file on disk is untouched, so there is nothing to interrupt, and it keeps its
-        place in the queue on purpose. Dropping it would move the cursor onto its
-        successor, and the autoplay at the end of the track would then step past that
-        successor and skip it.
+        :param track_ids: Tracks to add in order.
+        :returns: None.
+        """
+        if not track_ids:
+            return
+        was_empty = len(self.queue) == 0
+        for track_id in track_ids:
+            self.queue.append(track_id)
+        self.queueChanged.emit()
+        if was_empty:
+            self._open_current()
+
+    def purge_tracks(self, track_ids: List[int]) -> None:
+        """Drop tracks deleted from the library out of the queue.
+
+        The track playing keeps its place and plays on: it is already decoded, and moving
+        the cursor off it would make the autoplay at the end skip its successor.
 
         :param track_ids: Tracks removed from the library.
         :returns: None.

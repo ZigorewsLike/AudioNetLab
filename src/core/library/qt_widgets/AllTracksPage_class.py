@@ -1,14 +1,14 @@
 from typing import List, Optional, TYPE_CHECKING
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QEvent, QModelIndex, Qt, QTimer
+from PyQt6.QtCore import QEvent, QTimer
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QLabel, QLineEdit,
-                             QListView, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from src.api.db.db_handler import create_session
 from src.api.db import library_repo
-from src.core.library.AlbumTracksModel_class import AlbumTracksModel, TrackRoles
+from src.core.library.AlbumTracksModel_class import AlbumTracksModel
+from src.core.library.qt_widgets.TrackListView_class import TrackListView
 from src.core.library.qt_widgets.TrackRowDelegate_class import TrackRowDelegate
 from src.enums import PlayerState, TrackSort
 from src.global_styles import AppColorSchemes, DEFAULT_SCROLLBAR_STYLE
@@ -86,17 +86,11 @@ class AllTracksPage(QWidget):
         # region list
         self.model = AlbumTracksModel(self)
         self.delegate = TrackRowDelegate(self)
-        self.list_view = QListView(self)
+        self.list_view = TrackListView(self.mf, self)
         self.list_view.setModel(self.model)
         self.list_view.setItemDelegate(self.delegate)
-        self.list_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.list_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.list_view.setUniformItemSizes(True)
-        self.list_view.setMouseTracking(True)
-        self.list_view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.list_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list_view.setStyleSheet(DEFAULT_SCROLLBAR_STYLE)
-        self.list_view.clicked.connect(self._on_track_activated)
+        self.list_view.playRequested.connect(self._on_track_activated)
         root.addWidget(self.list_view, 1)
         # endregion
 
@@ -198,15 +192,16 @@ class AllTracksPage(QWidget):
             self._sort = value
             self.reload()
 
-    def _on_track_activated(self, index: QModelIndex) -> None:
-        """Play the clicked track, or pause it when it is already playing.
+    def _on_track_activated(self, track_id: int) -> None:
+        """Play a track from the list, or pause it when it is already playing.
 
-        :param index: Clicked row.
+        The whole visible list becomes the context, so next and previous walk what the
+        user is looking at, filtered and sorted as it is on screen.
+
+        :param track_id: Track to play.
         :returns: None.
         """
-        track_id = index.data(TrackRoles.TRACK_ID)
-        if track_id is not None:
-            self.mf.playback.activate_track(self.model.track_ids(), int(track_id))
+        self.mf.playback.activate_track(self.model.track_ids(), track_id)
     # endregion
 
     # region playing status
