@@ -130,25 +130,28 @@ class CoverCache:
         return cover_hash, cached.width(), cached.height()
 
     @staticmethod
-    def discard(cover_hash: str) -> int:
+    def discard(cover_hash: str) -> Tuple[int, int]:
         """Delete every cached copy of a cover and forget it in memory.
 
         A copy that cannot be removed is left where it is rather than raising.
 
         :param cover_hash: Hash of the source image.
-        :returns: int - Bytes freed on disk.
+        :returns: Tuple[int, int] - Files removed and bytes freed.
         """
         if not cover_hash:
-            return 0
+            return 0, 0
         _apply_memory_budget()
+        removed = 0
         freed = 0
         folder: Optional[str] = None
         for size in COVER_CACHE_SIZES:
             path = CoverCache.path_for(cover_hash, size)
             folder = os.path.dirname(path)
             try:
-                freed += os.path.getsize(path)
+                file_size = os.path.getsize(path)
                 os.remove(path)
+                removed += 1
+                freed += file_size
             except OSError:
                 pass
             QPixmapCache.remove(cache_key(cover_hash, size))
@@ -157,7 +160,7 @@ class CoverCache:
                 os.rmdir(folder)  # Only succeeds once the prefix holds no other cover
             except OSError:
                 pass
-        return freed
+        return removed, freed
 
     @staticmethod
     def load_image(cover_hash: str, size: int) -> Optional[QImage]:

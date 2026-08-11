@@ -325,7 +325,7 @@ def get_path_index(session: Session) -> Dict[str, PathEntry]:
             for path, track_id, mtime, is_missing in rows}
 
 
-def delete_orphans(session: Session) -> tuple:
+def delete_unused_albums(session: Session) -> tuple:
     """Remove every album and artist that no track references any more.
 
     A whole-library sweep, unlike the targeted cleanup on a single delete. The caller
@@ -339,6 +339,45 @@ def delete_orphans(session: Session) -> tuple:
     used_artists = select(Track.artist_id).where(Track.artist_id.is_not(None))
     artists = session.execute(delete(Artist).where(Artist.id.not_in(used_artists))).rowcount
     return albums, artists
+
+
+def delete_unused_covers(session: Session) -> List[str]:
+    """Remove every cover row no track and no album references any more.
+
+    A whole-library sweep, unlike the targeted cleanup on a single delete.
+
+    :param session: Open session, the caller commits.
+    :returns: List[str] - Hashes of the removed covers, their files can go.
+    """
+    used_by_tracks = select(Track.cover_id).where(Track.cover_id.is_not(None))
+    used_by_albums = select(Album.cover_id).where(Album.cover_id.is_not(None))
+    unused = (
+        select(Cover.id, Cover.hash)
+        .where(Cover.id.not_in(used_by_tracks))
+        .where(Cover.id.not_in(used_by_albums))
+    )
+    rows = session.execute(unused).all()
+    for chunk in _id_chunks([row[0] for row in rows]):
+        session.execute(delete(Cover).where(Cover.id.in_(chunk)))
+    return [row[1] for row in rows if row[1]]
+
+
+def get_cover_hashes(session: Session) -> Set[str]:
+    """Read the hash of every cover the library knows.
+
+    :param session: Open session.
+    :returns: Set[str] - Hashes whose files are still in use.
+    """
+    return {value for value in session.scalars(select(Cover.hash)).all() if value}
+
+
+def get_track_ids(session: Session) -> Set[int]:
+    """Read the id of every track in the library.
+
+    :param session: Open session.
+    :returns: Set[int] - Track ids, the registry folders that may exist.
+    """
+    return set(session.scalars(select(Track.id)).all())
 
 
 class DeleteStats(NamedTuple):
@@ -400,13 +439,13 @@ def _cover_in_use(session: Session, cover_id: int) -> bool:
     return session.scalar(select(Album.id).where(Album.cover_id == cover_id).limit(1)) is not None
 
 
-def _cleanup_orphans(session: Session,
+def _cleanup_unused(session: Session,
                      album_ids: Set[int],
                      artist_ids: Set[int],
                      cover_ids: Set[int]) -> DeleteStats:
     """Drop the albums, artists and covers a delete left without an owner.
 
-    Only the rows the deleted tracks pointed at are tested, unlike delete_orphans. An
+    Only the rows the deleted tracks pointed at are tested, unlike delete_unused_albums. An
     album that empties out adds its own artist and cover to the candidates.
 
     :param session: Open session.
@@ -434,17 +473,17 @@ def _cleanup_orphans(session: Session,
         session.flush()
 
     artists = 0
-    orphan_artists = [artist_id for artist_id in sorted(artist_ids)
+    unused_artists = [artist_id for artist_id in sorted(artist_ids)
                       if not _artist_in_use(session, artist_id)]
-    for chunk in _id_chunks(orphan_artists):
+    for chunk in _id_chunks(unused_artists):
         artists += session.execute(delete(Artist).where(Artist.id.in_(chunk))).rowcount
 
     cover_hashes: List[str] = []
-    orphan_covers = [cover_id for cover_id in sorted(cover_ids)
+    unused_covers = [cover_id for cover_id in sorted(cover_ids)
                      if not _cover_in_use(session, cover_id)]
-    if orphan_covers:
+    if unused_covers:
         rows = []
-        for chunk in _id_chunks(orphan_covers):
+        for chunk in _id_chunks(unused_covers):
             rows += session.execute(select(Cover.hash).where(Cover.id.in_(chunk))).all()
             session.execute(delete(Cover).where(Cover.id.in_(chunk)))
         cover_hashes = [row[0] for row in rows if row[0]]
@@ -487,8 +526,8 @@ def delete_tracks(session: Session, track_ids: Sequence[int]) -> DeleteStats:
         tracks += session.execute(delete(Track).where(Track.id.in_(chunk))).rowcount
     session.flush()
 
-    orphans = _cleanup_orphans(session, album_ids, artist_ids, cover_ids)
-    return orphans._replace(tracks=tracks)
+    unused = _cleanup_unused(session, album_ids, artist_ids, cover_ids)
+    return unused._replace(tracks=tracks)
 
 
 def delete_album(session: Session, album_id: int) -> DeleteStats:
@@ -511,11 +550,11 @@ def delete_album(session: Session, album_id: int) -> DeleteStats:
     session.flush()
     artist_ids = {row[0]} if row[0] is not None else set()
     cover_ids = {row[1]} if row[1] is not None else set()
-    orphans = _cleanup_orphans(session, set(), artist_ids, cover_ids)
+    unused = _cleanup_unused(session, set(), artist_ids, cover_ids)
     return DeleteStats(tracks=stats.tracks,
                        albums=stats.albums + 1,
-                       artists=stats.artists + orphans.artists,
-                       cover_hashes=stats.cover_hashes + orphans.cover_hashes)
+                       artists=stats.artists + unused.artists,
+                       cover_hashes=stats.cover_hashes + unused.cover_hashes)
 
 
 class QueueTrack(NamedTuple):

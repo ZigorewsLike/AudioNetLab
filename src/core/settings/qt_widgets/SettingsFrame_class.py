@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QLabel, QFrame, QTreeWidget, QTreeWidgetItem
 from .SettingsAudioWidget_class import SettingsAudioWidget
 from .SettingsEQWidget_class import SettingsEQWidget
 from .SettingsInterfaceWidget_class import SettingsInterfaceWidget
+from .SettingsLibraryWidget_class import SettingsLibraryWidget
 
 if TYPE_CHECKING:
     from src.forms import MainForm
@@ -49,6 +50,7 @@ class SettingsFrame(QFrame):
         self.audio_settings = SettingsAudioWidget(self.mf)
         self.eq_settings = SettingsEQWidget()
         self.interface_settings = SettingsInterfaceWidget(self.mf)
+        self.library_settings = SettingsLibraryWidget(self.mf)
 
         # The tree item order must match the order the pages are added in
         self.audio_tree_item = QTreeWidgetItem([""])
@@ -65,6 +67,11 @@ class SettingsFrame(QFrame):
         self.interface_tree_item.setFont(0, font_item)
         self.tree_widget.insertTopLevelItem(2, self.interface_tree_item)
         self.tab_widget.add_tab(self.interface_settings, "")
+
+        self.library_tree_item = QTreeWidgetItem([""])
+        self.library_tree_item.setFont(0, font_item)
+        self.tree_widget.insertTopLevelItem(3, self.library_tree_item)
+        self.tab_widget.add_tab(self.library_settings, "")
 
         self.tree_widget.expandAll()
         self.tree_widget.setCurrentItem(self.tree_widget.topLevelItem(0))
@@ -110,6 +117,7 @@ class SettingsFrame(QFrame):
         self.audio_tree_item.setText(0, self.tr("Audio settings"))
         self.eq_tree_item.setText(0, self.tr("Equalizer presets"))
         self.interface_tree_item.setText(0, self.tr("Interface"))
+        self.library_tree_item.setText(0, self.tr("Library"))
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Lay out the tree and the pages on resize.

@@ -919,6 +919,7 @@ class MainForm(QMainWindow):
             self.scan_thread.quit()
             self.scan_thread.wait(5000)
         self.library_widget.shutdown()  # Stop the cover loader threads
+        self.settings_widget.library_settings.shutdown()
         self.save_config_app()
 
     def on_tab_changed(self, index: int):
