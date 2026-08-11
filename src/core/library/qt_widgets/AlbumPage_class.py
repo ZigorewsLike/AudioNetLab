@@ -1,6 +1,3 @@
-import os
-import subprocess
-import sys
 from typing import Optional, TYPE_CHECKING
 
 from PyQt6 import QtCore
@@ -13,8 +10,8 @@ from src.api.db.db_handler import create_session
 from src.api.db import library_repo
 from src.core.library.AlbumTracksModel_class import AlbumTracksModel, TrackRoles, format_duration
 from src.core.library.cover_cache import CoverCache
+from src.core.file_system.os_integration import reveal_in_file_manager
 from src.core.library.qt_widgets.AlbumTrackDelegate_class import AlbumTrackDelegate
-from src.core.log_system import print_e
 from src.enums import TrackSort, PlayerState
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import RESOURCE_ICON_DIR
@@ -262,16 +259,7 @@ class AlbumPage(QWidget):
 
         :returns: None.
         """
-        if not self._first_path:
-            return
-        path = self._first_path.replace("/", "\\")
-        try:
-            if sys.platform == "win32":
-                subprocess.call(f'explorer /select,"{path}"')
-            else:
-                subprocess.call(["open", "-R", self._first_path])
-        except Exception as e:
-            print_e("Reveal in file manager failed", e)
+        reveal_in_file_manager(self._first_path)
     # endregion
 
     # region playing status

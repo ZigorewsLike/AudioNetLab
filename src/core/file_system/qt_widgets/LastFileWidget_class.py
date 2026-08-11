@@ -1,6 +1,4 @@
 import os
-import subprocess
-import sys
 from math import pi, cos
 from typing import Optional, TYPE_CHECKING, Union, Dict
 
@@ -11,6 +9,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QFrame, QScrollArea, Q
 
 from src.api.db.db_handler import DBHandler
 from src.api.db.models import Track
+from src.core.file_system.os_integration import reveal_in_file_manager
 from src.function_lib.math_lib import fixed_hash
 from src.global_constants import RESOURCE_ICON_DIR
 from src.global_styles import DEFAULT_SCROLLBAR_STYLE, AppColorSchemes
@@ -155,22 +154,16 @@ class LastFileList(QWidget):
         return track_id
 
     def delete_elem(self, item: Union[QWidget, 'LastFileItem']):
-        """Remove a track from the list, the database and the registry.
+        """Remove a track from the library.
+
+        The work belongs to the main form: a delete touches the database, the registry,
+        the cover cache and the play queue, and every view has to be rebuilt afterwards,
+        this list among them.
 
         :param item: List item to remove.
         :returns: None.
         """
-        self.v_layout.removeWidget(item)
-        self.db.connect()
-        self.db.delete_track(track=item.track)
-        self.db.disconnect()
-        self.mf.file_meta_controller.delete_track(item.track.id)
-        self.update_file_list()
-        # Deleting the last track of an album drops the album too, refresh the grid so the
-        # tile disappears instead of lingering as an empty one
-        library_widget = getattr(self.mf, "library_widget", None)
-        if library_widget is not None:
-            library_widget.reload()
+        self.mf.delete_tracks_from_library([item.track.id])
 
     def update_track_last_opened(self, track_id: int) -> None:
         """Stamp the track as opened now so it moves to the top of the list.
@@ -445,12 +438,7 @@ class LastFileItem(QWidget):
         if action == open_folder:
             self.button_open.click()
         elif action == show_folder:
-            path = self.track.path
-            path = path.replace('/', '\\')
-            if sys.platform == "win32":
-                subprocess.call(f'explorer /select,"{path}"')
-            else:
-                subprocess.call(["open", "-R", path])
+            reveal_in_file_manager(self.track.path)
         elif action == delete_elem:
             self.container.delete_elem(self)
         self.color = 'transparent'

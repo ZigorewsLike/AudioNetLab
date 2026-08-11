@@ -160,6 +160,31 @@ class PlayQueue:
             # The current track was removed; clamp so the cursor stays in range
             self._index = min(self._index, len(self._items) - 1)
 
+    def remove_ids(self, track_ids: List[int]) -> bool:
+        """Drop every occurrence of a set of tracks, for tracks deleted from the library.
+
+        The cursor follows the track it was on when that track survives. When it was one
+        of the removed ones it lands on whatever took its place, the same way remove_at
+        clamps, so next and previous still make sense afterwards.
+
+        :param track_ids: Tracks to remove.
+        :returns: bool - True when the queue changed.
+        """
+        targets = set(track_ids)
+        if not targets:
+            return False
+        kept = [(position, item) for position, item in enumerate(self._items) if item not in targets]
+        if len(kept) == len(self._items):
+            return False
+
+        survivors_before = sum(1 for position, _ in kept if position < self._index)
+        self._items = [item for _, item in kept]
+        if not self._items:
+            self._index = -1
+        else:
+            self._index = min(survivors_before, len(self._items) - 1)
+        return True
+
     def move(self, from_index: int, to_index: int) -> None:
         """Reorder a track, following the current one so it stays selected.
 

@@ -18,6 +18,7 @@ from src.api.db import library_repo
 from src.api.db.db_handler import create_session
 from src.api.db.models import Track
 from src.core.file_system import FileMetaController
+from src.core.library import library_service
 from src.core.library.qt_widgets import ScanProgressWidget, LibraryTabWidget
 from src.core.library.scanner import ScanStats
 from src.core.log_system import print_d
@@ -666,6 +667,33 @@ class MainForm(QMainWindow):
         self.scan_thread.quit()
         self.scan_progress.finish(self.tr("Scan failed"))
         self.show_error_message_log(self.tr("Library"), message)
+
+    def delete_tracks_from_library(self, track_ids: Sequence[int]) -> None:
+        """Remove tracks from the library and refresh everything that showed them.
+
+        The entry point every delete goes through, from the recent list, the track lists
+        and the album page alike, so one action always has one meaning. The audio files
+        stay on disk, only the library forgets them.
+
+        :param track_ids: Tracks to remove.
+        :returns: None.
+        """
+        ids = list(track_ids)
+        if not ids:
+            return
+        result = library_service.delete_tracks(ids, self.file_meta_controller)
+        self.playback.purge_tracks(result.track_ids)
+        self.library_widget.reload()
+
+    def delete_album_from_library(self, album_id: int) -> None:
+        """Remove an album and every track on it.
+
+        :param album_id: Album id.
+        :returns: None.
+        """
+        result = library_service.delete_album(album_id, self.file_meta_controller)
+        self.playback.purge_tracks(result.track_ids)
+        self.library_widget.reload()
 
     @pyqtSlot(int)
     def play_album(self, album_id: int) -> None:

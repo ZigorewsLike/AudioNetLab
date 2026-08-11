@@ -1,4 +1,4 @@
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict, Iterator, List, NamedTuple, Optional, Sequence, Set
 
 from sqlalchemy import delete, func, select, nulls_last
 from sqlalchemy.orm import Session
@@ -6,6 +6,9 @@ from sqlalchemy.sql import Select
 
 from src.enums import AlbumSort, ArtistSort, TrackSort
 from .models import Album, Artist, Cover, Track, normalize_key
+
+# Ids per statement, SQLite caps the number of bound parameters in one query
+_ID_CHUNK = 500
 
 
 class AlbumRow(NamedTuple):
@@ -320,6 +323,188 @@ def delete_orphans(session: Session) -> tuple:
     used_artists = select(Track.artist_id).where(Track.artist_id.is_not(None))
     artists = session.execute(delete(Artist).where(Artist.id.not_in(used_artists))).rowcount
     return albums, artists
+
+
+class DeleteStats(NamedTuple):
+    """What one delete removed from the library."""
+    tracks: int
+    albums: int
+    artists: int
+    cover_hashes: List[str]  # Covers nothing references any more, their files can go
+
+
+_EMPTY_DELETE = DeleteStats(tracks=0, albums=0, artists=0, cover_hashes=[])
+
+
+def _id_chunks(ids: Sequence[int]) -> Iterator[List[int]]:
+    """Split a list of ids into batches small enough for one statement.
+
+    :param ids: Ids to split.
+    :returns: Iterator[List[int]] - Batches of at most _ID_CHUNK ids.
+    """
+    for start in range(0, len(ids), _ID_CHUNK):
+        yield list(ids[start:start + _ID_CHUNK])
+
+
+def _album_has_tracks(session: Session, album_id: int) -> bool:
+    """Whether an album still holds a track.
+
+    :param session: Open session.
+    :param album_id: Album id.
+    :returns: bool - True when at least one track belongs to it.
+    """
+    return session.scalar(select(Track.id).where(Track.album_id == album_id).limit(1)) is not None
+
+
+def _artist_in_use(session: Session, artist_id: int) -> bool:
+    """Whether anything still credits an artist.
+
+    An album counts even when none of its tracks name the artist: on a compilation the
+    album artist is the only place the name appears, and dropping the row would blank
+    the album's artist through the SET NULL foreign key.
+
+    :param session: Open session.
+    :param artist_id: Artist id.
+    :returns: bool - True when a track or an album still references it.
+    """
+    if session.scalar(select(Track.id).where(Track.artist_id == artist_id).limit(1)) is not None:
+        return True
+    return session.scalar(select(Album.id).where(Album.artist_id == artist_id).limit(1)) is not None
+
+
+def _cover_in_use(session: Session, cover_id: int) -> bool:
+    """Whether a cover is still referenced.
+
+    Covers are shared: one image can back several albums and any number of tracks, so a
+    cover may only be dropped once nothing points at it at all.
+
+    :param session: Open session.
+    :param cover_id: Cover id.
+    :returns: bool - True when a track or an album still references it.
+    """
+    if session.scalar(select(Track.id).where(Track.cover_id == cover_id).limit(1)) is not None:
+        return True
+    return session.scalar(select(Album.id).where(Album.cover_id == cover_id).limit(1)) is not None
+
+
+def _cleanup_orphans(session: Session,
+                     album_ids: Set[int],
+                     artist_ids: Set[int],
+                     cover_ids: Set[int]) -> DeleteStats:
+    """Drop the albums, artists and covers a delete left without an owner.
+
+    Targeted, unlike delete_orphans: only the rows the deleted tracks pointed at are
+    tested. An album that empties out contributes its own artist and cover to the
+    candidates, so a whole album disappears in one pass.
+
+    :param session: Open session.
+    :param album_ids: Albums the deleted tracks belonged to.
+    :param artist_ids: Artists the deleted tracks belonged to.
+    :param cover_ids: Covers the deleted tracks used.
+    :returns: DeleteStats - Counts of what was removed, tracks always zero.
+    """
+    albums = 0
+    empty_albums = [album_id for album_id in sorted(album_ids)
+                    if not _album_has_tracks(session, album_id)]
+    if empty_albums:
+        for album_id in empty_albums:
+            row = session.execute(
+                select(Album.artist_id, Album.cover_id).where(Album.id == album_id)
+            ).first()
+            if row is None:
+                continue
+            if row[0] is not None:
+                artist_ids.add(row[0])
+            if row[1] is not None:
+                cover_ids.add(row[1])
+        for chunk in _id_chunks(empty_albums):
+            albums += session.execute(delete(Album).where(Album.id.in_(chunk))).rowcount
+        session.flush()
+
+    artists = 0
+    orphan_artists = [artist_id for artist_id in sorted(artist_ids)
+                      if not _artist_in_use(session, artist_id)]
+    for chunk in _id_chunks(orphan_artists):
+        artists += session.execute(delete(Artist).where(Artist.id.in_(chunk))).rowcount
+
+    cover_hashes: List[str] = []
+    orphan_covers = [cover_id for cover_id in sorted(cover_ids)
+                     if not _cover_in_use(session, cover_id)]
+    if orphan_covers:
+        rows = []
+        for chunk in _id_chunks(orphan_covers):
+            rows += session.execute(select(Cover.hash).where(Cover.id.in_(chunk))).all()
+            session.execute(delete(Cover).where(Cover.id.in_(chunk)))
+        cover_hashes = [row[0] for row in rows if row[0]]
+    session.flush()
+    return DeleteStats(tracks=0, albums=albums, artists=artists, cover_hashes=cover_hashes)
+
+
+def delete_tracks(session: Session, track_ids: Sequence[int]) -> DeleteStats:
+    """Remove tracks from the library together with what they leave behind.
+
+    The tracks go first, then the album, artist and cover rows that nothing references
+    any more, all in the caller's transaction. The audio files are never touched, and
+    neither are the cover files: the returned hashes tell the caller which ones on disk
+    are now unreferenced.
+
+    :param session: Open session, the caller commits.
+    :param track_ids: Tracks to remove.
+    :returns: DeleteStats - What was removed.
+    """
+    ids = list(dict.fromkeys(int(track_id) for track_id in track_ids))
+    if not ids:
+        return _EMPTY_DELETE
+
+    album_ids: Set[int] = set()
+    artist_ids: Set[int] = set()
+    cover_ids: Set[int] = set()
+    for chunk in _id_chunks(ids):
+        rows = session.execute(
+            select(Track.album_id, Track.artist_id, Track.cover_id).where(Track.id.in_(chunk))
+        ).all()
+        for album_id, artist_id, cover_id in rows:
+            if album_id is not None:
+                album_ids.add(album_id)
+            if artist_id is not None:
+                artist_ids.add(artist_id)
+            if cover_id is not None:
+                cover_ids.add(cover_id)
+
+    tracks = 0
+    for chunk in _id_chunks(ids):
+        tracks += session.execute(delete(Track).where(Track.id.in_(chunk))).rowcount
+    session.flush()
+
+    orphans = _cleanup_orphans(session, album_ids, artist_ids, cover_ids)
+    return orphans._replace(tracks=tracks)
+
+
+def delete_album(session: Session, album_id: int) -> DeleteStats:
+    """Remove an album and every track on it.
+
+    :param session: Open session, the caller commits.
+    :param album_id: Album id.
+    :returns: DeleteStats - What was removed.
+    """
+    stats = delete_tracks(session, get_album_track_ids(session, album_id))
+
+    row = session.execute(
+        select(Album.artist_id, Album.cover_id).where(Album.id == album_id)
+    ).first()
+    if row is None:
+        return stats  # It went with its last track
+
+    # An album row that outlived its tracks, or one that never had any
+    session.execute(delete(Album).where(Album.id == album_id))
+    session.flush()
+    artist_ids = {row[0]} if row[0] is not None else set()
+    cover_ids = {row[1]} if row[1] is not None else set()
+    orphans = _cleanup_orphans(session, set(), artist_ids, cover_ids)
+    return DeleteStats(tracks=stats.tracks,
+                       albums=stats.albums + 1,
+                       artists=stats.artists + orphans.artists,
+                       cover_hashes=stats.cover_hashes + orphans.cover_hashes)
 
 
 class QueueTrack(NamedTuple):
