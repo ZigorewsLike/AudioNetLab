@@ -118,7 +118,7 @@ class ArtistPage(QWidget):
         self.albums_label.setFont(section_font)
         root.addWidget(self.albums_label)
 
-        self.album_grid = AlbumGridView(cover_loader, self)
+        self.album_grid = AlbumGridView(self.mf, cover_loader, self)
         self.album_grid.set_cover_size(CoverTileDelegate.COVER_SMALL)
         self.album_grid.albumActivated.connect(self.albumActivated)
         root.addWidget(self.album_grid, 3)

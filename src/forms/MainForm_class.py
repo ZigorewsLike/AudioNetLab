@@ -684,14 +684,41 @@ class MainForm(QMainWindow):
         self.library_widget.reload()
 
     def delete_album_from_library(self, album_id: int) -> None:
-        """Remove an album and every track on it.
+        """Remove an album and every track on it, after asking.
 
         :param album_id: Album id.
         :returns: None.
         """
+        session = create_session()
+        try:
+            album = library_repo.get_album(session, album_id)
+        finally:
+            session.close()
+        if album is None:
+            return
+        if not self.confirm_album_delete(album.title, album.track_count or 0):
+            return
         result = library_service.delete_album(album_id, self.file_meta_controller)
         self.playback.purge_tracks(result.track_ids)
         self.library_widget.reload()
+
+    def confirm_album_delete(self, title: str, track_count: int) -> bool:
+        """Ask before removing a whole album.
+
+        :param title: Album title, named in the question.
+        :param track_count: Number of tracks that go with it.
+        :returns: bool - True when the user confirmed.
+        """
+        question = QMessageBox()
+        question.setWindowTitle(self.tr("Remove album"))
+        question.setIcon(QMessageBox.Icon.Question)
+        question.setText(self.tr('Remove "{0}" from the library?').format(title))
+        question.setInformativeText(
+            self.tr("%n track(s) will be removed. The files stay on disk.", "", track_count))
+        question.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        question.setDefaultButton(QMessageBox.StandardButton.No)
+        question.move(self.frameGeometry().center() - QtCore.QRect(QtCore.QPoint(), question.sizeHint()).center())
+        return question.exec() == QMessageBox.StandardButton.Yes
 
     @pyqtSlot(int)
     def play_album(self, album_id: int) -> None:
@@ -713,6 +740,19 @@ class MainForm(QMainWindow):
                                         self.tr("No playable file in this album"))
             return
         self.playback.play_context(track_ids, 0)
+
+    def enqueue_album(self, album_id: int) -> None:
+        """Add every track of an album to the end of the play queue.
+
+        :param album_id: Album id.
+        :returns: None.
+        """
+        session = create_session()
+        try:
+            track_ids = library_repo.get_album_track_ids(session, album_id)
+        finally:
+            session.close()
+        self.playback.enqueue(track_ids)
 
     def open_current_album(self) -> None:
         """Open the album of the playing track in the library tab, from the player cover.

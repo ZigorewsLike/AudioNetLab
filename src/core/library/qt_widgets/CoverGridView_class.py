@@ -1,5 +1,5 @@
 from PyQt6 import QtCore
-from PyQt6.QtCore import QAbstractListModel, QModelIndex, QSize, Qt
+from PyQt6.QtCore import QAbstractListModel, QModelIndex, QPoint, QSize, Qt
 from PyQt6.QtGui import QResizeEvent
 from PyQt6.QtWidgets import QAbstractItemView, QListView
 
@@ -18,9 +18,11 @@ class CoverGridView(QListView):
     covers nobody is looking at any more. A subclass supplies the model, the tile delegate
     and the roles carrying the item id and the cover hash.
 
-    :signals: itemActivated (int) - id of a clicked tile
+    :signals: itemActivated (int) - id of a clicked tile,
+              itemMenuRequested (int, QPoint) - id of a right clicked tile and where to open
     """
     itemActivated = QtCore.pyqtSignal(int)
+    itemMenuRequested = QtCore.pyqtSignal(int, QPoint)
 
     def __init__(self, cover_loader: CoverLoader, model: QAbstractListModel,
                  delegate: CoverTileDelegate, id_role: int, cover_hash_role: int,
@@ -72,6 +74,9 @@ class CoverGridView(QListView):
         """ + DEFAULT_SCROLLBAR_STYLE)
 
         self._apply_grid_size()
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_menu_requested)
 
         # A finished cover repaints just its tiles instead of the whole viewport
         self._loader.coverReady.connect(self._on_cover_ready)
@@ -189,3 +194,18 @@ class CoverGridView(QListView):
         item_id = index.data(self._id_role)
         if item_id is not None:
             self.itemActivated.emit(int(item_id))
+
+    def _on_menu_requested(self, position: QPoint) -> None:
+        """Select the right clicked tile and ask for its menu.
+
+        :param position: Point in viewport coordinates.
+        :returns: None.
+        """
+        index = self.indexAt(position)
+        if not index.isValid():
+            return
+        item_id = index.data(self._id_role)
+        if item_id is None:
+            return
+        self.setCurrentIndex(index)
+        self.itemMenuRequested.emit(int(item_id), self.viewport().mapToGlobal(position))

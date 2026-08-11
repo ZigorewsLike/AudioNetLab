@@ -288,6 +288,22 @@ def get_album_track_ids(session: Session, album_id: int) -> List[int]:
     return list(session.scalars(query).all())
 
 
+def get_album_first_path(session: Session, album_id: int) -> Optional[str]:
+    """Read the file path of the first track of an album, for revealing its folder.
+
+    :param session: Open session.
+    :param album_id: Album id.
+    :returns: str - Path, None when the album holds no track.
+    """
+    query = (
+        select(Track.path)
+        .where(Track.album_id == album_id)
+        .order_by(nulls_last(Track.disc_no), nulls_last(Track.track_no), Track.title_key)
+        .limit(1)
+    )
+    return session.scalar(query)
+
+
 class PathEntry(NamedTuple):
     """What the scanner needs to know about a path already in the library."""
     track_id: int

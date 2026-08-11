@@ -61,6 +61,8 @@ class AlbumPage(QWidget):
         QPushButton:hover {{ background-color: {AppColorSchemes.BUTTON_HOVER}; }}
         QPushButton#PlayButton {{ background-color: #2f8f43; color: white; font-weight: bold; }}
         QPushButton#PlayButton:hover {{ background-color: #37a24d; }}
+        QPushButton#DeleteButton {{ background-color: #a83232; color: white; }}
+        QPushButton#DeleteButton:hover {{ background-color: #c03b3b; }}
         """)
         self.setObjectName("AlbumRoot")
 
@@ -109,8 +111,12 @@ class AlbumPage(QWidget):
         self.button_play.clicked.connect(self._on_play)
         self.button_reveal = QPushButton("", self)
         self.button_reveal.clicked.connect(self._on_reveal)
+        self.button_delete = QPushButton("", self)
+        self.button_delete.setObjectName("DeleteButton")
+        self.button_delete.clicked.connect(self._on_delete)
         buttons.addWidget(self.button_play)
         buttons.addWidget(self.button_reveal)
+        buttons.addWidget(self.button_delete)
         buttons.addStretch(1)
 
         info.addStretch(1)
@@ -163,6 +169,7 @@ class AlbumPage(QWidget):
         self.button_back.setText(self.tr("← Back"))
         self.button_play.setText(self.tr("Play"))
         self.button_reveal.setText(self.tr("Show in file manager"))
+        self.button_delete.setText(self.tr("Remove album"))
         if self._album_id is not None:
             self._apply_subtitle()
     # endregion
@@ -268,6 +275,14 @@ class AlbumPage(QWidget):
         :returns: None.
         """
         reveal_in_file_manager(self._first_path)
+
+    def _on_delete(self) -> None:
+        """Remove the whole album, leaving the page when it is gone.
+
+        :returns: None.
+        """
+        if self._album_id is not None:
+            self.mf.delete_album_from_library(self._album_id)
     # endregion
 
     # region playing status

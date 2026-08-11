@@ -79,7 +79,7 @@ class LibraryTabWidget(QWidget):
         albums_page = QWidget(self)
         albums_layout = QStackedLayout(albums_page)
         albums_layout.setContentsMargins(0, 0, 0, 0)
-        self.grid = AlbumGridView(self._cover_loader, self)
+        self.grid = AlbumGridView(self.mf, self._cover_loader, self)
         # A tile opens the album page; albumActivated is also forwarded for raw activation
         self.grid.albumActivated.connect(self.open_album)
         self.grid.albumActivated.connect(self.albumActivated)
