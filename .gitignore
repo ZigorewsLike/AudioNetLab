@@ -9,6 +9,9 @@ local_history.bin
 storage.db
 !main_template.spec
 *.db-*
+*.onnx
+*.h5
+!best_cls_genre_fma_3s_0.0001.onnx
 
 # Project dirs
 logs
