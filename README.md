@@ -57,7 +57,8 @@ in the default configuration the application makes no network requests.
   from 2 to 20.
 * **Library.** SQLite database, folder scanner on a separate thread, an album grid and a flat track
   list with search and sort, and a play queue. Covers are cached pre-scaled and shared between
-  albums with the same artwork.
+  albums with the same artwork. A track or a whole album can be removed from any list, which also
+  clears the cached data it leaves behind.
 * **Interface.** Waveform panel rendered with OpenGL, tag panel, lyrics tab with a timeline that
   follows playback, English and Russian localisation.
 * **Experimental modules,** off by default: audio transcription, lyrics translation and
@@ -217,6 +218,14 @@ English and Russian are available; the choice is applied
 immediately and stored in `config_app.ini`. On the first start the language follows the system locale
 and falls back to English when the locale has no catalog.
 
+The **Interface** page also chooses whether an album or artist tile opens on a single or a double
+click.
+
+### Library
+
+**Clean up now** removes the cached covers and per-track folders left on disk by albums that are no
+longer in the library, and reports how much it freed. See [Data on disk](#data-on-disk).
+
 ## Data on disk
 
 | Path | Content |
@@ -231,9 +240,16 @@ and falls back to English when the locale has no catalog.
 | `config_app.ini` | Application settings |
 | `error_log.txt` | Uncaught exceptions |
 
-Deleting a track from the list also deletes its registry folder if it has one: a scanner-imported
-track keeps its tags in the database and only gets a registry folder once it is opened. The audio
-file itself is never touched — the app only stores its path.
+Deleting a track also deletes its registry folder if it has one, and the cached cover once no
+other track or album uses that image. Removing a whole album takes its tracks with it, and its
+artist when nothing else credits them. The audio files are never touched — the app only stores
+their paths, so a deleted track comes back by adding its file again.
+
+**Settings → Library → Clean up now** sweeps what slipped past that: covers and registry folders
+left behind by an older version or by a delete that could not remove a file, and cached copies in a
+size the app no longer uses. It runs on its own thread and reports how much it freed. It never
+touches anything the library still references, so it is safe to run at any time — but not while a
+scan is running, and it declines to start in that case.
 
 <details>
 <summary><b>Library internals</b> — importing, the Library tab, the database schema</summary>
@@ -279,9 +295,20 @@ tiles on screen and the work per repaint does not grow with the size of the libr
 loaded outside the interface thread: a tile shows whatever is already in memory and a placeholder
 otherwise, and the finished image repaints just that tile when it arrives.
 
+Every track list — the album page, the artist page, the flat track view and the recent list — can
+delete. A delete button appears at the right end of the row under the cursor, the right button opens
+a menu with play, queue, reveal and remove, and the Delete key removes the selected track. There is
+no confirmation for a single track: the file stays on disk and adding it back is a drag and drop
+away. Removing a whole album is the destructive one, so the red button on the album page and the
+Remove album entry on a tile ask first, naming the album and how many tracks go with it.
+
 Deleting the last track of an album removes the album and, if it also empties out, the artist, so
 the grid keeps no tile for an album without tracks. A database from before this rule is cleaned once
 by the schema migration.
+
+The track playing when its own row is deleted plays on to its end: the audio is already decoded and
+the file is untouched. It keeps its place in the queue as well, so the autoplay at the end still
+moves to the track that follows it.
 
 Playing an album, or a track from any list, fills a play queue: the player advances through it at
 the end of each track, and the previous and next buttons step through it. The queue button opens a
@@ -311,14 +338,14 @@ main.py                     Entry point: logging, DPI, main window
 src/
   forms/                    MainForm, the main window and the module wiring
   core/
-    library/                Folder scanner, cover cache, the Library tab and album grid
+    library/                Folder scanner, cover cache, deletion and cleanup, the Library tab
     i18n/                   Translation manager, loads and switches the catalogs
     audio/                  AudioStreamer (streaming thread), AudioPlayer (player panel)
     render/graphics_system/ OpenGL waveform panels
     qt_widgets/             Shared widgets: sliders, equalizer, title bar, overlays
     file_system/            Tag reader, track registry and the recent-track list
     settings/               Settings object and the settings pages
-    workers/                Background workers: file opening, genre prediction, library scan
+    workers/                Background workers: file opening, genre prediction, scan, cleanup
     log_system/             Logging and the profiler
     point_system/           Point helper type
   ai_module/

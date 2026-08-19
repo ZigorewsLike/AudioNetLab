@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import pyqtSlot, QEvent, QThread
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
@@ -27,6 +27,9 @@ class SettingsLibraryWidget(QWidget):
         """
         super().__init__(*args, **kwargs)
         self.mf: MainForm = mf
+        self._status: str = ""             # What the result line is showing, see _apply_status
+        self._result: Optional[MaintenanceResult] = None
+        self._error: str = ""
 
         self._thread = QThread(self)
         self._worker = MaintenanceWorker()
@@ -62,10 +65,10 @@ class SettingsLibraryWidget(QWidget):
         if self._thread.isRunning():
             return
         if self.mf.scan_thread.isRunning():
-            self.result_label.setText(self.tr("A scan is running, try again once it is done"))
+            self._set_status("scan")
             return
         self.cleanup_button.setEnabled(False)
-        self.result_label.setText(self.tr("Cleaning up…"))
+        self._set_status("busy")
         self._thread.start()
 
     @pyqtSlot(object)
@@ -77,12 +80,8 @@ class SettingsLibraryWidget(QWidget):
         """
         self._thread.quit()
         self.cleanup_button.setEnabled(True)
-        if result.bytes_freed or result.albums or result.artists:
-            self.result_label.setText(self.tr("Removed {0} covers and {1} track folders, {2} freed")
-                                      .format(result.cover_files, result.registry_folders,
-                                              self._format_size(result.bytes_freed)))
-        else:
-            self.result_label.setText(self.tr("Nothing to clean up"))
+        self._result = result
+        self._set_status("done")
         if result.albums or result.artists:
             self.mf.library_widget.reload()
 
@@ -95,7 +94,8 @@ class SettingsLibraryWidget(QWidget):
         """
         self._thread.quit()
         self.cleanup_button.setEnabled(True)
-        self.result_label.setText(self.tr("Cleanup failed: {0}").format(message))
+        self._error = message
+        self._set_status("failed")
 
     def shutdown(self) -> None:
         """Wait for a running sweep, called when the window closes.
@@ -105,6 +105,38 @@ class SettingsLibraryWidget(QWidget):
         if self._thread.isRunning():
             self._thread.quit()
             self._thread.wait(5000)
+
+    def _set_status(self, status: str) -> None:
+        """Remember what the result line is showing and draw it.
+
+        :param status: One of busy, scan, done, failed, or empty for nothing.
+        :returns: None.
+        """
+        self._status = status
+        self._apply_status()
+
+    def _apply_status(self) -> None:
+        """Write the result line in the current language.
+
+        :returns: None.
+        """
+        if self._status == "busy":
+            self.result_label.setText(self.tr("Cleaning up…"))
+        elif self._status == "scan":
+            self.result_label.setText(self.tr("A scan is running, try again once it is done"))
+        elif self._status == "failed":
+            self.result_label.setText(self.tr("Cleanup failed: {0}").format(self._error))
+        elif self._status == "done" and self._result is not None:
+            result = self._result
+            if result.bytes_freed or result.albums or result.artists:
+                self.result_label.setText(
+                    self.tr("Removed {0} covers and {1} track folders, {2} freed")
+                    .format(result.cover_files, result.registry_folders,
+                            self._format_size(result.bytes_freed)))
+            else:
+                self.result_label.setText(self.tr("Nothing to clean up"))
+        else:
+            self.result_label.setText("")
 
     @staticmethod
     def _format_size(size: int) -> str:
@@ -138,3 +170,4 @@ class SettingsLibraryWidget(QWidget):
                     "can be left over on disk. Cleaning up removes them; the library itself "
                     "and the audio files are not affected."))
         self.cleanup_button.setText(self.tr("Clean up now"))
+        self._apply_status()
