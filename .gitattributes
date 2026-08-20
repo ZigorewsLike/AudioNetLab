@@ -1,0 +1,7 @@
+# Qt Linguist catalogs. The .ts extension is also TypeScript, without this the
+# repository language stats treat the translation sources as TypeScript code.
+*.ts linguist-language=XML
+*.ts text eol=lf
+
+# Compiled catalogs are binary, git must not try to diff or merge them.
+*.qm binary

@@ -1,0 +1,1 @@
+from .AudioLyricsModule_class import AudioLyricsModule
